@@ -1,0 +1,67 @@
+{
+  "name": "padswitcher",
+  "version": "1.4.0",
+  "description": "Profile Account Directory Switcher — personal Codex profile manager for Windows",
+  "private": true,
+  "main": "src/main.cjs",
+  "author": "PADSwitcher",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "node scripts/run-electron.cjs .",
+    "test": "node --test test/*.test.cjs",
+    "check": "node scripts/check.cjs",
+    "icons": "node scripts/run-electron.cjs scripts/create-icon.cjs",
+    "preview": "node scripts/preview.cjs",
+    "smoke": "node scripts/smoke.cjs",
+    "smoke:ui": "node scripts/run-electron.cjs scripts/electron-smoke.cjs",
+    "helper": "node scripts/build-helper.cjs",
+    "smoke:gateway": "node scripts/gateway-smoke.cjs --live --inference",
+    "smoke:recovery": "node scripts/recovery-native-smoke.cjs --live",
+    "prebuild": "node scripts/build-helper.cjs",
+    "predist": "node scripts/build-helper.cjs",
+    "build": "electron-builder --win dir",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "jsdom": "30.1.1"
+  },
+  "overrides": {
+    "@electron/get": "5.1.0"
+  },
+  "build": {
+    "appId": "personal.pad.padswitcher",
+    "productName": "PADSwitcher",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "src/assets/PADCodex.exe"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true,
+      "enableEmbeddedAsarIntegrityValidation": true
+    },
+    "win": {
+      "target": "portable",
+      "icon": "src/assets/padswitcher.ico",
+      "signExecutable": false
+    },
+    "portable": {
+      "artifactName": "PADSwitcher-${version}-Windows.exe"
+    }
+  },
+  "dependencies": {
+    "jsonc-parser": "3.3.1",
+    "ws": "8.22.0"
+  }
+}

@@ -1,0 +1,10 @@
+'use strict';
+const path=require('node:path');
+const {spawnSync}=require('node:child_process');
+const fs=require('node:fs');
+const compiler=path.join(process.env.SystemRoot||'C:\\Windows','Microsoft.NET','Framework64','v4.0.30319','csc.exe');
+if(!fs.existsSync(compiler))throw Error('Windows .NET Framework 4.8 compiler is required.');
+const result=spawnSync(compiler,['/nologo','/optimize+','/target:exe','/reference:System.Web.Extensions.dll',`/win32icon:${path.resolve('src/assets/padswitcher.ico')}`,`/out:${path.resolve('src/assets/PADCodex.exe')}`,path.resolve('src/helper/PADCodex.cs')],{encoding:'utf8',windowsHide:true});
+process.stdout.write(result.stdout);process.stderr.write(result.stderr);
+if(result.status!==0)process.exit(result.status||1);
+console.log('Native PADCodex transport built.');

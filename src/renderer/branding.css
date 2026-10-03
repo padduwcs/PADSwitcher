@@ -1,0 +1,3 @@
+/* Supplied emblem is used intact, with proportions suited to a compact wordmark. */
+.brand-symbol { display: block; width: 44px; height: 44px; object-fit: contain; }
+.empty-symbol { display: block; width: 104px; height: 104px; object-fit: contain; margin: 0 auto 22px; }
