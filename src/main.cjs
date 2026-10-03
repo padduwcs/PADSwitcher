@@ -8,6 +8,13 @@ const { Gateway } = require('./core/gateway.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
 let window, service, gateway, integration, tray, timer, quitting = false, shutdown = false;
+let uiLocale='vi';
+const text=(vi,en)=>uiLocale==='en'?en:vi;
+function updateTray() {
+  if(!tray)return;
+  tray.setToolTip(text('PADSwitcher — quản lý phiên Codex','PADSwitcher — Codex account manager'));
+  tray.setContextMenu(Menu.buildFromTemplate([{label:text('Mở PADSwitcher','Open PADSwitcher'),click:()=>{if(window.isMinimized())window.restore();window.show();window.focus();}},{type:'separator'},{label:text('Thoát PADSwitcher','Quit PADSwitcher'),click:()=>app.quit()}]));
+}
 const rendererFile = path.join(__dirname,'renderer','index.html');
 const rendererUrl = pathToFileURL(rendererFile).href;
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -36,6 +43,7 @@ async function start() {
     if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== rendererUrl) return { ok:false,error:{message:'Nguồn yêu cầu không hợp lệ.',code:'INVALID_ORIGIN'} };
     try {
       if (!args || typeof args !== 'object' || Array.isArray(args)) throw new UserError('Yêu cầu không hợp lệ.', 'INVALID_REQUEST');
+      if(['vi','en'].includes(args.locale)&&uiLocale!==args.locale){uiLocale=args.locale;updateTray();}
       let result;
       switch(command) {
         case 'state': result = service.view(); break;
@@ -45,6 +53,8 @@ async function start() {
         case 'recoverLogin': result = await service.recoverLogin(); break;
         case 'refresh': result = await service.refresh(args.id); break;
         case 'refreshAll': result = await service.refreshAll(); break;
+        case 'prepareReset': result = await service.prepareReset(args.id,args.creditId ?? null); break;
+        case 'consumeReset': result = await service.consumeReset(args.id,args.key,args.confirmed); break;
         case 'switch': result = await service.switchDesktop(args.id); break;
         case 'restore': result = await service.restoreDesktop(); break;
         case 'launch': result = await service.launchCli(args.id,args.resume === true); break;
@@ -53,7 +63,7 @@ async function start() {
         case 'cancelRecovery': gateway.recovery.cancel('Đã hủy các lượt tự tiếp tục đang chờ.');gateway.changed();break;
         case 'stopGateway': await gateway.stop();service.state.gatewayEnabled=false;await service.save();break;
         case 'forceStopGateway': {
-          const answer=await dialog.showMessageBox(window,{type:'warning',buttons:['Giữ gateway','Dừng và ngắt các lượt đang chạy'],defaultId:0,cancelId:0,message:'Dừng toàn bộ gateway?',detail:'Các kết nối CLI/extension và lượt Codex đang chạy qua PADSwitcher sẽ bị ngắt. Thao tác này không đóng VS Code.'});
+          const answer=await dialog.showMessageBox(window,{type:'warning',buttons:[text('Giữ gateway','Keep connected'),text('Dừng và ngắt các lượt đang chạy','Disconnect and interrupt active turns')],defaultId:0,cancelId:0,message:text('Dừng toàn bộ gateway?','Disconnect all Codex sessions?'),detail:text('Các kết nối CLI/extension và lượt Codex đang chạy qua PADSwitcher sẽ bị ngắt. Thao tác này không đóng VS Code.','CLI/extension connections and Codex turns through PADSwitcher will be interrupted. VS Code stays open.')});
           if(answer.response===1){await gateway.stop(true);service.state.gatewayEnabled=false;await service.save();}break;
         }
         case 'configureVSCode': await integration.configure(gateway.helper);break;
@@ -80,7 +90,7 @@ async function start() {
         case 'diagnostics': result = await service.diagnostics(); break;
         case 'pick': {
           if (!['codexPath','workspace','desktopHome'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
-          const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'codexPath' ? 'Chọn codex.exe chính thức' : 'Chọn thư mục', properties: args.kind === 'codexPath' ? ['openFile'] : ['openDirectory'], ...(args.kind === 'codexPath' ? { filters:[{name:'Codex',extensions:['exe']}] } : {}) });
+          const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'codexPath' ? text('Chọn codex.exe chính thức','Choose official codex.exe') : text('Chọn thư mục','Choose folder'), properties: args.kind === 'codexPath' ? ['openFile'] : ['openDirectory'], ...(args.kind === 'codexPath' ? { filters:[{name:'Codex',extensions:['exe']}] } : {}) });
           result = selected.canceled ? null : selected.filePaths[0]; break;
         }
         case 'openData': await shell.openPath(service.root); break;
@@ -100,7 +110,7 @@ async function start() {
   tray=new Tray(path.join(__dirname,'assets','padswitcher.ico'));tray.setToolTip('PADSwitcher — quản lý phiên Codex');
   const showWindow=()=>{if(window.isMinimized())window.restore();window.show();window.focus();};
   tray.on('double-click',showWindow);
-  tray.setContextMenu(Menu.buildFromTemplate([{label:'Mở PADSwitcher',click:showWindow},{type:'separator'},{label:'Thoát PADSwitcher',click:()=>app.quit()}]));
+  updateTray();
   if(service.state.gatewayEnabled&&service.state.profiles.some(p=>p.id===service.state.gatewayProfileId)){
     await gateway.start(service.state.gatewayProfileId).catch(error=>{if(!window.isDestroyed())window.webContents.send('pad:refresh-error',publicError(error));});
   }
@@ -125,7 +135,7 @@ async function start() {
   app.on('before-quit',event => {
     if(quitting)return;
     if(service?.busy){event.preventDefault();if(service.login)service.cancelLogin();return;}
-    if(gateway.turns.size){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:'Codex còn lượt đang chạy',detail:'Chờ hoàn tất hoặc chọn Dừng gateway trong PADSwitcher trước khi thoát.'});return;}
+    if(gateway.turns.size){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:text('Codex còn lượt đang chạy','Codex has active turns'),detail:text('Chờ hoàn tất hoặc chọn Dừng gateway trong PADSwitcher trước khi thoát.','Wait for completion or disconnect Codex in PADSwitcher before quitting.')});return;}
     if(gateway.status!=='stopped'){
       event.preventDefault();if(shutdown)return;shutdown=true;
       gateway.stop().then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});

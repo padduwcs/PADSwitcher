@@ -1,12 +1,27 @@
-# PADSwitcher 1.4.0
+# PADSwitcher 1.5.0
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher — Profile Account Directory Switcher" width="128">
 
 Ứng dụng Windows quản lý tài khoản ChatGPT dùng với Codex: lưu phiên bằng DPAPI, xem quota còn lại và đổi tài khoản cho extension/CLI qua kết nối cục bộ.
 
+Mã nguồn: [padduwcs/PADSwitcher](https://github.com/padduwcs/PADSwitcher). Bản portable 1.5.0 sau khi đóng gói nằm trong `dist`; tài khoản và cấu hình cá nhân không nằm trong repository.
+
+## Giao diện và lượt reset
+
+- Nút **EN / VI** và biểu tượng mặt trăng ở góc trên đổi ngôn ngữ và sáng/tối ngay. Có thể chọn trong **Cài đặt → Giao diện**; lựa chọn được nhớ trên máy.
+- Hai thanh quota xếp trên–dưới: xanh dương cho cửa sổ ngắn, xanh ngọc cho cửa sổ dài, cam khi gần hết. Thanh vẫn hiển thị **phần còn lại**.
+- Trong chi tiết tài khoản, **Lượt reset** hiển thị số lượt do Codex cung cấp. **Xem lượt reset** mở danh sách và hạn dùng nếu có. Nếu dịch vụ chỉ trả số lượt, hiển thị số đó; không suy ra số lượt từ số dòng. `—` nghĩa là chưa có dữ liệu, khác với 0 lượt.
+- **Dùng reset** đọc lại số lượt và mở xác nhận cho tài khoản đó. Chỉ **Xác nhận dùng reset** mới tiêu thụ một lượt. Có thể dùng một dòng cụ thể hoặc để dịch vụ chọn lượt tiếp theo. Hủy hộp thoại không tiêu thụ lượt.
+- Nếu chưa rõ kết quả do lỗi mạng, dùng **Kiểm tra reset** để kiểm tra lại cùng mã yêu cầu. Mã được lưu trước khi gửi và giữ qua khởi động lại; không tự gửi lại, tự dùng reset hoặc đổi sang mã mới khi kết quả còn chưa rõ.
+- Sau reset, quota được đọc lại từ Codex. Nếu lần đọc lỗi, giao diện đánh dấu cần cập nhật; không tự giả định quota đã đầy. Reset **không tự khởi động lại lượt đã dừng**: quay lại hội thoại Codex và nhắn tiếp tục nếu cần.
+
+Tính năng dùng API chính thức `account/rateLimits/read` và `account/rateLimitResetCredit/consume`, với `idempotencyKey` và `creditId` tùy chọn. [Tài liệu Codex App Server](https://learn.chatgpt.com/docs/app-server#8-earned-rate-limit-resets-chatgpt). PADSwitcher ưu tiên Codex từ extension đang cài để đọc quota/reset. Bản Codex cũ hoặc tài khoản chưa được dịch vụ cung cấp dữ liệu sẽ không có nút dùng reset.
+
+**Chưa thử tiêu thụ reset trên tài khoản thật**, theo yêu cầu của người dùng. Các kiểm thử reset đều dùng backend và phiên giả; không xác nhận kết quả sử dụng reset thực tế hoặc điều kiện được cấp lượt cho tài khoản của bạn.
+
 ## Dùng ngay
 
-Mở **`dist/PADSwitcher-1.4.0-Windows.exe`**. Thoát PADSwitcher cũ trước khi mở bản mới; kho tài khoản, cấu hình kết nối và thứ tự tự đổi hiện có được giữ nguyên. Cần Windows 10/11 x64, .NET Framework 4.8 và Codex chính thức; không cần Node.js/npm hoặc Administrator. Gateway ưu tiên binary đi kèm extension VS Code để khớp giao thức.
+Mở **`dist/PADSwitcher-1.5.0-Windows.exe`**. Thoát PADSwitcher cũ trước khi mở bản mới; kho tài khoản, cấu hình kết nối và thứ tự tự đổi hiện có được giữ nguyên. Cần Windows 10/11 x64, .NET Framework 4.8 và Codex chính thức; không cần Node.js/npm hoặc Administrator. Gateway ưu tiên binary đi kèm extension VS Code để khớp giao thức.
 
 1. Bấm **••• → Lưu tài khoản hiện tại**, hoặc **Thêm tài khoản** qua trang OpenAI. Nếu chưa có tài khoản nào, nút lưu cũng xuất hiện giữa màn hình.
 2. Chọn tài khoản → **Dùng tài khoản này**. Chờ **Đã kết nối Codex**.

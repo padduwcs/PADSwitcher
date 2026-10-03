@@ -9,7 +9,7 @@ app.disableHardwareAcceleration();
 let timeout;
 (async () => {
   await fs.mkdir(root,{recursive:true}); app.setPath('appData',root); app.setPath('userData',path.join(root,'browser')); app.setName('PADSwitcher QA');
-  timeout = setTimeout(() => {console.error('Electron startup timed out.'); app.exit(1);},30000);
+  timeout = setTimeout(() => {console.error('Electron UI verification timed out.'); app.exit(1);},45000);
   app.once('browser-window-created',(_event,win) => {
     win.webContents.once('did-finish-load',async () => {
       try {
@@ -23,13 +23,13 @@ let timeout;
         await fs.mkdir(path.join(root,'assets/fonts'),{recursive:true});
         for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf','OFL.txt'])await fs.copyFile(path.join(__dirname,'../src/assets/fonts',file),path.join(root,'assets/fonts',file));
         for (const file of ['padswitcher-symbol.png','padswitcher-logo.png','padswitcher-emblem.png']) await fs.copyFile(path.join(__dirname,'../src/assets',file),path.join(root,'assets',file));
-        for (const file of ['index.html','styles.css','branding.css','app.js']) {
+        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','app.js']) {
           let content = await fs.readFile(path.join(__dirname,'../src/renderer',file),'utf8');
           if (file === 'index.html') content = content.replace('<script src="app.js" defer></script>','<script src="preview.js" defer></script><script src="app.js" defer></script>');
           await fs.writeFile(path.join(fixtureRoot,file),content);
         }
         await fs.writeFile(path.join(fixtureRoot,'preview.js'),require('./preview-data.cjs'));
-        const preview = new BrowserWindow({width:1260,height:900,show:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false,offscreen:true}});
+        const preview = new BrowserWindow({width:1260,height:900,show:false,webPreferences:{partition:'ui-fixture-'+Date.now(),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false,offscreen:true}});
         await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1'});
         await preview.webContents.executeJavaScript("document.fonts.ready.then(()=>{for(const weight of [400,500,600])if(!document.fonts.check(weight+' 14px \"Be Vietnam Pro\"','Tài khoản'))throw Error('Local font missing');return true;})");
         const layout = await preview.webContents.executeJavaScript("({count:document.querySelectorAll('.account-card').length,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,imagesLoaded:[...document.images].every(i=>i.complete&&i.naturalWidth>0)})");
@@ -70,9 +70,30 @@ let timeout;
         await new Promise(resolve=>setTimeout(resolve,250));
         const compactFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
         await fs.writeFile(path.join(root,'accounts-compact.png'),compactFrame);
-        preview.destroy(); console.log('Populated renderer with sample accounts and quota: passed.');
+        // Presentation checks and reset dialog below use preview.js fixtures only.
+        preview.setSize(1260,900);
+        await preview.webContents.executeJavaScript("document.querySelector('#language-select').value='vi';document.querySelector('#language-select').dispatchEvent(new Event('change'));document.querySelector('#theme-select').value='light';document.querySelector('#theme-select').dispatchEvent(new Event('change'));document.querySelectorAll('.account-card')[0].click();document.querySelector('#reset-list').open=true");
+        for(const variant of ['light-vi','dark-en']) {
+          if(variant==='dark-en')await preview.webContents.executeJavaScript("document.querySelector('#theme-toggle').click();document.querySelector('#language-toggle').click()");
+          await new Promise(resolve=>setTimeout(resolve,200));
+          const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+          await fs.writeFile(path.join(root,'accounts-'+variant+'.png'),frame);
+          const dimensions=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,stacked:[...document.querySelectorAll('.detail-quotas .quota-window')].map(el=>el.getBoundingClientRect().top),theme:document.documentElement.dataset.theme,lang:document.documentElement.lang})");
+          assert.equal(dimensions.overflow,false);assert(dimensions.stacked[1]>dimensions.stacked[0]);assert.equal(dimensions.theme,variant.startsWith('dark')?'dark':'light');assert.equal(dimensions.lang,variant.endsWith('en')?'en':'vi');
+        }
+        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('.reset-row button').click();await new Promise(r=>setTimeout(r,80));return true;})()");
+        const confirm=await preview.webContents.executeJavaScript("({open:document.querySelector('#modal').open,label:document.querySelector('#modal-submit').textContent,count:document.querySelector('.reset-heading b').textContent})");
+        assert.equal(confirm.open,true);assert.equal(confirm.label,'Confirm reset');assert.equal(confirm.count,'2');
+        await new Promise(resolve=>setTimeout(resolve,300));
+        const resetFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+        await fs.writeFile(path.join(root,'reset-confirmation-sample.png'),resetFrame);
+        await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click();document.querySelector('.nav[data-page=settings]').click()");
+        await new Promise(resolve=>setTimeout(resolve,300));
+        const settingsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+        await fs.writeFile(path.join(root,'settings-dark-en.png'),settingsFrame);
+        preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, vertical quotas, reset details and cancellation: passed.');
         clearTimeout(timeout); app.exit(0);
-      } catch { clearTimeout(timeout); console.error('Electron startup verification failed.'); app.exit(1); }
+      } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.message); app.exit(1); }
     });
   });
   require('../src/main.cjs');

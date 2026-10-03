@@ -9,11 +9,15 @@ module.exports = `
     { id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',label:'Dự án · Pro',email:'projects@example.test',plan:'pro',desktopActive:false,notes:'Dành cho dự án cá nhân và công việc dài.',status:'ready',quotaAt:new Date(now).toISOString(),quota:[{id:'codex',name:'codex',windows:[{kind:'primary',usedPercent:24,windowDurationMins:300,resetsAt:reset},{kind:'secondary',usedPercent:38,windowDurationMins:10080,resetsAt:reset+86400}]}]},
     { id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',label:'Tài khoản dự phòng',email:'backup@example.test',plan:'plus',desktopActive:false,notes:'',status:'error',lastError:'Dữ liệu mẫu: không kết nối được dịch vụ. Hãy thử cập nhật lại.',quotaAt:new Date(now-20*60000).toISOString(),quota:[{id:'codex',name:'codex',windows:[{kind:'primary',usedPercent:17,windowDurationMins:300,resetsAt:reset}]}]}
   ];
-  let state = {version:'1.4.0',profiles:new URLSearchParams(location.search).has('demo')?profiles:[],settings:{workspace:'D:\\\\Projects\\\\MyProject',desktopHome:'C:\\\\Users\\\\Personal\\\\.codex',codexPath:'',autoRefresh:false},busy:false,login:null,canRestore:false,recoveryPending:false,gateway:{status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0}};
+  profiles[0].resetCredits={availableCount:2,credits:[{id:'fixture-reset-a',resetType:'codexRateLimits',status:'available',title:'Reset',expiresAt:reset+86400},{id:'fixture-reset-b',resetType:'codexRateLimits',status:'available',title:'Reset',expiresAt:null}]};
+  profiles[1].resetCredits={availableCount:1,credits:null};
+  let state = {version:'1.5.0',profiles:new URLSearchParams(location.search).has('demo')?profiles:[],settings:{workspace:'D:\\\\Projects\\\\MyProject',desktopHome:'C:\\\\Users\\\\Personal\\\\.codex',codexPath:'',autoRefresh:false},busy:false,login:null,canRestore:false,recoveryPending:false,gateway:{status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0}};
   const publish = () => callback?.(clone(state));
   window.pad = {
     onState: cb => { callback = cb; },onDevice:cb => {deviceCallback=cb;},
     action:async (command,args={}) => {
+      if(command==='prepareReset'){const p=state.profiles.find(p=>p.id===args.id);p.resetAttempt={key:'fixture-reset-key',creditId:args.creditId,status:'prepared'};return {ok:true,result:{...p.resetAttempt,retry:false},state:clone(state)};}
+      if(command==='consumeReset'){const p=state.profiles.find(p=>p.id===args.id);if(!args.confirmed||args.key!==p.resetAttempt?.key)return {ok:false,error:{code:'RESET_STALE',message:'Xác nhận đã cũ.'},state:clone(state)};if(p.resetAttempt.status!=='completed'){p.resetCredits.availableCount--;p.resetCredits.credits=p.resetCredits.credits?.slice(1)||null;p.resetAttempt.status='completed';p.quota.forEach(b=>b.windows.forEach(w=>w.usedPercent=0));}publish();return {ok:true,result:{outcome:'reset',quotaRefreshed:true},state:clone(state)};}
       if (command==='state') return {ok:true,result:clone(state)};
       if (command==='pick') return {ok:true,result:'D:\\\\Projects\\\\ChosenProject',state:clone(state)};
       if (command==='diagnostics') return {ok:true,result:{version:'codex-cli 0.159.2 (mẫu)',codex:'C:\\\\Programs\\\\Codex\\\\codex.exe',blockers:['Code.exe'],storage:'C:\\\\Users\\\\Personal\\\\AppData\\\\Roaming\\\\PADSwitcher',loginRecovery:false},state:clone(state)};

@@ -6,7 +6,7 @@ class CodexRpc {
   constructor(executable, home, options = {}) {
     const env = { ...process.env, CODEX_HOME: home };
     for (const name of ['CODEX_SQLITE_HOME','CODEX_ACCESS_TOKEN','CODEX_API_KEY','OPENAI_API_KEY','ACCESS_TOKEN','OPENAI_IDENTITY_TOKEN_FILE','OPENAI_WORKSPACE_ID','OPENAI_FEDERATION_RULE_ID']) delete env[name];
-    this.child = (options.spawn || spawn)(executable, ['app-server', '--listen', 'stdio://', ...(options.fileStore ? ['-c', 'cli_auth_credentials_store="file"'] : [])], { env, cwd: home, stdio: ['pipe','pipe','pipe'], windowsHide: true });
+    this.child = (options.spawn || spawn)(executable, ['app-server', '--listen', 'stdio://', ...(options.ephemeralStore ? ['-c','cli_auth_credentials_store="ephemeral"'] : options.fileStore ? ['-c', 'cli_auth_credentials_store="file"'] : [])], { env, cwd: home, stdio: ['pipe','pipe','pipe'], windowsHide: true });
     this.pending = new Map(); this.listeners = new Set(); this.sequence = 0; this.closed = false;
     this.child.stderr.resume(); this.child.stdin.on('error', () => {});
     this.lines = readline.createInterface({ input: this.child.stdout });

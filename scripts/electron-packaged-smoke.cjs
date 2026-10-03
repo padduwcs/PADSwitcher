@@ -27,7 +27,7 @@ app.disableHardwareAcceleration();
       console.log('Packaged local font loading: passed.');
       const action=(command,args={})=>win.webContents.executeJavaScript('window.pad.action('+JSON.stringify(command)+','+JSON.stringify(args)+')');
       const imported=await action('import');assert(imported.ok);const started=await action('gateway',{id:imported.result});assert(started.ok);console.log('Packaged gateway startup passed.');
-      assert.equal(started.state.version,'1.4.0');assert.equal(started.state.gateway.status,'ready');
+      assert.equal(started.state.version,require('../package.json').version);assert.equal(started.state.gateway.status,'ready');
       assert.equal(started.state.gateway.recovery.enabled,false);
       const policy=await action('autoSwitchSettings',{enabled:false,order:[imported.result]});assert(policy.ok);assert.deepEqual(policy.state.autoSwitch,{enabled:false,order:[imported.result]});
       assert.equal((await action('autoSwitchSettings',{enabled:true,order:[imported.result]})).ok,false);

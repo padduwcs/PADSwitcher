@@ -17,6 +17,7 @@ function dom(t,demo = true, editState = null) {
     const action = window.pad.action;
     window.pad.action = async (...args) => { const response = await action(...args); if (args[0] === 'state') editState(response.result); return response; };
   }
+  window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/i18n.js'),'utf8'));
   window.eval(script); t.after(() => window.close()); return window;
 }
 test('renderer shows a useful empty state and disables quota refresh with no accounts',async t => {
@@ -151,4 +152,52 @@ test('quiet status hides normal explanations but exposes connection errors and b
   const blocked=dom(t,true,state=>{state.gateway.lastError='Không kết nối được.';state.gateway.recovery={message:'Công cụ chưa hoàn tất.',events:[{type:'blocked'}]};});await settle();
   assert.equal(blocked.document.querySelector('#gateway-detail').classList.contains('hidden'),false);
   assert.equal(blocked.document.querySelector('#recovery-detail').classList.contains('hidden'),false);
+});
+
+test('theme and language persist, translate all pages and keep account names intact',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('#theme-toggle').click();assert.equal(d.documentElement.dataset.theme,'dark');assert.equal(w.localStorage.getItem('pad-theme'),'dark');
+  d.querySelector('#language-toggle').click();assert.equal(d.documentElement.lang,'en');assert.equal(w.localStorage.getItem('pad-language'),'en');
+  assert.equal(d.querySelector('#accounts-page h1').textContent,'Accounts');assert(d.querySelector('.card-identity').textContent.includes('Cá nhân'));
+  assert(d.querySelector('#detail progress').getAttribute('aria-label').includes('hours: 0% remaining'));
+  assert.equal(d.querySelector('#search').placeholder,'Search accounts');
+  for(const page of ['connections','settings','help']){d.querySelector('.nav[data-page='+page+']').click();assert(!d.querySelector('#'+page+'-page').classList.contains('hidden'));}
+  assert(d.querySelector('#help-page').textContent.includes('How do earned resets work?'));
+  d.querySelector('#add-account').click();assert(d.querySelector('#modal-body').textContent.includes('official OpenAI sign-in'));assert(!d.querySelector('#modal-body').textContent.includes('Trình duyệt'));
+  d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#accounts-page h1').textContent,'Tài khoản');assert(d.querySelector('#modal-body').textContent.includes('Trình duyệt'));
+});
+
+test('language and theme selectors update immediately without saving account settings',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('#language-select').value='en';d.querySelector('#language-select').dispatchEvent(new w.Event('change'));
+  d.querySelector('#theme-select').value='dark';d.querySelector('#theme-select').dispatchEvent(new w.Event('change'));
+  assert.equal(d.documentElement.lang,'en');assert.equal(d.documentElement.dataset.theme,'dark');
+  assert.equal(d.querySelector('#language-toggle').textContent,'VI');assert.equal(d.querySelector('#theme-toggle').getAttribute('aria-pressed'),'true');
+  assert.equal(d.querySelector('#settings-form').dataset.dirty,undefined);
+});
+
+test('resets show authoritative counts, optional details and unknown separately from zero',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  assert.equal(d.querySelector('.reset-heading b').textContent,'2');assert.equal(d.querySelectorAll('.reset-row').length,2);
+  d.querySelectorAll('.account-card')[1].click();assert.equal(d.querySelector('.reset-heading b').textContent,'1');assert(d.querySelector('.reset-panel').textContent.includes('Chỉ biết số lượt'));
+  d.querySelectorAll('.account-card')[2].click();assert.equal(d.querySelector('.reset-heading b').textContent,'—');assert.equal(d.querySelector('[data-reset-credit]'),null);
+  const zero=dom(t,true,state=>state.profiles[0].resetCredits={availableCount:0,credits:[]});await settle();
+  assert.equal(zero.document.querySelector('.reset-heading b').textContent,'0');assert(zero.document.querySelector('.reset-panel').textContent.includes('Không có lượt reset'));
+});
+
+test('reset selection and cancellation never consume; explicit confirm binds the original account',async t=>{
+  const w=dom(t);await settle();const d=w.document,calls=[];const original=w.pad.action;
+  w.pad.action=async(...args)=>{calls.push(args);return original(...args);};
+  d.querySelector('.reset-row button').click();await settle();assert(d.querySelector('#modal').open);assert(d.querySelector('#modal-body').textContent.includes('Cá nhân'));
+  assert.equal(calls.filter(x=>x[0]==='consumeReset').length,0);d.querySelector('#modal-cancel').click();assert.equal(calls.filter(x=>x[0]==='consumeReset').length,0);
+  d.querySelector('.reset-row button').click();await settle();d.querySelectorAll('.account-card')[1].click();
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  const consume=calls.find(x=>x[0]==='consumeReset');assert.equal(consume[1].id,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');assert.equal(consume[1].confirmed,true);assert.equal(consume[1].key,'fixture-reset-key');
+});
+
+test('a pending reset offers the same attempt, and unsafe credit titles are escaped',async t=>{
+  const w=dom(t,true,state=>{state.profiles[0].resetCredits.credits[0].title='<img src=x onerror=alert(1)>';});await settle();const d=w.document;
+  assert.equal(d.querySelector('.reset-panel img'),null);assert(d.querySelector('.reset-panel').textContent.includes('<img'));
+  const pending=dom(t,true,state=>state.profiles[0].resetAttempt={key:'same-key',status:'pending'});await settle();
+  assert(pending.document.querySelector('[data-reset-credit]').textContent.includes('Kiểm tra reset'));assert.equal(pending.document.querySelector('.reset-row'),null);
 });

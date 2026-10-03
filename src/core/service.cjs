@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 const { UserError, publicError } = require('./errors.cjs');
 const { exists, atomicWrite, profilePath, readLimited, assertDirectory } = require('./files.cjs');
 const { parseAuth, normalizeLimits } = require('./auth.cjs');
+const { normalizeResets, availableCredit } = require('./resets.cjs');
 const windows = require('./windows.cjs');
 const { CodexRpc } = require('./rpc.cjs');
 const { SEAL_SESSION } = require('./guardian.cjs');
@@ -35,6 +36,7 @@ class ProfileService extends EventEmitter {
         profilePath(this.profilesRoot,p.id);
         if (ids.has(p.id) || !/^[a-f0-9]{64}$/.test(p.identity) || typeof p.label !== 'string') throw new UserError('Danh sách hồ sơ không hợp lệ.', 'STORE_INVALID');
         ids.add(p.id);
+        if(p.resetAttempt && (!/^[a-f0-9-]{36}$/.test(p.resetAttempt.key)||!['prepared','pending','completed'].includes(p.resetAttempt.status)||!Number.isFinite(Date.parse(p.resetAttempt.at))||(p.resetAttempt.creditId!==null&&(typeof p.resetAttempt.creditId!=='string'||!p.resetAttempt.creditId||p.resetAttempt.creditId.length>1024))||(p.resetAttempt.status==='completed'&&!['reset','alreadyRedeemed','nothingToReset','noCredit'].includes(p.resetAttempt.outcome)))) throw new UserError('Trạng thái reset không hợp lệ. Giữ nguyên dữ liệu để kiểm tra.', 'STORE_INVALID');
       }
       if (typeof parsed.settings.desktopHome !== 'string' || !path.isAbsolute(parsed.settings.desktopHome) || typeof parsed.settings.workspace !== 'string' || typeof parsed.settings.codexPath !== 'string') throw new UserError('Cài đặt đường dẫn không hợp lệ.', 'STORE_INVALID');
       this.state = { ...this.state, ...parsed, settings: { ...this.state.settings, ...parsed.settings } };
@@ -202,7 +204,7 @@ class ProfileService extends EventEmitter {
     const p = this.get(id); const current = await this.desktopIdentity();
     const desktop = current?.identity === p.identity;
     const wasRunning = this.running.has(id);
-    const executable = await this.executable();
+    const executable = await (this.platform.findGatewayCodex?.(this.state.settings.codexPath) || this.executable());
     const home = desktop ? this.state.settings.desktopHome : await this.runtime(id);
     const rpc = this.rpcFactory(executable,home,{ fileStore: !desktop });
     try {
@@ -211,7 +213,7 @@ class ProfileService extends EventEmitter {
       if (account?.account?.type !== 'chatgpt') throw new UserError('Phiên đã hết hạn hoặc chưa đăng nhập ChatGPT. Hãy đăng nhập lại hồ sơ này.', 'AUTH_INVALID');
       const result = await rpc.request('account/rateLimits/read',{});
       p.email = account.account.email || p.email; p.plan = account.account.planType || p.plan;
-      p.quota = normalizeLimits(result); p.quotaAt = new Date().toISOString(); p.status = 'ready'; p.lastError = null;
+      p.quota = normalizeLimits(result); p.resetCredits = normalizeResets(result); p.quotaAt = new Date().toISOString(); p.status = 'ready'; p.lastError = null;
       const codexWindows=p.quota.filter(b=>b.id==='codex'||b.name==='codex').flatMap(b=>b.windows||[]);
       if(codexWindows.length&&codexWindows.every(w=>w.usedPercent<100))delete this.state.quotaCooldowns[id];
       if (desktop) this.state.activeDesktopId = p.id;
@@ -222,6 +224,73 @@ class ProfileService extends EventEmitter {
       if (!desktop && !wasRunning) await this.seal(id);
       if (desktop) { const bytes = await this.desktopAuth(); if (bytes) { try { await this.storeAuth(id,bytes); } finally { bytes.fill(0); } } }
     }
+  }
+  async prepareReset(id, creditId = null) {
+    return this.exclusive(async () => {
+      const p = this.get(id);
+      if (p.resetAttempt?.status === 'pending') return {...p.resetAttempt,retry:true};
+      if (creditId !== null && (typeof creditId !== 'string' || !creditId || creditId.length > 1024)) throw new UserError('Lượt reset không hợp lệ.', 'RESET_STALE');
+      await this.refreshOne(id); // Read-only: preparation never consumes a credit.
+      if (!p.resetCredits) throw new UserError('Codex chưa cung cấp dữ liệu lượt reset. Hãy cập nhật Codex rồi làm mới.', 'RESET_UNAVAILABLE');
+      if (!p.resetCredits.availableCount) throw new UserError('Tài khoản không còn lượt reset.', 'RESET_NO_CREDIT');
+      if (creditId !== null && !availableCredit(p.resetCredits,creditId)) throw new UserError('Lượt reset đã thay đổi hoặc hết hạn. Hãy chọn lại.', 'RESET_STALE');
+      p.resetAttempt = {key:crypto.randomUUID(),creditId,status:'prepared',at:new Date().toISOString()};
+      await this.save(); return {...p.resetAttempt,retry:false};
+    });
+  }
+  async consumeReset(id, key, confirmed = false) {
+    // Authenticate the named profile, never the currently selected gateway account.
+    // External tokens stay in memory; this RPC cannot overwrite a shared login.
+    if (confirmed !== true) throw new UserError('Cần xác nhận trước khi dùng lượt reset.', 'RESET_CONFIRMATION');
+    const initial = this.get(id).resetAttempt;
+    if (typeof key !== 'string' || initial?.key !== key) throw new UserError('Xác nhận reset đã cũ. Hãy mở lại.', 'RESET_STALE');
+    if (initial.status === 'completed') return {outcome:initial.outcome,quotaRefreshed:false};
+    const bundle = await this.accessBundle(id);
+    try { return await this.exclusive(async () => {
+      const p = this.get(id), attempt = p.resetAttempt;
+      if (attempt?.key !== key) throw new UserError('Xác nhận reset đã cũ. Hãy mở lại.', 'RESET_STALE');
+      if (attempt.status === 'completed') return {outcome:attempt.outcome,quotaRefreshed:false};
+      const retry = attempt.status === 'pending';
+      if (!retry && Date.now()-Date.parse(attempt.at) > 5*60000) throw new UserError('Xác nhận reset đã hết hạn. Hãy mở lại.', 'RESET_STALE');
+      const home = await fs.mkdtemp(path.join(this.root,'reset-rpc-'));
+      let rpc;
+      try {
+        await this.platform.protectDirectory(home);
+        const executable = await (this.platform.findGatewayCodex?.(this.state.settings.codexPath) || this.executable());
+        rpc = this.rpcFactory(executable,home,{ephemeralStore:true});
+        await rpc.initialize({experimentalApi:true});
+        await rpc.request('account/login/start',{type:'chatgptAuthTokens',...bundle});
+        if (!retry) {
+          const before = normalizeResets(await rpc.request('account/rateLimits/read',{}));
+          if (!before) throw new UserError('Codex chưa cung cấp dữ liệu lượt reset.', 'RESET_UNAVAILABLE');
+          if (!before.availableCount) throw new UserError('Tài khoản không còn lượt reset.', 'RESET_NO_CREDIT');
+          if (attempt.creditId !== null && !availableCredit(before,attempt.creditId)) throw new UserError('Lượt reset đã thay đổi hoặc hết hạn.', 'RESET_STALE');
+        }
+        // Persist the key BEFORE sending. Timeout/restart retries reuse this key,
+        // including when the service already consumed the credit but the reply was lost.
+        attempt.status = 'pending'; p.resetCredits=null; await this.save(); this.changed();
+        let response;
+        try { response = await rpc.request('account/rateLimitResetCredit/consume',{idempotencyKey:key,...(attempt.creditId !== null ? {creditId:attempt.creditId} : {})}); }
+        catch { throw new UserError('Chưa xác định kết quả reset. Kiểm tra lại lần này; ứng dụng sẽ giữ nguyên mã yêu cầu để tránh dùng thêm lượt.', 'RESET_UNCERTAIN'); }
+        if (!['reset','alreadyRedeemed','nothingToReset','noCredit'].includes(response?.outcome)) throw new UserError('Chưa xác định kết quả reset. Hãy kiểm tra lại cùng lần reset.', 'RESET_UNCERTAIN');
+        Object.assign(attempt,{status:'completed',outcome:response.outcome});
+        p.quotaAt = null; await this.save();
+        let quotaRefreshed = false;
+        try {
+          const result = await rpc.request('account/rateLimits/read',{});
+          p.quota = normalizeLimits(result); p.resetCredits = normalizeResets(result); p.quotaAt = new Date().toISOString(); p.status = 'ready'; p.lastError = null;
+          const limits=p.quota.filter(b=>b.id==='codex').flatMap(b=>b.windows);
+          if(limits.length&&limits.every(w=>w.usedPercent<100))delete this.state.quotaCooldowns[id];
+          quotaRefreshed = true;
+        } catch { p.lastError='Reset đã có kết quả; cần làm mới quota.'; }
+        await this.save(); return {outcome:response.outcome,quotaRefreshed};
+      } finally {
+        try { await rpc?.close(); } finally {
+          if (path.dirname(home) !== this.root || !path.basename(home).startsWith('reset-rpc-')) throw new Error('Unsafe reset cleanup');
+          await fs.rm(home,{recursive:true,force:true});
+        }
+      }
+    }); } finally { bundle.accessToken = null; }
   }
   async addAccount(label, openUrl, device = false, expectedId = null, onDevice = () => {}) {
     return this.exclusive(async () => {

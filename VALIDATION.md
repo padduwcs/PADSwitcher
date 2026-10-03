@@ -1,4 +1,15 @@
-# Kiểm chứng PADSwitcher 1.4.0
+# Kiểm chứng PADSwitcher 1.5.0
+
+Bản gốc 1.4.0 được lưu tại commit `749cf8f2378e2953d6ed33dd5e2dfae1f6b02ee8` trên `https://github.com/padduwcs/PADSwitcher.git`. Bản 1.5.0 bổ sung các thay đổi và kiểm chứng bên dưới.
+
+## Phạm vi mới của 1.5.0
+
+- 93 bài kiểm thử: thêm 8 bài backend reset và 5 bài renderer về reset, ngôn ngữ, theme, giữ nguyên tên/ghi chú người dùng và chống chèn HTML.
+- Reset: đối chiếu tài liệu OpenAI và JSON Schema do Codex 0.160.0 đang cài sinh ra. Read nhận `rateLimitResetCredits`; consume gửi `idempotencyKey` và `creditId` nếu chọn dòng cụ thể. Số lượt từ `availableCount`, không dùng độ dài danh sách.
+- **Không gọi consume thật, không dùng lượt reset người dùng.** Backend mô phỏng kiểm tra xác nhận, hủy, sai tài khoản/mã cũ, TTL xác nhận, số dư thay đổi, phản hồi mất, cùng mã sau khởi động lại, yêu cầu lặp, các outcome và lỗi đọc quota sau khi consume đã thành công.
+- Phiên cho consume dùng external ChatGPT tokens trong bộ nhớ và kho ephemeral riêng, không đổi tài khoản gateway/phiên chung. Mã lần thử được lưu trước request. Khi chưa rõ kết quả, UI yêu cầu kiểm tra cùng lần thử; không tự retry/tiêu thụ lượt khác. Tự đổi tài khoản không gọi phần consume mới.
+- Electron fixture: kiểm tra sáng/Việt và tối/Anh, hai quota xếp dọc, danh sách reset, xác nhận và hủy. Cửa sổ 1000 × 680 có nút chọn tài khoản và vùng reset trong viewport; không tràn ngang. Native tray và hộp thoại theo ngôn ngữ UI.
+- Ảnh mới: `accounts-light-vi.png`, `accounts-dark-en.png`, `reset-confirmation-sample.png`, `settings-dark-en.png` trong `artifacts/electron-qa`, hoàn toàn dữ liệu giả.
 
 Ngày 03/10/2026; Windows x64, Node.js 24.18.1, Electron 44.5.1, .NET Framework 4.8. Binary gateway hiện tại: Codex 0.160.0 trong extension VS Code 26.930.31730-win32-x64; CLI độc lập 0.159.2 dùng cho các kiểm tra cũ. Các kết quả tài khoản/inference thật của bản 1.1.0 trước đây được ghi riêng trong bảng; bản 1.2.0 bổ sung kiểm chứng tự phục hồi bằng Codex chính thức và model fixture cục bộ.
 
@@ -7,7 +18,7 @@ Ngày 03/10/2026; Windows x64, Node.js 24.18.1, Electron 44.5.1, .NET Framework 
 | Hạng mục | Kết quả / phạm vi |
 |---|---|
 | Cú pháp | `npm run check` qua |
-| Kiểm thử tự động | **80 bài qua**, sử dụng phiên mẫu và backend mô phỏng; luồng tài khoản đầu tiên, trang Kết nối, bàn phím, giữ mục mở rộng khi cập nhật; kiểm tra thông tin thường được ẩn nhưng lỗi kết nối/trạng thái tự tiếp tục bị chặn vẫn hiển thị |
+| Kiểm thử tự động | **93 bài qua**, sử dụng phiên mẫu và backend mô phỏng; luồng tài khoản đầu tiên, trang Kết nối, bàn phím, giữ mục mở rộng khi cập nhật; kiểm tra thông tin thường được ẩn nhưng lỗi kết nối/trạng thái tự tiếp tục bị chặn vẫn hiển thị |
 | Hai tài khoản thật (đã kiểm chứng ở 1.1.0) | A → B trên cùng tiến trình gateway/App Server và cùng kết nối WebSocket; account/read đúng tài khoản, rateLimits đọc được cho cả hai |
 | Inference thật A → B (đã kiểm chứng ở 1.1.0) | Lượt A hoàn tất trước khi đổi; lượt B tiếp tục trên **cùng thread**, nhớ marker trong ngữ cảnh A; không khởi động lại backend/kết nối |
 | Tự phục hồi bằng Codex chính thức 1.2.0 | Codex gọi dynamic tool ghi marker → model fixture báo HTTP 429 usage_limit_reached → Codex phát mã usageLimitExceeded → PADSwitcher tự A → B → lượt tiếp tục hoàn tất cùng thread, nhận lịch sử kết quả công cụ. Marker chỉ ghi **một lần**; backend không tạo auth.json, hash phiên gốc không đổi |
@@ -18,18 +29,18 @@ Ngày 03/10/2026; Windows x64, Node.js 24.18.1, Electron 44.5.1, .NET Framework 
 | Windows DPAPI / ACL | Mã hóa/giải mã thật; blob không chứa dữ liệu gốc. Thử thêm quyền Everyone rồi áp lại ACL: chỉ còn người dùng hiện tại + SYSTEM, chặn kế thừa |
 | Dừng khi chủ sở hữu bị kết thúc | Windows Job Object thật; dừng tiến trình quản lý thử nghiệm khiến cả helper và Codex con thoát |
 | Bộ giám sát CLI riêng cũ | PowerShell thật mã hóa phiên mẫu và bỏ auth.json tạm |
-| Electron / renderer | Giao diện 1.4.0: khởi động thật, preload/IPC, sandbox, CSP; font local tải đủ 400/500/600; trang Tài khoản/Kết nối/Cài đặt/Hướng dẫn, trạng thái chưa có tài khoản, hộp tự đổi và ưu tiên; không tràn ngang ở 1260 × 900 và 1000 × 680; nút chọn tài khoản nằm trong viewport tối thiểu |
+| Electron / renderer | Giao diện 1.5.0: khởi động thật, preload/IPC, sandbox, CSP; font local tải đủ 400/500/600; trang Tài khoản/Kết nối/Cài đặt/Hướng dẫn, trạng thái chưa có tài khoản, hộp tự đổi và ưu tiên; không tràn ngang ở 1260 × 900 và 1000 × 680; nút chọn tài khoản nằm trong viewport tối thiểu |
 | Gói ASAR | Chạy mã đóng gói bằng Electron trong app-data thử nghiệm; khởi động gateway, copy helper đã unpack, initialize và thread/loaded/list qua stdio; đóng cửa sổ thu xuống khay, gateway vẫn hoạt động; giữ nguyên auth fixture |
 | Thành phần trong gói | gateway.cjs, ws và jsonc-parser có trong ASAR; helper có trong ASAR unpacked; không có auth.json, DPAPI vault, danh sách tài khoản hay khóa gateway thử nghiệm |
 | Electron fuses | RunAsNode, NodeOptions, Node CLI inspect tắt; OnlyLoadAppFromAsar và EmbeddedAsarIntegrity bật |
 | npm audit | **0 lỗ hổng** tại thời điểm đóng gói |
-| Portable | dist/PADSwitcher-1.4.0-Windows.exe và tệp SHA-256; Windows x64, chưa ký chứng thư |
+| Portable | dist/PADSwitcher-1.5.0-Windows.exe và tệp SHA-256; Windows x64, chưa ký chứng thư |
 
-SHA-256 bản portable nằm trong `dist/PADSwitcher-1.4.0-Windows.exe.sha256`.
+SHA-256 bản portable nằm trong `dist/PADSwitcher-1.5.0-Windows.exe.sha256`.
 
-## Thiết kế giao diện 1.4.0
+## Thiết kế giao diện 1.5.0
 
-Logo `padswitcher-emblem.png` là nguyên bản ảnh người dùng đã lọc nền; icon Windows lấy từ ảnh này ở 16–256 px. Bản 1.4.0 dùng thanh điều hướng ngang, nền sáng, bề mặt xanh nhẹ và chữ Be Vietnam Pro đóng gói local (400/500/600). Quota còn lại có số lớn, hai cửa sổ cùng hàng; các khung trạng thái, mô tả lặp, thống kê lớn và footer kỹ thuật được bỏ. Thông tin phiên bình thường thu thành một dòng; lỗi/chờ chuyển/tự tiếp tục bị chặn vẫn được hiển thị. Menu ••• chứa nhập phiên và ẩn email; Tùy chọn tài khoản chứa chỉnh sửa/đăng nhập lại/xóa/làm mới riêng/Nâng cao. Hướng dẫn kết nối được mở theo nhu cầu. Không dùng thư viện UI, CDN hoặc font service trong renderer; giấy phép font nằm trong `src/assets/fonts/OFL.txt` và nguồn ghi trong README cùng thư mục.
+Logo `padswitcher-emblem.png` giữ nguyên ảnh người dùng đã lọc nền; icon Windows lấy từ ảnh này ở 16–256 px. Bản 1.5.0 giữ thanh điều hướng ngang, thêm nền tối xanh đậm và ngôn ngữ Việt/Anh, dùng Be Vietnam Pro local (400/500/600). Hai thanh quota xếp dọc; xanh dương và xanh ngọc phân biệt hai cửa sổ, phần reset có nền cam nhẹ. Có nút đổi theme/ngôn ngữ trên thanh trên và lựa chọn trong Cài đặt. Giao diện nhớ lựa chọn; tên/ghi chú tài khoản giữ nguyên khi đổi ngôn ngữ. Thông tin thường dùng vẫn gọn, chi tiết reset và tùy chọn tài khoản mở theo nhu cầu. Không dùng thư viện UI, CDN hoặc font service; giấy phép font nằm trong `src/assets/fonts/OFL.txt`.
 
 Ảnh QA nằm trong `artifacts/electron-qa`: `startup.png`, `accounts-sample.png`, `accounts-compact.png`, `connections-sample.png`, `settings-sample.png`, `help-logo.png`, `automatic-switch-setup.png`. Nền ảnh dùng tài khoản mẫu, không chứa phiên người dùng. Phần gateway/tự phục hồi giữ triển khai 1.2.0; các kiểm chứng native quota/CLI đã ghi bên dưới thuộc lần kiểm chứng 1.2.0, không coi ảnh UI là kiểm chứng quota thật.
 
@@ -59,7 +70,7 @@ Cũng kiểm tra phiên mới nhất trong auth dùng chung, token xoay khi CLI 
 
 Các kiểm tra tài khoản thật chạy trong thư mục CODEX_HOME/app-data riêng, chỉ đọc vault thật vào bộ nhớ; không ghi token tài khoản vào đầu ra, tài liệu, ảnh mẫu hoặc gói phát hành. Kiểm tra inference sử dụng một lượng quota nhỏ. Kho tài khoản thật và cài đặt VS Code thật không bị các script QA thay thế.
 
-Ảnh nhận diện dùng nguyên bản người dùng cung cấp; icon có 7 kích thước 16–256 px. Đã trích icon từ `dist/win-unpacked/PADSwitcher.exe` và kiểm tra bằng ảnh: đúng logo mới; metadata ProductName/FileDescription là PADSwitcher, ProductVersion 1.4.0.0. Tham khảo 9router để chọn ý tưởng điều phối; bản này dùng giao thức Codex App Server chính thức, không chép tuyến gọi endpoint ChatGPT riêng hay kho token không mã hóa của repo tham khảo.
+Ảnh nhận diện dùng nguyên bản người dùng cung cấp; icon có 7 kích thước 16–256 px. Icon đã được trích và kiểm tra ở bản 1.4.0, không đổi ở 1.5.0. Metadata gói mới: ProductName/FileDescription PADSwitcher, ProductVersion 1.5.0.0. Tham khảo 9router để chọn ý tưởng điều phối; bản này dùng giao thức Codex App Server chính thức, không chép tuyến gọi endpoint ChatGPT riêng hay kho token không mã hóa của repo tham khảo.
 
 WebSocket và external ChatGPT tokens vẫn là giao thức experimental theo [OpenAI](https://learn.chatgpt.com/docs/app-server); kết quả trên áp dụng cho phiên bản/môi trường đã ghi.
 

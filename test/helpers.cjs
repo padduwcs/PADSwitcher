@@ -16,7 +16,7 @@ async function fixture(t) {
   await fs.writeFile(path.join(desktop,'history.jsonl'),'KEEP HISTORY\n');
   const key = crypto.randomBytes(32);
   const adapter = {
-    protectDirectory:async () => {}, processes:async () => [], findCodex:async () => 'fixture-codex.exe', run:async () => 'codex-cli 0.159.2',
+    protectDirectory:async () => {}, processes:async () => [], findCodex:async () => 'fixture-codex.exe', findGatewayCodex:async () => 'fixture-codex.exe', run:async () => 'codex-cli 0.159.2',
     dpapi:async (bytes,decrypt) => {
       if (decrypt) { const decipher = crypto.createDecipheriv('aes-256-gcm',key,bytes.subarray(0,12)); decipher.setAuthTag(bytes.subarray(12,28)); return Buffer.concat([decipher.update(bytes.subarray(28)),decipher.final()]); }
       const iv = crypto.randomBytes(12), cipher = crypto.createCipheriv('aes-256-gcm',key,iv); const encrypted = Buffer.concat([cipher.update(bytes),cipher.final()]); return Buffer.concat([iv,cipher.getAuthTag(),encrypted]);
