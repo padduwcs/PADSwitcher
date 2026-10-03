@@ -3,6 +3,16 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs/promises'),path=require('node:path');
 const {fixture}=require('./helpers.cjs');
 const {Integration,settingsValue}=require('../src/core/integration.cjs');
+test('connection settings status is read-only, handles external edits, missing helper and malformed config',async t=>{
+  const f=await fixture(t),file=path.join(f.directory,'settings.json'),helper=path.join(f.service.root,'gateway','PADCodex.exe');
+  await fs.mkdir(path.dirname(helper));await fs.writeFile(file,'{}');const integration=new Integration(f.service,file);
+  assert.equal((await integration.status()).configuration,'notConfigured');
+  const configured=JSON.stringify({'chatgpt.cliExecutable':helper});await fs.writeFile(file,configured);
+  assert.deepEqual(await integration.status(),{configuration:'configured',helperPresent:false});await fs.writeFile(helper,'fixture');
+  assert.deepEqual(await integration.status(),{configuration:'configured',helperPresent:true});assert.equal(await fs.readFile(file,'utf8'),configured);
+  await fs.writeFile(file,JSON.stringify({'chatgpt.cliExecutable':'another.exe'}));assert.equal((await integration.status()).configuration,'notConfigured');
+  await fs.writeFile(file,'{broken');assert.equal((await integration.status()).configuration,'unknown');
+});
 test('VS Code setup and restore preserve comments and unrelated later changes',async t=>{
   const f=await fixture(t),file=path.join(f.directory,'settings.json'),helper=path.join(f.directory,'PADCodex.exe');await fs.writeFile(helper,'fixture');
   await fs.writeFile(file,'{\n // Keep this comment\n "editor.fontSize": 14,\n "chatgpt.cliExecutable": "old.exe",\n}');

@@ -6,3 +6,4 @@ artifacts/
 auth.json
 *.dpapi
 .preview/
+src/assets/PADCodex.exe

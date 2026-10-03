@@ -13,6 +13,13 @@ function settingsValue(text){
 class Integration{
   constructor(service,file=path.join(process.env.APPDATA||'', 'Code','User','settings.json')){this.service=service;this.file=file;this.record=path.join(service.root,'vscode-integration.json');}
   async text(){await assertDirectory(path.dirname(this.file));return await exists(this.file)?(await readLimited(this.file,4*1024*1024)).toString('utf8'):'{}';}
+  async status(){
+    try {
+      const value=settingsValue(await this.text())[KEY],helper=path.join(this.service.root,'gateway','PADCodex.exe');
+      const configured=typeof value==='string'&&path.normalize(value).toLowerCase()===path.normalize(helper).toLowerCase();
+      return {configuration:configured?'configured':'notConfigured',helperPresent:configured&&await exists(helper)};
+    } catch { return {configuration:'unknown',helperPresent:false}; }
+  }
   async configure(helper){
     if(!helper||!await exists(helper))throw new UserError('Bật gateway trước khi kết nối VS Code.', 'GATEWAY_STOPPED');
     const original=await this.text();const values=settingsValue(original);

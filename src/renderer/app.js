@@ -75,6 +75,7 @@ function render() {
   document.querySelectorAll('.account-card').forEach(card => card.addEventListener('click',() => { selectedId = card.dataset.id; render(); document.querySelector('.account-card.selected')?.focus({preventScroll:true}); }));
   const p = state.profiles.find(p => p.id === selectedId); renderDetail(p);
   const g=state.gateway||{status:'stopped'};
+  renderConnectionStatus(g);
   $('#gateway-status').textContent=({stopped:'Chưa bật kết nối',starting:'Đang khởi động Codex…',ready:'Đã kết nối Codex',stopping:'Đang dừng…',error:'Kết nối cần khởi động lại'}[g.status]||g.status);
   const pending=state.profiles.find(x=>x.id===g.pendingId);
   $('#gateway-detail').textContent=g.lastError|| (g.status==='ready'?`${g.clients} kết nối · ${g.activeTurns} lượt đang chạy${pending?' · Sẽ dùng '+pending.label+' khi lượt hiện tại xong':''}`:'Chọn tài khoản bên dưới → Dùng tài khoản này.');
@@ -91,7 +92,7 @@ function render() {
   const recovery=g.recovery||{},policy=state.autoSwitch||{enabled:false,order:[]};
   $('#recovery-title').textContent='Tự đổi · '+(policy.enabled?'Bật':'Tắt');
   $('#configure-auto').setAttribute('aria-label','Thiết lập tự đổi khi hết quota: '+(policy.enabled?'đang bật':'đang tắt'));
-  $('#recovery-detail').textContent=recovery.message||(policy.enabled?`${policy.order.length} tài khoản theo thứ tự ưu tiên. Tự tiếp tục cùng hội thoại.`:state.profiles.length<2?'Thêm một tài khoản dự phòng để bật tự đổi.':'Chọn tài khoản dự phòng để công việc tiếp tục.');
+  $('#recovery-detail').textContent=recovery.message||(policy.enabled?`${policy.order.length} tài khoản theo thứ tự ưu tiên. Thử lại lần gọi bị hết quota.`:state.profiles.length<2?'Thêm một tài khoản dự phòng để bật tự đổi.':'Chọn tài khoản dự phòng để công việc tiếp tục.');
   $('.recovery-panel').classList.toggle('enabled',policy.enabled);
   const lastRecovery=recovery.events?.at(-1);
   $('#recovery-detail').classList.toggle('hidden',!(recovery.queued||recovery.active||['blocked','error','exhausted'].includes(lastRecovery?.type)));
@@ -133,6 +134,24 @@ function renderDetail(p) {
   $('#edit-profile').onclick = () => showModal('Sửa hồ sơ',`<label for="profile-label">Tên dễ nhớ</label><input id="profile-label" type="text" maxlength="80" required value="${e(p.label)}"><label for="profile-notes">Ghi chú</label><textarea id="profile-notes" maxlength="500">${e(p.notes)}</textarea>`,async () => { const label = $('#profile-label').value, notes = $('#profile-notes').value; closeModal(); await call('edit',{id:p.id,label,notes},'Đã lưu hồ sơ.'); },'Lưu thay đổi');
   $('#reauth-profile').onclick = () => accountModal(p);
   $('#remove-profile').onclick = () => showModal('Xóa khỏi danh sách?',`<p>Hồ sơ <span class="confirm-name">${e(p.label)}</span> sẽ được chuyển vào thư mục trash trên máy. Tài khoản OpenAI vẫn giữ nguyên.</p><p class="field-help">Không thể xóa hồ sơ đang dùng cho desktop hoặc đang mở CLI.</p>`,async () => { closeModal(); await call('remove',{id:p.id},'Đã chuyển hồ sơ vào trash.'); },'Xóa hồ sơ');
+}
+function renderConnectionStatus(g) {
+  const live=g.status==='ready'&&(g.connected?.vscode||0)>0,configured=state.vscode?.configuration==='configured',unknown=!state.vscode||state.vscode.configuration==='unknown';
+  const status=live?'VS Code · Đang kết nối':unknown?'VS Code · Chưa rõ cấu hình':!configured?'VS Code · Chưa thiết lập':g.status!=='ready'?'VS Code · Kết nối đã dừng':'VS Code · Chờ extension';
+  $('#vscode-status').textContent=status;
+  $('#vscode-dot').className='status-dot '+(live?'ready':configured?'waiting':'');
+  $('#vscode-pill').classList.toggle('connected',live);
+  $('#vscode-pill').title=live?'Extension đã kết nối qua PADSwitcher.':'Mở trang Kết nối để kiểm tra VS Code.';
+  $('#vscode-config').textContent=unknown?'Không đọc được cấu hình':configured?'Đã thiết lập':'Chưa thiết lập';
+  $('#vscode-config').className=configured?'status-good':'status-waiting';
+  $('#vscode-live').textContent=live?'Đang kết nối':g.status!=='ready'?'Kết nối đã dừng':'Chưa kết nối';
+  $('#vscode-live').className=live?'status-good':'status-waiting';
+  $('#vscode-next').textContent=live?'':unknown?'Kiểm tra settings.json của VS Code rồi mở lại PADSwitcher.':!configured?'Bấm Thiết lập VS Code rồi Reload Window một lần.':g.status!=='ready'?'Chọn tài khoản → Dùng tài khoản này để bật kết nối.':!state.vscode.helperPresent?'Chọn tài khoản để tạo lại cầu nối, rồi Reload Window.':'Mở extension Codex. Nếu vẫn chưa kết nối, lưu công việc rồi chạy Developer: Reload Window.';
+  $('#vscode-next').classList.toggle('hidden',live);
+  $('#vscode-config').title='Kiểm tra cài đặt User của VS Code bản thường, hồ sơ mặc định.';
+  const cli=g.status==='ready'?(g.connected?.cli||0):0;
+  $('#cli-status').textContent=cli?ui.language==='en'?`${cli} CLI connections`:`${cli} CLI đang kết nối`:'Chưa có CLI kết nối';
+  $('#cli-dot').className='status-dot '+(cli?'ready':'');
 }
 function resetPanel(p,disabled) {
   const summary=p.resetCredits, pending=p.resetAttempt?.status==='pending';
@@ -226,7 +245,7 @@ $('#open-gateway-cli').onclick=()=>call('launchGateway',{},'Đã mở Codex CLI 
 $('#configure-auto').onclick=()=>{
   const policy=state.autoSwitch||{enabled:false,order:[]},order=policy.order.length?policy.order:state.profiles.map(p=>p.id);
   const profiles=[...state.profiles].sort((a,b)=>(order.indexOf(a.id)<0?999:order.indexOf(a.id))-(order.indexOf(b.id)<0?999:order.indexOf(b.id)));
-  showModal('Tự đổi khi hết quota',`<div class="auto-switch-toggle"><label class="check-label"><input type="checkbox" id="auto-enabled" ${policy.enabled?'checked':''} ${profiles.length<2?'disabled':''}> Tự đổi và tiếp tục hội thoại</label></div><p class="auto-hint">${profiles.length<2?'Thêm ít nhất hai tài khoản để bật tính năng này.':'Chọn ít nhất hai tài khoản. Số ưu tiên nhỏ được thử trước; tài khoản hết quota sẽ được bỏ qua.'}</p><div class="auto-heading"><span>Tài khoản dự phòng</span><span>Ưu tiên</span></div><div class="auto-accounts">${profiles.map((p,i)=>`<div class="auto-row"><label class="check-label"><input type="checkbox" data-auto-id="${e(p.id)}" ${order.includes(p.id)?'checked':''}> <span data-literal>${e(p.label)}</span></label><input type="number" min="1" max="200" value="${i+1}" data-auto-priority="${e(p.id)}" aria-label="Ưu tiên ${e(p.label)}"></div>`).join('')}</div><p class="auto-hint">Dùng cho Codex đã kết nối qua PADSwitcher. Nếu không thể tiếp tục an toàn, ứng dụng sẽ dừng và báo lý do.</p>`,async()=>{
+  showModal('Tự đổi khi hết quota',`<div class="auto-switch-toggle"><label class="check-label"><input type="checkbox" id="auto-enabled" ${policy.enabled?'checked':''} ${profiles.length<2?'disabled':''}> Tự đổi tài khoản khi hết quota</label></div><p class="auto-hint">${profiles.length<2?'Thêm ít nhất hai tài khoản để bật tính năng này.':'Chọn ít nhất hai tài khoản. Số ưu tiên nhỏ được thử trước; tài khoản hết quota sẽ được bỏ qua.'}</p><p class="auto-hint">Giữ nguyên yêu cầu đang gửi, thử tài khoản dự phòng. Không thêm tin nhắn vào hội thoại.</p><div class="auto-heading"><span>Tài khoản dự phòng</span><span>Ưu tiên</span></div><div class="auto-accounts">${profiles.map((p,i)=>`<div class="auto-row"><label class="check-label"><input type="checkbox" data-auto-id="${e(p.id)}" ${order.includes(p.id)?'checked':''}> <span data-literal>${e(p.label)}</span></label><input type="number" min="1" max="200" value="${i+1}" data-auto-priority="${e(p.id)}" aria-label="Ưu tiên ${e(p.label)}"></div>`).join('')}</div><p class="auto-hint">Dùng cho Codex đã kết nối qua PADSwitcher. Không tự phát lại khi câu trả lời đã bắt đầu hoặc kết quả chưa rõ.</p>`,async()=>{
     const enabled=$('#auto-enabled').checked;
     const chosen=[...document.querySelectorAll('[data-auto-id]:checked')].map(el=>({id:el.dataset.autoId,priority:Number(document.querySelector('[data-auto-priority="'+el.dataset.autoId+'"]').value)}));
     if(chosen.some(x=>!Number.isInteger(x.priority)||x.priority<1||x.priority>200)){toast('Ưu tiên phải là số từ 1 đến 200.',true);return;}

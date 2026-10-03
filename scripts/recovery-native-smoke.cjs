@@ -50,7 +50,7 @@ async function main(){
     };
     accountA=(await service.accessBundle(a.id)).chatgptAccountId;accountB=(await service.accessBundle(b.id)).chatgptAccountId;
   }
-  const g=new Gateway(service,{backendArgs:['-c','model_provider="padswitcher_fixture"','-c','model="gpt-5.4"','-c','model_providers.padswitcher_fixture.name="PADSwitcher local QA"','-c','model_providers.padswitcher_fixture.base_url="'+base+'"','-c','model_providers.padswitcher_fixture.wire_api="responses"','-c','model_providers.padswitcher_fixture.requires_openai_auth=true','-c','model_providers.padswitcher_fixture.supports_websockets=false']});let c;
+  const g=new Gateway(service,{disableRouter:true,backendArgs:['-c','model_provider="padswitcher_fixture"','-c','model="gpt-5.4"','-c','model_providers.padswitcher_fixture.name="PADSwitcher local QA"','-c','model_providers.padswitcher_fixture.base_url="'+base+'"','-c','model_providers.padswitcher_fixture.wire_api="responses"','-c','model_providers.padswitcher_fixture.requires_openai_auth=true','-c','model_providers.padswitcher_fixture.supports_websockets=false']});let c;
   try{
     await g.start(a.id);console.log('Official Codex fixture started:',g.version);c=new WsRpc(await connect(g.url,g.frontToken));await c.initialize();let text='',failed=0,done=0;
     if(process.argv.includes('--cli-hold')){

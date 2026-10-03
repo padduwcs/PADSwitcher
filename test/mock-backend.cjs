@@ -13,7 +13,7 @@ wss.on('connection',socket=>socket.on('message',data=>{
   if(m.id==null)return;
   let result={};
   switch(m.method){
-    case 'initialize':result={userAgent:'fixture'};break;
+    case 'initialize':if(m.params?.fixtureRejectInitialize){send(socket,{id:m.id,error:{code:-1,message:'Fixture handshake rejected'}});return;}result={userAgent:'fixture'};break;
     case 'account/login/start':account=m.params;break;
     case 'account/read':result={account:{type:'chatgpt',email:account?.chatgptAccountId+'@example.test'}};break;
     case 'thread/start':result={thread:{id:'thread-fixture'}};break;

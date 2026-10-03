@@ -67,6 +67,7 @@ let timeout;
         const compactAccounts=await preview.webContents.executeJavaScript("(async()=>{document.querySelector('[data-page=accounts]').click();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,ready:document.querySelector('#gateway-status').textContent.includes('Đã kết nối'),enabled:!document.querySelector('#connect-vscode').disabled,actionVisible:document.querySelector('#use-gateway').getBoundingClientRect().bottom<=innerHeight};})()");
         assert.equal(compactAccounts.overflow,false);assert.equal(compactAccounts.ready,true);assert.equal(compactAccounts.enabled,true);
         assert.equal(compactAccounts.actionVisible,true);
+        const compactReset=await preview.webContents.executeJavaScript("document.querySelector('.reset-panel').getBoundingClientRect().bottom<=innerHeight");assert.equal(compactReset,true);
         await new Promise(resolve=>setTimeout(resolve,250));
         const compactFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
         await fs.writeFile(path.join(root,'accounts-compact.png'),compactFrame);
@@ -80,6 +81,7 @@ let timeout;
           await fs.writeFile(path.join(root,'accounts-'+variant+'.png'),frame);
           const dimensions=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,stacked:[...document.querySelectorAll('.detail-quotas .quota-window')].map(el=>el.getBoundingClientRect().top),theme:document.documentElement.dataset.theme,lang:document.documentElement.lang})");
           assert.equal(dimensions.overflow,false);assert(dimensions.stacked[1]>dimensions.stacked[0]);assert.equal(dimensions.theme,variant.startsWith('dark')?'dark':'light');assert.equal(dimensions.lang,variant.endsWith('en')?'en':'vi');
+          const client=await preview.webContents.executeJavaScript("({active:document.querySelector('#vscode-pill').classList.contains('connected'),text:document.querySelector('#vscode-status').textContent})");assert.equal(client.active,true);assert(client.text.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
         }
         await preview.webContents.executeJavaScript("(async()=>{document.querySelector('.reset-row button').click();await new Promise(r=>setTimeout(r,80));return true;})()");
         const confirm=await preview.webContents.executeJavaScript("({open:document.querySelector('#modal').open,label:document.querySelector('#modal-submit').textContent,count:document.querySelector('.reset-heading b').textContent})");
@@ -91,6 +93,16 @@ let timeout;
         await new Promise(resolve=>setTimeout(resolve,300));
         const settingsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
         await fs.writeFile(path.join(root,'settings-dark-en.png'),settingsFrame);
+        // Compare both backgrounds with the same selected account and layout.
+        await preview.webContents.executeJavaScript("document.querySelector('.nav[data-page=accounts]').click();document.querySelectorAll('.account-card')[1].click()");
+        for(const variant of ['dark','light']){
+          if(variant==='light')await preview.webContents.executeJavaScript("document.querySelector('#theme-toggle').click();document.querySelector('#language-toggle').click()");
+          await new Promise(resolve=>setTimeout(resolve,200));
+          const backgroundFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+          await fs.writeFile(path.join(root,'background-'+variant+'.png'),backgroundFrame);
+          const background=await preview.webContents.executeJavaScript("({paint:getComputedStyle(document.body).backgroundImage,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})");
+          assert(background.paint.includes('linear-gradient'));assert.equal(background.overflow,false);
+        }
         preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, vertical quotas, reset details and cancellation: passed.');
         clearTimeout(timeout); app.exit(0);
       } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.message); app.exit(1); }

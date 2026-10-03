@@ -1,13 +1,15 @@
 {
   "name": "padswitcher",
-  "version": "1.5.0",
+  "version": "1.7.0",
   "description": "Profile Account Directory Switcher — personal Codex profile manager for Windows",
   "private": true,
   "main": "src/main.cjs",
-  "author": "PADSwitcher",
-  "license": "UNLICENSED",
+  "author": "Anh-Duc Phan",
+  "license": "MIT",
   "scripts": {
+    "prestart": "node scripts/build-helper.cjs",
     "start": "node scripts/run-electron.cjs .",
+    "pretest": "node scripts/build-helper.cjs",
     "test": "node --test test/*.test.cjs",
     "check": "node scripts/check.cjs",
     "icons": "node scripts/run-electron.cjs scripts/create-icon.cjs",
@@ -38,7 +40,9 @@
     },
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md"
     ],
     "asar": true,
     "asarUnpack": [

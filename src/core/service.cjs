@@ -61,6 +61,7 @@ class ProfileService extends EventEmitter {
       autoSwitch:{...this.state.autoSwitch,order:[...this.state.autoSwitch.order]},
       canRestore: Boolean(this.state.rollback), recoveryPending: this.recoveryPending || false,
       gateway: this.gateway?.view() || {status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0},
+      vscode: this.vscode || {configuration:'unknown',helperPresent:false},
     };
   }
   changed() { this.emit('change',this.view()); }
@@ -124,7 +125,7 @@ class ProfileService extends EventEmitter {
       finally { bytes.fill(0); }
     });
   }
-  async executable() { return this.platform.findCodex(this.state.settings.codexPath); }
+  async executable() { return this.platform.findGatewayCodex ? this.platform.findGatewayCodex(this.state.settings.codexPath) : this.platform.findCodex(this.state.settings.codexPath); }
   async accessBundle(id, force = false) {
     return this.exclusive(async () => {
       const p=this.get(id), desktop=(await this.desktopIdentity())?.identity===p.identity;
@@ -144,7 +145,11 @@ class ProfileService extends EventEmitter {
         }
         const accountId=data.tokens.account_id||JSON.parse(Buffer.from(data.tokens.id_token.split('.')[1],'base64url'))['https://api.openai.com/auth']?.chatgpt_account_id;
         if(!accountId)throw new UserError('Phiên thiếu mã tài khoản ChatGPT.', 'AUTH_INVALID');
-        return {accessToken:data.tokens.access_token,chatgptAccountId:accountId,chatgptPlanType:p.plan||null};
+        const tokenPlan=parseAuth(bytes).plan,personal=plan=>['free','plus','pro'].includes(String(plan||'').toLowerCase());
+        // Either source indicating a managed plan must keep it out of the
+        // personal model route, including during a plan/token transition.
+        const plan=tokenPlan&&!personal(tokenPlan)?tokenPlan:p.plan||tokenPlan||null;
+        return {accessToken:data.tokens.access_token,chatgptAccountId:accountId,chatgptPlanType:plan};
       } finally {bytes?.fill(0);}
     });
   }
@@ -294,7 +299,7 @@ class ProfileService extends EventEmitter {
   }
   async addAccount(label, openUrl, device = false, expectedId = null, onDevice = () => {}) {
     return this.exclusive(async () => {
-      if(expectedId&&(this.gateway?.profileId===expectedId||this.gateway?.pendingId===expectedId))throw new UserError('Dừng gateway hoặc chọn tài khoản khác trước khi đăng nhập lại hồ sơ này.', 'PROFILE_ACTIVE');
+      if(expectedId&&(this.gateway?.profileId===expectedId||this.gateway?.pendingId===expectedId||this.gateway?.router?.isUsing(expectedId)))throw new UserError('Dừng gateway hoặc chọn tài khoản khác trước khi đăng nhập lại hồ sơ này.', 'PROFILE_ACTIVE');
       if (expectedId && this.running.has(expectedId)) throw new UserError('Hãy đóng CLI của hồ sơ trước khi đăng nhập lại.', 'PROFILE_RUNNING');
       if (expectedId && (await this.desktopIdentity())?.identity === this.get(expectedId).identity) throw new UserError('Hồ sơ này đang dùng cho desktop. Chuyển desktop sang tài khoản khác trước khi đăng nhập lại; hoặc đăng nhập lại trong Codex rồi bấm Lưu tài khoản hiện tại.', 'PROFILE_ACTIVE');
       const loginRoot = path.join(this.root,'login'); await fs.mkdir(loginRoot,{ recursive:true }); await assertDirectory(loginRoot);
@@ -480,7 +485,7 @@ class ProfileService extends EventEmitter {
   async remove(id) {
     return this.exclusive(async () => {
       const p = this.get(id); await this.checkRecovered();
-      if(this.gateway?.profileId===id||this.gateway?.pendingId===id)throw new UserError('Hãy chọn tài khoản khác trong gateway trước khi xóa.', 'PROFILE_ACTIVE');
+      if(this.gateway?.profileId===id||this.gateway?.pendingId===id||this.gateway?.router?.isUsing(id))throw new UserError('Hãy chọn tài khoản khác trong gateway trước khi xóa.', 'PROFILE_ACTIVE');
       if (this.running.has(id)) throw new UserError('Hãy đóng CLI trước khi xóa hồ sơ.', 'PROFILE_RUNNING');
       if (this.state.activeDesktopId === id || (await this.desktopIdentity())?.identity === p.identity) throw new UserError('Đây là tài khoản desktop hiện tại. Hãy chuyển sang hồ sơ khác trước khi xóa khỏi danh sách.', 'PROFILE_ACTIVE');
       const home = this.home(id); await assertDirectory(home); await this.seal(id);

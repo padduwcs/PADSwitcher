@@ -8,12 +8,30 @@ const WebSocket=require('ws');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function ready(t){
   const cleanup=[];const f=await fixture({after:fn=>cleanup.push(fn)}),a=await f.service.capture(auth('a')),b=await f.service.capture(auth('b'));
-  const g=new Gateway(f.service,{executable:'fixture-codex.exe',spawn:(_exe,args,opts)=>spawn(process.execPath,[path.join(__dirname,'mock-backend.cjs'),...args],opts)});
+  const g=new Gateway(f.service,{disableRouter:true,executable:'fixture-codex.exe',spawn:(_exe,args,opts)=>spawn(process.execPath,[path.join(__dirname,'mock-backend.cjs'),...args],opts)});
   let c;t.after(async()=>{c?.close();await g.stop(true);for(const fn of cleanup)await fn();});await g.start(a.id);
   c=new WsRpc(await connect(g.url,g.frontToken));await c.initialize();
   return {...f,g,c,a,b};
 }
 async function until(condition){for(let i=0;i<100&&!condition();i++)await pause(20);assert(condition());}
+test('client indicators require a successful initialize and initialized notification; disconnect removes them',async t=>{
+  const {g}=await ready(t),extension=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>extension.close());
+  assert.equal(g.view().connected.vscode,0);
+  await extension.request('initialize',{clientInfo:{name:'codex_vscode',title:'Codex Extension'}});
+  assert.equal(g.view().connected.vscode,0);
+  extension.send({method:'initialized',params:{}});await until(()=>g.view().connected.vscode===1);
+  const cli=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>cli.close());
+  await cli.request('initialize',{clientInfo:{name:'codex_cli_rs'}});cli.send({method:'initialized',params:{}});await until(()=>g.view().connected.cli===1);
+  assert.equal(g.view().connected.vscode,1);extension.close();await until(()=>g.view().connected.vscode===0);assert.equal(g.view().connected.cli,1);
+  assert(!JSON.stringify(g.view()).includes('Codex Extension'));
+});
+test('a rejected handshake, unknown client and CLI never appear as a connected extension',async t=>{
+  const {g}=await ready(t),rejected=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>rejected.close());
+  await assert.rejects(rejected.request('initialize',{clientInfo:{name:'codex_vscode'},fixtureRejectInitialize:true}));
+  rejected.send({method:'initialized',params:{}});await pause(20);assert.equal(g.view().connected.vscode,0);
+  const unknown=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>unknown.close());await unknown.initialize();await until(()=>g.view().connected.other>=1);
+  assert.equal(g.view().connected.vscode,0);
+});
 test('gateway changes memory authentication across connected clients without writing shared auth',async t=>{
   const {g,c,a,b,desktop}=await ready(t);const d=new WsRpc(await connect(g.url,g.frontToken));await d.initialize();t.after(()=>d.close());
   assert.equal((await c.request('account/read')).account.email,'fixture-account-a@example.test');

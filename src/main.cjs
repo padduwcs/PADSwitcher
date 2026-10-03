@@ -7,7 +7,7 @@ const { createQuotaRefresher } = require('./core/quota-refresh.cjs');
 const { Gateway } = require('./core/gateway.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
-let window, service, gateway, integration, tray, timer, quitting = false, shutdown = false;
+let window, service, gateway, integration, tray, timer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
 let uiLocale='vi';
 const text=(vi,en)=>uiLocale==='en'?en:vi;
 function updateTray() {
@@ -31,6 +31,8 @@ async function start() {
   service = new ProfileService(path.join(app.getPath('appData'),'PADSwitcher','data'));
   await service.init();
   gateway=new Gateway(service);integration=new Integration(service);
+  const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const next=await integration.status();if(JSON.stringify(service.vscode)!==JSON.stringify(next)){service.vscode=next;service.changed();}})().finally(()=>{integrationFlight=null;}));
+  await checkIntegration();
   window = new BrowserWindow({ width: 1260, height: 840, minWidth: 1000, minHeight: 680, title: 'PADSwitcher', icon:path.join(__dirname,'assets','padswitcher.ico'), backgroundColor:'#F6F8FB', autoHideMenuBar:true, show:false, webPreferences: { preload:path.join(__dirname,'preload.cjs'), nodeIntegration:false, contextIsolation:true, sandbox:true, webSecurity:true, devTools:!app.isPackaged } });
   window.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
   window.webContents.on('will-navigate',(event,url) => { if (url !== rendererUrl) event.preventDefault(); });
@@ -66,8 +68,8 @@ async function start() {
           const answer=await dialog.showMessageBox(window,{type:'warning',buttons:[text('Giữ gateway','Keep connected'),text('Dừng và ngắt các lượt đang chạy','Disconnect and interrupt active turns')],defaultId:0,cancelId:0,message:text('Dừng toàn bộ gateway?','Disconnect all Codex sessions?'),detail:text('Các kết nối CLI/extension và lượt Codex đang chạy qua PADSwitcher sẽ bị ngắt. Thao tác này không đóng VS Code.','CLI/extension connections and Codex turns through PADSwitcher will be interrupted. VS Code stays open.')});
           if(answer.response===1){await gateway.stop(true);service.state.gatewayEnabled=false;await service.save();}break;
         }
-        case 'configureVSCode': await integration.configure(gateway.helper);break;
-        case 'restoreVSCode': await integration.restore();break;
+        case 'configureVSCode': await integration.configure(gateway.helper);await checkIntegration();break;
+        case 'restoreVSCode': await integration.restore();await checkIntegration();break;
         case 'copyCLI': {
           if(gateway.status!=='ready')throw new UserError('Bật gateway trước.', 'GATEWAY_STOPPED');
           clipboard.writeText('& "'+gateway.helper.replace(/"/g,'""')+'"');break;
@@ -120,6 +122,8 @@ async function start() {
   }); };
   refresh('startup');
   window.on('focus',() => refresh('focus'));
+  window.on('focus',()=>checkIntegration());
+  integrationTimer=setInterval(()=>checkIntegration(),3000);
   timer = setInterval(() => refresh('periodic'), 5 * 60 * 1000);
   window.on('close',event => {
     if (quitting) return;
@@ -131,7 +135,7 @@ async function start() {
     }
     if (service.login) { event.preventDefault(); service.cancelLogin(); const wait = setInterval(() => { if (!service.busy) { clearInterval(wait); quitting = true; window.close(); } },100); }
   });
-  app.on('window-all-closed',() => { clearInterval(timer); app.quit(); });
+  app.on('window-all-closed',() => { clearInterval(timer); clearInterval(integrationTimer); app.quit(); });
   app.on('before-quit',event => {
     if(quitting)return;
     if(service?.busy){event.preventDefault();if(service.login)service.cancelLogin();return;}

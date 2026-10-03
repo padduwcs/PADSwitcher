@@ -201,3 +201,18 @@ test('a pending reset offers the same attempt, and unsafe credit titles are esca
   const pending=dom(t,true,state=>state.profiles[0].resetAttempt={key:'same-key',status:'pending'});await settle();
   assert(pending.document.querySelector('[data-reset-credit]').textContent.includes('Kiểm tra reset'));assert.equal(pending.document.querySelector('.reset-row'),null);
 });
+test('VS Code distinguishes setup from a live extension and a ready gateway or CLI is insufficient',async t=>{
+  const cases=[
+    [{configuration:'notConfigured'},'ready',{cli:1},'Chưa thiết lập'],
+    [{configuration:'configured',helperPresent:true},'ready',{cli:2},'Chờ extension'],
+    [{configuration:'configured',helperPresent:true},'stopped',{vscode:1},'Kết nối đã dừng'],
+    [{configuration:'unknown'},'ready',{},'Chưa rõ cấu hình'],
+    [{configuration:'configured',helperPresent:true},'ready',{vscode:1},'Đang kết nối']
+  ];
+  for(const [vscode,status,connected,expected] of cases){const w=dom(t,true,state=>{state.vscode=vscode;state.gateway={...state.gateway,status,connected};});await settle();const d=w.document;assert(d.querySelector('#vscode-status').textContent.includes(expected));assert.equal(d.querySelector('#vscode-pill').classList.contains('connected'),expected==='Đang kết nối');}
+});
+test('connection indicators explain the next step, translate and offer a shortcut',async t=>{
+  const w=dom(t,true,state=>{state.vscode={configuration:'configured',helperPresent:true};state.gateway={...state.gateway,status:'ready',connected:{vscode:0,cli:1}};});await settle();const d=w.document;
+  assert(d.querySelector('#vscode-next').textContent.includes('Reload Window'));d.querySelector('#vscode-pill').click();assert(!d.querySelector('#connections-page').classList.contains('hidden'));
+  d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#vscode-status').textContent,'VS Code · Waiting for extension');assert.equal(d.querySelector('#vscode-config').textContent,'Configured');assert.equal(d.querySelector('#cli-status').textContent,'1 CLI connections');
+});

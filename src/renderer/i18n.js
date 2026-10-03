@@ -5,6 +5,21 @@ window.padUI = (() => {
   let theme = localStorage.getItem('pad-theme') || 'light';
   if (!['light','dark'].includes(theme)) theme = 'light';
   const dictionary = {
+    'Bộ định tuyến hiện hỗ trợ tài khoản cá nhân Free, Plus và Pro. Tài khoản tổ chức cần luồng kết nối riêng.':'The router supports personal Free, Plus and Pro accounts. Organization accounts require a separate connection flow.',
+    'Bỏ qua tài khoản dự phòng chưa xác định là tài khoản cá nhân.':'Skipped a backup account without a confirmed personal plan.',
+    'Tự đổi chỉ hỗ trợ tài khoản cá nhân Free, Plus và Pro đã xác định.':'Auto-switch supports identified personal Free, Plus and Pro accounts only.',
+    'Bật “Tự đổi khi hết quota”, chọn ít nhất hai tài khoản và đặt ưu tiên. Lần gọi model bị từ chối vì hết quota sẽ được thử lại bằng tài khoản dự phòng, giữ nguyên ngữ cảnh và kết quả công cụ. Không thêm tin nhắn “tiếp tục”; Codex vẫn giữ quyền phê duyệt thao tác.':'Enable auto-switch, select at least two accounts and set their priorities. A model request rejected for exhausted usage is retried with a backup account and the same context and tool results. No continuation message is added; Codex still controls approvals.',
+    'Nếu câu trả lời đã bắt đầu, kết quả chưa rõ hoặc hết tài khoản dự phòng, ứng dụng không tự phát lại. Kiểm tra hội thoại rồi tiếp tục thủ công nếu cần. Dùng nút dừng/Esc trong Codex để ngắt lượt đang chạy.':'No automatic replay after output begins, when the result is uncertain, or when no backup account is available. Check the conversation and continue manually if needed. Stop an active turn in Codex.',
+    'Cần Codex 0.160.0 trở lên. Bộ định tuyến dùng provider OpenAI gốc, nối model qua HTTP Responses; các yêu cầu dùng tham chiếu riêng của tài khoản không tự đổi. Background/realtime và cloud jobs không hỗ trợ. Cập nhật Codex có thể cần kiểm tra lại tương thích.':'Requires Codex 0.160.0 or later. The router uses the built-in OpenAI provider over HTTP Responses. Account-specific references are not rotated. Background/realtime and cloud jobs are unsupported. Codex updates may require compatibility checks.',
+    'Cần Codex 0.160.0 trở lên cho bộ định tuyến model. Cập nhật extension Codex rồi thử lại.':'The model router requires Codex 0.160.0 or later. Update the Codex extension and try again.',
+    'Tự đổi khi hết quota':'Auto-switch on usage limit','Tự đổi tài khoản khi hết quota':'Switch accounts on usage limit',
+    'Giữ nguyên yêu cầu đang gửi, thử tài khoản dự phòng. Không thêm tin nhắn vào hội thoại.':'Retry the same request with a backup account. No extra conversation message.',
+    'Dùng cho Codex đã kết nối qua PADSwitcher. Không tự phát lại khi câu trả lời đã bắt đầu hoặc kết quả chưa rõ.':'For Codex connected through PADSwitcher. No automatic replay after output begins or when the result is uncertain.',
+    'Đã đổi tài khoản và thử lại lần gọi model; không thêm tin nhắn.':'Account switched; retried the model request without an extra message.',
+    'Hết quota: đang thử tài khoản dự phòng cho cùng lần gọi model.':'Usage limit reached: retrying the same model request with a backup account.',
+    'Không còn tài khoản dự phòng khả dụng.':'No available backup account.',
+    'Yêu cầu dùng trạng thái riêng của tài khoản; không tự phát lại.':'Request uses account-specific state; automatic replay was skipped.',
+    'Lần gọi model bị lỗi kết nối; không tự phát lại.':'Model connection failed; automatic replay was skipped.',
     'Tài khoản':'Accounts','Kết nối':'Connections','Cài đặt':'Settings','Hướng dẫn':'Help',
     'tài khoản':'accounts','còn quota':'with quota','Thêm tài khoản':'Add account','Tùy chọn tài khoản':'Account options','Lưu tài khoản hiện tại':'Save current account','Ẩn email':'Hide emails','Hiện email':'Show emails',
     'Tìm tài khoản':'Search accounts','Tìm tên hoặc email tài khoản':'Search by name or email','Cập nhật quota':'Refresh usage','Làm mới':'Refresh',
@@ -49,6 +64,10 @@ window.padUI = (() => {
     'Lần đổi phiên trước chưa hoàn tất. Mở Cài đặt → Khôi phục & dữ liệu để kiểm tra.':'The previous session switch did not finish. Open Settings → Recovery & data to check.'
   };
   Object.assign(dictionary,{
+    'VS Code · Đang kiểm tra':'VS Code · Checking','VS Code · Đang kết nối':'VS Code · Connected','VS Code · Chưa rõ cấu hình':'VS Code · Configuration unknown','VS Code · Chưa thiết lập':'VS Code · Setup needed','VS Code · Kết nối đã dừng':'VS Code · Connection stopped','VS Code · Chờ extension':'VS Code · Waiting for extension',
+    'Cấu hình VS Code':'VS Code configuration','Extension':'Extension','Đã thiết lập':'Configured','Chưa thiết lập':'Not configured','Chưa kết nối':'Not connected','Kết nối đã dừng':'Connection stopped','Đang kiểm tra':'Checking','Không đọc được cấu hình':'Configuration unavailable',
+    'Extension đã kết nối qua PADSwitcher.':'The extension is connected through PADSwitcher.','Mở trang Kết nối để kiểm tra VS Code.':'Open Connections to check VS Code.','Kiểm tra settings.json của VS Code rồi mở lại PADSwitcher.':'Check VS Code settings.json, then reopen PADSwitcher.','Bấm Thiết lập VS Code rồi Reload Window một lần.':'Select Set up VS Code, then Reload Window once.','Chọn tài khoản → Dùng tài khoản này để bật kết nối.':'Select an account → Use this account to connect.','Chọn tài khoản để tạo lại cầu nối, rồi Reload Window.':'Select an account to restore the bridge, then Reload Window.','Mở extension Codex. Nếu vẫn chưa kết nối, lưu công việc rồi chạy Developer: Reload Window.':'Open the Codex extension. If it does not connect, save your work and run Developer: Reload Window.',
+    'Kiểm tra cài đặt User của VS Code bản thường, hồ sơ mặc định.':'Checks User settings in regular VS Code with the default profile.','Chưa có CLI kết nối':'No CLI connected',
     'Bạn đã thao tác trên hội thoại; tự tiếp tục đã được hủy.':'You changed this conversation; automatic continuation was cancelled.',
     'Không lưu được thời gian chờ quota.':'Could not save the usage cooldown.',
     'Có quá nhiều hội thoại chờ; hãy tiếp tục thủ công.':'Too many queued conversations; continue manually.',
@@ -97,7 +116,7 @@ window.padUI = (() => {
     [/^Cập nhật (\d+) phút trước$/, 'Updated $1 minutes ago'],[/^Cập nhật (\d+) giờ trước$/, 'Updated $1 hours ago'],[/^Cập nhật (\d+) ngày trước$/, 'Updated $1 days ago'],
     [/^Đặt lại (.+)$/, 'Resets $1'],[/^Hết hạn (.+)$/, 'Expires $1'],[/^(\d+) lượt$/, '$1 available'],[/^(\d+) kết nối · (\d+) lượt đang chạy(.*)$/, '$1 connections · $2 active turns$3'],
     [/^ · Sẽ dùng (.+) khi lượt hiện tại xong$/, ' · Switching to $1 after the current turn'],
-    [/^(\d+) tài khoản theo thứ tự ưu tiên. Tự tiếp tục cùng hội thoại.$/, '$1 accounts in priority order. Continues in the same conversation.'],
+    [/^(\d+) tài khoản theo thứ tự ưu tiên. Thử lại lần gọi bị hết quota.$/, '$1 accounts in priority order. Retries quota-rejected requests.'],
     [/^(\d+)\/(\d+) hồ sơ có dữ liệu mới$/, '$1/$2 accounts with fresh data'],[/^Cập nhật gần nhất (.+)$/, 'Last refreshed $1'],[/^Đang dùng (.+)\.$/, 'Now using $1.'],[/^Đang dùng (.+). Chọn cách bạn dùng Codex bên dưới.$/, 'Using $1. Choose your Codex setup below.'],
     [/^Thiết lập tự đổi khi hết quota: đang bật$/, 'Usage auto-switch settings: enabled'],[/^Thiết lập tự đổi khi hết quota: đang tắt$/, 'Usage auto-switch settings: disabled'],[/^Ưu tiên (.+)$/, 'Priority for $1'],[/^(.+): (\d+)% còn lại$/, '$1: $2% remaining'],[/^: (\d+)% đã dùng$/, ': $1% used'],[/^(\d+)% đã dùng$/, '$1% used'],
     [/^Mã thiết bị: (.+) · Nhập mã trên trang OpenAI vừa mở.$/, 'Device code: $1 · Enter it on the OpenAI page.']

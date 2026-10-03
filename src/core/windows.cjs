@@ -39,9 +39,17 @@ function blockers(list, ownPids = []) {
   return list.filter(p => !own.has(p.ProcessId) && /^(codex(?:[-_].*)?|chatgpt|code|code-insiders|cursor|windsurf)\.exe$/i.test(p.Name));
 }
 async function findCodex(custom) {
+  const searchPath=(process.env.PATH||'').split(path.delimiter).map(p=>p.replace(/^"|"$/g,'')).filter(Boolean);
+  const vendors=['bin','codex'].map(folder=>path.join('vendor','x86_64-pc-windows-msvc',folder,'codex.exe'));
+  const npmRoots=[...searchPath,path.join(process.env.APPDATA||'','npm')];
   const candidates = custom ? [custom] : [
     path.join(process.env.LOCALAPPDATA || '', 'Programs', 'OpenAI', 'Codex', 'bin', 'codex.exe'),
-    ...(process.env.PATH || '').split(path.delimiter).map(p => path.join(p, 'codex.exe'))
+    ...searchPath.map(p => path.join(p, 'codex.exe')),
+    ...npmRoots.flatMap(p=>vendors.flatMap(vendor=>[
+      path.join(p,'node_modules','@openai','codex','node_modules','@openai','codex-win32-x64',vendor),
+      path.join(p,'node_modules','@openai','codex-win32-x64',vendor),
+      path.join(p,'node_modules','@openai','codex',vendor)
+    ]))
   ];
   for (const candidate of candidates) { try { if ((await fs.stat(candidate)).isFile() && path.basename(candidate).toLowerCase() === 'codex.exe') return path.resolve(candidate); } catch {} }
   throw new UserError('Chưa tìm thấy Codex CLI. Chọn codex.exe trong Cài đặt hoặc cài Codex chính thức.', 'CODEX_MISSING');

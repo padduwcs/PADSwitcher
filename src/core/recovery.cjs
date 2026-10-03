@@ -32,6 +32,9 @@ class Recovery {
   }
   cancelThread(id){if(this.active?.threadId===id||this.queue.some(j=>j.threadId===id))this.cancel('Bạn đã thao tác trên hội thoại; tự tiếp tục đã được hủy.');}
   complete(t,turn){
+    // The Responses router retries within the original turn. Do not append a
+    // continuation if the relay exhausted its candidates or a stream broke.
+    if(this.g.router)return;
     if(!this.policy.enabled||turn.status!=='failed'||!quotaError(turn.error||t.lastError)||t.method!=='turn/start'||!t.startParams||!t.client||t.auxiliary||t.noAutoRecovery)return;
     if(!t.threadId||!turn.id||t.disconnected||t.client.front.readyState!==1||t.client.back?.readyState!==1)return;
     const attempted=new Set(t.attempted||[]);attempted.add(t.profileId);

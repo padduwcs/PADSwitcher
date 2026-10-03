@@ -9,6 +9,15 @@ const { profilePath,exists,atomicWrite } = require('../src/core/files.cjs');
 const { publicError } = require('../src/core/errors.cjs');
 const { blockers } = require('../src/core/windows.cjs');
 
+test('account login and refresh can use an extension-only installation and preserve the explicit path',async t=>{
+  const f=await fixture(t);let received;
+  f.service.platform.findCodex=async()=>{throw Error('No standalone CLI installed');};
+  f.service.platform.findGatewayCodex=async custom=>{received=custom;return custom||'extension-codex.exe';};
+  assert.equal(await f.service.executable(),'extension-codex.exe');
+  f.service.state.settings.codexPath='chosen-codex.exe';
+  assert.equal(await f.service.executable(),'chosen-codex.exe');assert.equal(received,'chosen-codex.exe');
+});
+
 test('gateway credentials use the latest shared login without replacing it',async t=>{
   const f=await fixture(t),p=await f.service.capture(auth('a'));
   const data=JSON.parse(auth('a').toString());data.tokens.access_token=jwt({sub:'fixture-user-a',revision:'new'});

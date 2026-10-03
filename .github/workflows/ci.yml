@@ -1,0 +1,42 @@
+name: Windows checks and portable build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install Codex for isolated protocol checks
+        run: npm install --global @openai/codex@0.160.0
+      - run: npm run check
+      - run: npm test
+      - run: npm run smoke
+      - run: npm run smoke:ui
+      - run: npm run dist
+      - run: node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
+      - name: SHA-256
+        shell: pwsh
+        run: |
+          $releaseFile = Get-ChildItem -LiteralPath dist -Filter 'PADSwitcher-*-Windows.exe' | Select-Object -First 1
+          $releaseHash = (Get-FileHash -LiteralPath $releaseFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          [IO.File]::WriteAllText("$($releaseFile.FullName).sha256", "$releaseHash  $($releaseFile.Name)`n", [Text.UTF8Encoding]::new($false))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PADSwitcher-Windows
+          path: |
+            dist/PADSwitcher-*-Windows.exe
+            dist/PADSwitcher-*-Windows.exe.sha256
+          if-no-files-found: error
