@@ -1,6 +1,6 @@
 {
   "name": "padswitcher",
-  "version": "1.7.0",
+  "version": "1.9.0",
   "description": "Profile Account Directory Switcher — personal Codex profile manager for Windows",
   "private": true,
   "main": "src/main.cjs",

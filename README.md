@@ -2,7 +2,7 @@
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
 
-Quản lý các tài khoản Codex cá nhân trên Windows: xem quota, đổi tài khoản và tiếp tục làm việc trong VS Code hoặc CLI. Giao diện sáng/tối, tiếng Việt/Anh.
+Quản lý các tài khoản Codex cá nhân trên Windows: xem quota, đổi tài khoản và tiếp tục làm việc trong VS Code, CLI hoặc JetBrains AI Assistant. Giao diện sáng/tối, tiếng Việt/Anh.
 
 **[Tải bản Windows](https://github.com/padduwcs/PADSwitcher/releases/latest)** · [English](README.en.md) · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
 
@@ -35,7 +35,31 @@ Trong **Kết nối**, sao chép lệnh CLI của PADSwitcher và chạy trong t
 
 Có thể thêm `resume` để mở lại hội thoại. Lệnh `codex` thông thường vẫn dùng đăng nhập riêng và không đi qua PADSwitcher. CLI được kết nối bằng lệnh trên mới nhận việc đổi tài khoản từ ứng dụng.
 
+### Android Studio / JetBrains AI Assistant
+
+1. Cài plugin **AI Assistant** và agent **Codex** trong mục **Agents**, mở Codex một lần để IDE tải runtime. Tích hợp hiện hỗ trợ adapter **codex-acp 2.1.1**.
+2. Trong PADSwitcher, bật kết nối bằng **Dùng tài khoản này**, mở **Kết nối → Thiết lập JetBrains**.
+3. Trong **AI Chat**, chọn agent **Codex · PADSwitcher** và mở chat mới. Nếu chưa thấy agent, mở lại IDE một lần.
+4. Xem **Agent → Đang kết nối** trong PADSwitcher để xác nhận chat đang đi qua ứng dụng. **Đã thiết lập** chỉ xác nhận cấu hình, chưa xác nhận chat đang kết nối.
+
+Đổi tài khoản thủ công/tự động áp dụng cho agent này như VS Code/CLI. Agent **Codex** thông thường vẫn dùng đăng nhập riêng. Hội thoại cũ của agent thông thường không tự chuyển sang agent PADSwitcher. Tích hợp thêm một agent trong `%USERPROFILE%\.jetbrains\acp.json`, giữ các agent khác. Không cần cài Node.js riêng; dùng runtime đã được IDE tải.
+
+Muốn trở về cách dùng cũ: chọn lại agent **Codex** trong AI Chat. Có thể gỡ agent PADSwitcher tại **Kết nối → Gỡ kết nối JetBrains**. Bước duyệt công cụ vẫn hiển thị trong IDE.
+
 ## Dùng hằng ngày
+
+### Dùng chung hoặc tài khoản riêng
+
+Mặc định VS Code, JetBrains và CLI qua PADSwitcher dùng chung tài khoản. Muốn tách:
+
+1. Mở **Kết nối**, bấm **Tài khoản** ở mục VS Code, JetBrains hoặc CLI.
+2. Chọn **Tài khoản riêng**, chọn tài khoản rồi **Lưu thiết lập**. Chờ lượt đang chạy xong trước khi đổi chế độ.
+3. Reload Window trong VS Code, mở lại chat JetBrains hoặc CLI **một lần** để áp dụng chế độ mới. Không phải thiết lập lại đường dẫn kết nối.
+4. Trong trang **Tài khoản**, chọn **Dùng cho → VS Code / JetBrains / CLI**. Nút **Dùng tài khoản này**, **Tự đổi** và lịch sử tự đổi áp dụng cho kết nối đang chọn. Chọn **Dùng chung** để quản lý nhóm dùng chung.
+
+Ví dụ VS Code dùng A → B, JetBrains dùng C → D: VS Code hết quota thì chuyển sang B, JetBrains vẫn dùng C. Các lần đổi tài khoản trong cùng chế độ không cần mở lại IDE. Nếu cùng dùng một tài khoản, hai bên cùng tiêu quota; thông tin tài khoản hết quota được chia sẻ để tránh chọn lại tài khoản đó.
+
+Muốn gộp lại, mở **Kết nối → Tài khoản → Dùng chung**, rồi mở lại kết nối đó một lần. Cấu hình tự đổi riêng được giữ lại để dùng sau. Phạm vi tách là loại kết nối: tất cả cửa sổ VS Code dùng cùng nhóm VS Code, tất cả chat agent PADSwitcher trong JetBrains dùng cùng nhóm JetBrains. CLI trong terminal VS Code thuộc nhóm **CLI**.
 
 Mở PADSwitcher trước khi dùng Codex qua kết nối này. Có thể mở VS Code trước; nếu extension chưa tự nối sau khi PADSwitcher sẵn sàng, Reload Window một lần.
 

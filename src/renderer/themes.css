@@ -174,6 +174,25 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
 .page-heading h1::after { width:5px; height:5px; background:var(--mint); }
 .nav { border-radius:9px; padding:9px 15px; }
 .button { border-radius:9px; }
+.toolbar-right .refresh-button { min-height:40px; padding:9px 14px; gap:8px; line-height:20px; border:1px solid var(--card-edge); background:var(--card-fill); color:var(--ink); border-radius:10px; }
+.toolbar-right .refresh-button .icon { display:block; width:18px; height:18px; }
+.refresh-button > span { display:block; line-height:20px; }
+.toolbar-right .refresh-button:hover { border-color:var(--detail-line); background:var(--surface-soft); box-shadow:0 2px 8px var(--action-shadow); }
+.connection-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.integration-card { min-width:0; display:flex; flex-direction:column; }
+.integration-card > .button, .integration-card > .integration-actions { align-self:flex-start; margin-bottom:20px; }
+.integration-card .button { white-space:normal; }
+.jetbrains-mark { color:var(--mint); background:var(--mint-soft); font-weight:600; letter-spacing:-1px; }
+.jetbrains-card .client-status-panel b { text-align:right; }
+.account-target { display:flex; align-items:center; gap:10px; margin:0; color:var(--muted); font-size:12px; }
+.account-target select { width:150px; padding:7px 10px; background:var(--card-fill); border:1px solid var(--card-edge); border-radius:8px; color:var(--ink); }
+.account-target label { font-weight:500; }
+.account-target > span { display:none; }
+.route-options { display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid var(--card-edge); margin-top:auto; padding-top:14px; }
+.route-options span { min-width:0; font-size:11px; color:var(--muted); overflow-wrap:anywhere; }
+.route-options .button { flex-shrink:0; padding:7px 10px; font-size:12px; }
+@media (max-width:1120px) { .connection-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:850px) { .connection-grid { grid-template-columns:1fr; } }
 .card-identity strong { font-weight:600; font-size:14px; letter-spacing:-.25px; }
 .card-identity small { font-size:11px; margin-top:2px; }
 .avatar { border-radius:12px; border:1px solid var(--line); width:40px; height:40px; }

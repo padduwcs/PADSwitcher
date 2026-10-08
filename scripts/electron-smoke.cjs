@@ -81,6 +81,15 @@ let timeout;
           await fs.writeFile(path.join(root,'accounts-'+variant+'.png'),frame);
           const dimensions=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,stacked:[...document.querySelectorAll('.detail-quotas .quota-window')].map(el=>el.getBoundingClientRect().top),theme:document.documentElement.dataset.theme,lang:document.documentElement.lang})");
           assert.equal(dimensions.overflow,false);assert(dimensions.stacked[1]>dimensions.stacked[0]);assert.equal(dimensions.theme,variant.startsWith('dark')?'dark':'light');assert.equal(dimensions.lang,variant.endsWith('en')?'en':'vi');
+          const refresh=await preview.webContents.executeJavaScript("(()=>{const b=document.querySelector('#refresh-all'),icon=b.querySelector('svg').getBoundingClientRect(),label=b.querySelector('span').getBoundingClientRect(),s=getComputedStyle(b);return {centerDelta:Math.abs(icon.top+icon.height/2-label.top-label.height/2),left:s.paddingLeft,right:s.paddingRight,label:b.querySelector('span').textContent};})()");
+          assert(refresh.centerDelta<=1);assert.equal(refresh.left,refresh.right);assert.equal(refresh.label,variant.endsWith('en')?'Refresh':'Làm mới');
+          await preview.webContents.executeJavaScript("document.querySelector('[data-page=connections]').click()");
+          await new Promise(resolve=>setTimeout(resolve,200));
+          const connections=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,count:document.querySelectorAll('.integration-card').length,live:document.querySelector('#jetbrains-live').textContent})");
+          assert.equal(connections.overflow,false);assert.equal(connections.count,3);assert(connections.live.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
+          const connectionsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+          await fs.writeFile(path.join(root,'connections-'+variant+'.png'),connectionsFrame);
+          await preview.webContents.executeJavaScript("document.querySelector('[data-page=accounts]').click()");
           const client=await preview.webContents.executeJavaScript("({active:document.querySelector('#vscode-pill').classList.contains('connected'),text:document.querySelector('#vscode-status').textContent})");assert.equal(client.active,true);assert(client.text.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
         }
         await preview.webContents.executeJavaScript("(async()=>{document.querySelector('.reset-row button').click();await new Promise(r=>setTimeout(r,80));return true;})()");
@@ -103,7 +112,23 @@ let timeout;
           const background=await preview.webContents.executeJavaScript("({paint:getComputedStyle(document.body).backgroundImage,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})");
           assert(background.paint.includes('linear-gradient'));assert.equal(background.overflow,false);
         }
-        preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, vertical quotas, reset details and cancellation: passed.');
+        // Scoped routing presentation uses fixtures and cannot change real IDE settings.
+        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('[data-page=connections]').click();document.querySelector('[data-route=jetbrains]').click();document.querySelector('#route-mode').value='private';document.querySelector('#route-mode').dispatchEvent(new Event('change'));document.querySelector('#route-profile').selectedIndex=1;document.querySelector('#modal-form').dispatchEvent(new Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,100));document.querySelector('#toasts').replaceChildren();return true;})()");
+        for(const variant of ['light-vi','dark-en']){
+          if(variant==='dark-en')await preview.webContents.executeJavaScript("document.querySelector('#theme-toggle').click();document.querySelector('#language-toggle').click()");
+          await preview.webContents.executeJavaScript("document.querySelector('[data-page=connections]').click()");
+          await new Promise(resolve=>setTimeout(resolve,200));
+          const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+          await fs.writeFile(path.join(root,'separate-connections-'+variant+'.png'),frame);
+          const route=await preview.webContents.executeJavaScript("({text:document.querySelector('#route-jetbrains').textContent,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})");assert(route.text.includes(variant.endsWith('en')?'Separate account':'Tài khoản riêng'));assert.equal(route.overflow,false);
+          await preview.webContents.executeJavaScript("document.querySelector('[data-page=accounts]').click();document.querySelectorAll('.account-card')[1].click()");
+          preview.setSize(1000,680);
+          const compactRoute=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {scope:document.querySelector('#account-scope').value,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,action:document.querySelector('#use-gateway').getBoundingClientRect().bottom<=innerHeight};})()");assert.equal(compactRoute.scope,'jetbrains');assert.equal(compactRoute.overflow,false);assert.equal(compactRoute.action,true);
+          await new Promise(resolve=>setTimeout(resolve,200));
+          const account=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'separate-accounts-'+variant+'.png'),account);
+          preview.setSize(1260,900);
+        }
+        preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, quotas, reset cancellation and separate account controls: passed.');
         clearTimeout(timeout); app.exit(0);
       } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.message); app.exit(1); }
     });

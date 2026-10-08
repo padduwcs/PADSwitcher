@@ -14,6 +14,14 @@ async function ready(t){
   return {...f,g,c,a,b};
 }
 async function until(condition){for(let i=0;i<100&&!condition();i++)await pause(20);assert(condition());}
+test('ACP JetBrains indicator accepts its successful handshake without requiring the optional initialized notification',async t=>{
+  const {g}=await ready(t),jb=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>jb.close());
+  await jb.request('initialize',{clientInfo:{name:'jetbrains'},_padswitcherClient:'jetbrains'});await until(()=>g.view().connected.jetbrains===1);
+  assert.equal(g.view().connected.vscode,0);assert.equal(g.view().connected.cli,0);
+  const rejected=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>rejected.close());
+  await assert.rejects(rejected.request('initialize',{clientInfo:{name:'jetbrains'},_padswitcherClient:'jetbrains',fixtureRejectInitialize:true}));assert.equal(g.view().connected.jetbrains,1);
+  jb.close();await until(()=>g.view().connected.jetbrains===0);
+});
 test('client indicators require a successful initialize and initialized notification; disconnect removes them',async t=>{
   const {g}=await ready(t),extension=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>extension.close());
   assert.equal(g.view().connected.vscode,0);

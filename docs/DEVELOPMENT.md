@@ -43,8 +43,16 @@ Run these only when deliberately authorizing access to your own accounts:
 - `node scripts/router-live-smoke.cjs --live --inference`: makes real model calls
   and therefore uses quota. Uses a locally injected quota failure for fallback.
 - `npm run smoke:gateway`: also makes a real model call.
+- `node scripts/jetbrains-smoke.cjs --live`: requires the IDE-installed ACP 2.1.1
+  runtime, two saved accounts and the native local model catalog. Uses saved
+  sessions for read-only workspace policy discovery; all model replies and quota
+  failures are local fixtures. Checks ACP chat, permissions, a single tool write
+  and post-tool fallback without consuming inference quota or reset credits.
+  Configuration changes target a disposable `.jetbrains/acp.json`.
+  Add `--split` to verify the stable endpoint dispatching ACP to a separate native
+  backend and router while the shared account remains unchanged.
 - `npm run smoke:recovery`: checks the retained legacy recovery path; it is not
-  the production 1.7 request-routing flow.
+  the production request-routing flow.
 
 Never test reset consumption with a real account as part of routine checks.
 Do not commit account data, generated connection files, logs or QA directories.

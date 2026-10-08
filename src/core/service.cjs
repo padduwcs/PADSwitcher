@@ -12,6 +12,7 @@ const { normalizeResets, availableCredit } = require('./resets.cjs');
 const windows = require('./windows.cjs');
 const { CodexRpc } = require('./rpc.cjs');
 const { SEAL_SESSION } = require('./guardian.cjs');
+const {defaults:routeDefaults,validate:validateRoutes,SCOPES}=require('./client-routes.cjs');
 
 class ProfileService extends EventEmitter {
   constructor(root, adapters = {}) {
@@ -23,6 +24,7 @@ class ProfileService extends EventEmitter {
     this.running = new Map(); this.busy = false; this.login = null;
     this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), workspace: process.cwd(), autoRefresh: true }, activeDesktopId: null, rollback: null };
     this.state.autoSwitch={enabled:false,order:[]};this.state.quotaCooldowns={};
+    this.state.clientRoutes=routeDefaults();
   }
   async init() {
     await fs.mkdir(this.root, { recursive: true }); await assertDirectory(this.root); await this.platform.protectDirectory(this.root);
@@ -40,6 +42,7 @@ class ProfileService extends EventEmitter {
       }
       if (typeof parsed.settings.desktopHome !== 'string' || !path.isAbsolute(parsed.settings.desktopHome) || typeof parsed.settings.workspace !== 'string' || typeof parsed.settings.codexPath !== 'string') throw new UserError('Cài đặt đường dẫn không hợp lệ.', 'STORE_INVALID');
       this.state = { ...this.state, ...parsed, settings: { ...this.state.settings, ...parsed.settings } };
+      validateRoutes(this.state.clientRoutes,ids);
       if(!this.state.autoSwitch||typeof this.state.autoSwitch.enabled!=='boolean'||!Array.isArray(this.state.autoSwitch.order)||this.state.autoSwitch.order.length>200||new Set(this.state.autoSwitch.order).size!==this.state.autoSwitch.order.length||this.state.autoSwitch.order.some(id=>!ids.has(id)))throw new UserError('Cấu hình tự đổi tài khoản không hợp lệ.', 'STORE_INVALID');
       if(!this.state.quotaCooldowns||Array.isArray(this.state.quotaCooldowns)||typeof this.state.quotaCooldowns!=='object'||Object.entries(this.state.quotaCooldowns).some(([id,v])=>!ids.has(id)||!Number.isFinite(v)||v<0))throw new UserError('Thời gian chờ quota không hợp lệ.', 'STORE_INVALID');
     } else await this.save();
@@ -57,11 +60,13 @@ class ProfileService extends EventEmitter {
   view() {
     return {
       version: require('../../package.json').version, profiles: this.state.profiles.map(p => ({ ...p, running: this.running.has(p.id), desktopActive: p.id === this.state.activeDesktopId })),
-      settings: { ...this.state.settings }, busy: this.busy, login: this.login ? { profileId: this.login.profileId } : null,
+      settings: { ...this.state.settings }, busy: this.busy||!!this.gateway?.flight, login: this.login ? { profileId: this.login.profileId } : null,
       autoSwitch:{...this.state.autoSwitch,order:[...this.state.autoSwitch.order]},
+      clientRoutes:JSON.parse(JSON.stringify(this.state.clientRoutes)),
       canRestore: Boolean(this.state.rollback), recoveryPending: this.recoveryPending || false,
       gateway: this.gateway?.view() || {status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0},
       vscode: this.vscode || {configuration:'unknown',helperPresent:false},
+      jetbrains: this.jetbrains || {configuration:'notConfigured',runtimePresent:false},
     };
   }
   changed() { this.emit('change',this.view()); }
@@ -299,7 +304,7 @@ class ProfileService extends EventEmitter {
   }
   async addAccount(label, openUrl, device = false, expectedId = null, onDevice = () => {}) {
     return this.exclusive(async () => {
-      if(expectedId&&(this.gateway?.profileId===expectedId||this.gateway?.pendingId===expectedId||this.gateway?.router?.isUsing(expectedId)))throw new UserError('Dừng gateway hoặc chọn tài khoản khác trước khi đăng nhập lại hồ sơ này.', 'PROFILE_ACTIVE');
+      if(expectedId&&(this.gateway?.isUsing?.(expectedId)||this.gateway?.profileId===expectedId||this.gateway?.pendingId===expectedId||this.gateway?.router?.isUsing(expectedId)))throw new UserError('Dừng gateway hoặc chọn tài khoản khác trước khi đăng nhập lại hồ sơ này.', 'PROFILE_ACTIVE');
       if (expectedId && this.running.has(expectedId)) throw new UserError('Hãy đóng CLI của hồ sơ trước khi đăng nhập lại.', 'PROFILE_RUNNING');
       if (expectedId && (await this.desktopIdentity())?.identity === this.get(expectedId).identity) throw new UserError('Hồ sơ này đang dùng cho desktop. Chuyển desktop sang tài khoản khác trước khi đăng nhập lại; hoặc đăng nhập lại trong Codex rồi bấm Lưu tài khoản hiện tại.', 'PROFILE_ACTIVE');
       const loginRoot = path.join(this.root,'login'); await fs.mkdir(loginRoot,{ recursive:true }); await assertDirectory(loginRoot);
@@ -485,7 +490,7 @@ class ProfileService extends EventEmitter {
   async remove(id) {
     return this.exclusive(async () => {
       const p = this.get(id); await this.checkRecovered();
-      if(this.gateway?.profileId===id||this.gateway?.pendingId===id||this.gateway?.router?.isUsing(id))throw new UserError('Hãy chọn tài khoản khác trong gateway trước khi xóa.', 'PROFILE_ACTIVE');
+      if(this.gateway?.isUsing?.(id)||this.gateway?.profileId===id||this.gateway?.pendingId===id||this.gateway?.router?.isUsing(id))throw new UserError('Hãy chọn tài khoản khác trong gateway trước khi xóa.', 'PROFILE_ACTIVE');
       if (this.running.has(id)) throw new UserError('Hãy đóng CLI trước khi xóa hồ sơ.', 'PROFILE_RUNNING');
       if (this.state.activeDesktopId === id || (await this.desktopIdentity())?.identity === p.identity) throw new UserError('Đây là tài khoản desktop hiện tại. Hãy chuyển sang hồ sơ khác trước khi xóa khỏi danh sách.', 'PROFILE_ACTIVE');
       const home = this.home(id); await assertDirectory(home); await this.seal(id);
@@ -495,10 +500,11 @@ class ProfileService extends EventEmitter {
       const destination = path.join(trash,id); if (await exists(destination)) throw new UserError('Có hồ sơ cùng mã trong thùng rác.', 'TRASH_CONFLICT');
       await fs.rename(home,destination);
       this.state.profiles = this.state.profiles.filter(p => p.id !== id);
-      const oldAuto=this.state.autoSwitch,oldCooldown=this.state.quotaCooldowns;
+      const oldAuto=this.state.autoSwitch,oldCooldown=this.state.quotaCooldowns,oldRoutes=this.state.clientRoutes;
       const order=oldAuto.order.filter(x=>x!==id);this.state.autoSwitch={enabled:oldAuto.enabled&&order.length>=2,order};
       this.state.quotaCooldowns={...oldCooldown};delete this.state.quotaCooldowns[id];this.gateway?.recovery.cancel();
-      try { await this.save(); } catch(e) { this.state.autoSwitch=oldAuto;this.state.quotaCooldowns=oldCooldown;this.state.profiles.push(p); await fs.rename(destination,home); throw e; }
+      this.state.clientRoutes=Object.fromEntries(SCOPES.map(k=>{const r=oldRoutes[k],order=r.autoSwitch.order.filter(x=>x!==id);return [k,{...r,...(r.profileId===id?{mode:'shared',profileId:null}:{}),autoSwitch:{enabled:r.autoSwitch.enabled&&order.length>=2,order}}];}));
+      try { await this.save(); } catch(e) { this.state.autoSwitch=oldAuto;this.state.quotaCooldowns=oldCooldown;this.state.clientRoutes=oldRoutes;this.state.profiles.push(p); await fs.rename(destination,home); throw e; }
       // Deletion never touches remote accounts; encrypted local vault is retained in trash.
     });
   }
@@ -548,9 +554,14 @@ class ProfileService extends EventEmitter {
   async autoSwitchSettings(input){
     return this.exclusive(async()=>{
       if(!input||typeof input.enabled!=='boolean'||!Array.isArray(input.order)||input.order.length>200||new Set(input.order).size!==input.order.length||input.order.some(id=>typeof id!=='string'||!this.state.profiles.some(p=>p.id===id))||(input.enabled&&input.order.length<2))throw new UserError('Chọn ít nhất hai tài khoản khác nhau và thứ tự dự phòng hợp lệ.', 'INVALID_SETTINGS');
-      this.gateway?.recovery.cancel('Đã cập nhật cấu hình tự đổi; các lượt tiếp tục đang chờ đã được hủy.');
-      const old=this.state.autoSwitch;this.state.autoSwitch={enabled:input.enabled,order:[...input.order]};
-      try{await this.save();}catch(e){this.state.autoSwitch=old;throw e;}
+      const requested=input.scope||'shared';
+      if(requested!=='shared'&&!SCOPES.includes(requested))throw new UserError('Kết nối không hợp lệ.', 'INVALID_SETTINGS');
+      if(this.gateway?.flight)throw new UserError('Chờ thay đổi chế độ kết nối hoàn tất.', 'BUSY');
+      const scope=requested!=='shared'&&this.state.clientRoutes[requested].mode==='private'?requested:'shared';
+      const target=scope==='shared'?this.state:this.state.clientRoutes[scope];
+      (this.gateway?.route?.(scope)||this.gateway)?.recovery.cancel('Đã cập nhật cấu hình tự đổi; các lượt tiếp tục đang chờ đã được hủy.');
+      const old=target.autoSwitch;target.autoSwitch={enabled:input.enabled,order:[...input.order]};
+      try{await this.save();}catch(e){target.autoSwitch=old;throw e;}
     });
   }
   async diagnostics() {

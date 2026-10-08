@@ -81,6 +81,15 @@ internal static class PADCodex {
                     var reader = new StreamReader(Console.OpenStandardInput(), Utf8, false, 8192);
                     while (ws.State == WebSocketState.Open) {
                         string line = await reader.ReadLineAsync(); if (line == null) break;
+                        if (Environment.GetEnvironmentVariable("PADSWITCHER_CLIENT_KIND") == "jetbrains") {
+                            var serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = MaxFrame;
+                            var message = serializer.Deserialize<Dictionary<string, object>>(line);
+                            if (message.ContainsKey("method") && (string)message["method"] == "initialize") {
+                                var parameters = (Dictionary<string, object>)message["params"];
+                                parameters["_padswitcherClient"] = "jetbrains";
+                                line = serializer.Serialize(message);
+                            }
+                        }
                         byte[] bytes = Utf8.GetBytes(line); if (bytes.Length > MaxFrame) throw new IOException();
                         await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, cancel.Token);
                         Array.Clear(bytes, 0, bytes.Length);

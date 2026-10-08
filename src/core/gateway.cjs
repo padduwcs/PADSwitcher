@@ -18,13 +18,13 @@ async function freePort(){const s=net.createServer();await new Promise((r,j)=>{s
 function validBearer(value,token){const bytes=Buffer.from(String(value||''));const expected=Buffer.from('Bearer '+token);return bytes.length===expected.length&&crypto.timingSafeEqual(bytes,expected);}
 class Gateway {
   constructor(service,options={}) {
-    this.service=service;this.root=path.join(service.root,'gateway');this.options=options;
+    this.service=service;this.root=options.root||path.join(service.root,'gateway');this.options=options;
     this.status='stopped';this.profileId=null;this.pendingId=null;this.changing=false;this.clients=new Set();this.turns=new Map();this.error=null;this.refreshFlight=null;this.generation=0;
     service.gateway=this;
     this.recovery=new Recovery(this);
     this.knownTurns=new Map();
   }
-  view(){const connected={vscode:0,cli:0,other:0};for(const c of this.clients)if(c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
+  view(){const connected={vscode:0,cli:0,jetbrains:0,other:0};for(const c of this.clients)if(c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
   changed(){this.service.changed();}
   async start(id){
     this.service.get(id);
@@ -46,6 +46,7 @@ class Gateway {
       const port=await freePort();this.backendUrl=`ws://127.0.0.1:${port}`;
       const env={...process.env,CODEX_HOME:this.service.state.settings.desktopHome};
       for(const name of ['CODEX_SQLITE_HOME','OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','ACCESS_TOKEN','OPENAI_BASE_URL','CODEX_INTERNAL_ORIGINATOR_OVERRIDE'])delete env[name];
+      if(this.options.isolatedState)env.CODEX_SQLITE_HOME=this.root;
       if(!this.options.disableRouter){
         const version=this.version.match(/^codex-cli (\d+)\.(\d+)\./);
         if(!version||(+version[1]===0&&+version[2]<160))throw new UserError('Cần Codex 0.160.0 trở lên cho bộ định tuyến model. Cập nhật extension Codex rồi thử lại.', 'GATEWAY_ROUTER_VERSION');
@@ -66,8 +67,8 @@ class Gateway {
       this.http=http.createServer((_req,res)=>{res.writeHead(404,{'Cache-Control':'no-store'});res.end();});
       this.wss=new WebSocketServer({noServer:true,maxPayload:MAX_FRAME,perMessageDeflate:false});
       this.http.on('upgrade',(req,socket,head)=>{
-        if(this.status!=='ready'||req.headers.origin||!validBearer(req.headers.authorization,this.frontToken)||this.clients.size>=16){socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');return;}
-        this.wss.handleUpgrade(req,socket,head,client=>this.attach(client));
+        if(this.status!=='ready'||req.headers.origin||!validBearer(req.headers.authorization,this.frontToken)||(this.options.clientCount?.()??this.clients.size)>=16){socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');return;}
+        this.wss.handleUpgrade(req,socket,head,client=>this.options.attach?this.options.attach(client):this.attach(client));
       });
       await new Promise((r,j)=>{this.http.once('error',j);this.http.listen(0,'127.0.0.1',r);});
       this.url=`ws://127.0.0.1:${this.http.address().port}`;
@@ -154,10 +155,10 @@ class Gateway {
       this.changed();this.applyPending().catch(()=>{});
     }
   }
-  async attach(front){
+  async attach(front,initialMessages=[]){
     const c={front,back:null,pending:new Map(),startContexts:new Map(),threadPending:new Map(),auxThreads:new Set(),internal:new Map(),approvals:new Map(),sequence:0};this.clients.add(c);this.changed();
     // Register immediately: extension initialize may arrive while connecting upstream.
-    const queue=[];let forwarding=false,queuedBytes=0;
+    const queue=[...initialMessages];let forwarding=false,queuedBytes=queue.reduce((n,d)=>n+d.length,0);
     front.on('message',data=>{queuedBytes+=data.length;if(queue.length>=100||queuedBytes>MAX_FRAME){front.close(1009);return;}queue.push(data);drain();});
     const drain=()=>{if(!c.back||forwarding)return;forwarding=true;try{while(queue.length){const data=queue.shift();queuedBytes-=data.length;this.fromClient(c,data);}}finally{forwarding=false;}};
     front.on('close',()=>{this.clients.delete(c);for(const p of c.internal.values())p.reject(new UserError('Client đã ngắt.', 'RECOVERY_DISCONNECTED'));c.internal.clear();if(this.recovery.active?.client===c||this.recovery.queue.some(j=>j.client===c))this.recovery.cancel('Codex đã ngắt kết nối; đã hủy tự tiếp tục.');for(const t of this.turns.values())if(t.client===c)t.disconnected=true;c.back?.terminate();if(this.status==='ready')this.interruptDisconnected(c).catch(()=>{});this.changed();});
@@ -181,9 +182,10 @@ class Gateway {
     if(m.method==='initialize'){
       if(c.initializeId===undefined&&!c.initializeAccepted&&m.id!=null){
         const name=m.params?.clientInfo?.name;
-        c.kind=['codex_vscode','codex_vscode_copilot'].includes(name)?'vscode':['codex_cli_rs','codex_cli'].includes(name)?'cli':'other';c.initializeId=m.id;
+        c.kind=m.params?._padswitcherClient==='jetbrains'?'jetbrains':['codex_vscode','codex_vscode_copilot'].includes(name)?'vscode':['codex_cli_rs','codex_cli'].includes(name)?'cli':'other';c.initializeId=m.id;
       }
       m.params={...m.params,capabilities:{...m.params?.capabilities,experimentalApi:true}};
+      delete m.params._padswitcherClient;
     }
     if(m.method==='initialized'&&c.initializeAccepted){c.initialized=true;this.changed();}
     if(this.router&&['thread/start','thread/resume','thread/fork','turn/start'].includes(m.method)&&m.params?.modelProvider&&m.params.modelProvider!=='openai'){
@@ -191,7 +193,7 @@ class Gateway {
     }
     if(['thread/start','thread/resume','thread/fork'].includes(m.method)&&m.id!=null)c.threadPending.set(m.id,m.params?.ephemeral===true||m.params?.threadSource==='thread_title');
     if(START_METHODS.has(m.method)){
-      if(this.pendingId||this.changing||this.recovery.busy||this.status!=='ready'){this.clientError(c,m.id,'PADSwitcher is switching accounts. Wait for the current turn to finish, then retry.');return;}
+      if(c.routeChanging||this.pendingId||this.changing||this.recovery.busy||this.status!=='ready'){this.clientError(c,m.id,'PADSwitcher is switching accounts. Wait for the current turn to finish, then retry.');return;}
       if(m.id==null){c.front.close(1007);return;}
       if(c.pending.has(m.id)){this.clientError(c,m.id,'Duplicate active request ID.');return;}
       if(this.knownTurns.size>=256){this.clientError(c,m.id,'Too many tracked turns. Stop and restart the gateway.');return;}
@@ -201,7 +203,7 @@ class Gateway {
   }
   fromBackend(c,data){
     let m;try{m=JSON.parse(data.toString());}catch{c.front.close(1007);return;}
-    if(m.id!=null&&!m.method&&c.initializeId===m.id){c.initializeAccepted=!m.error;delete c.initializeId;this.changed();}
+    if(m.id!=null&&!m.method&&c.initializeId===m.id){c.initializeAccepted=!m.error;if(c.kind==='jetbrains')c.initialized=c.initializeAccepted;delete c.initializeId;this.changed();}
     if(m.id!=null&&!m.method&&c.threadPending.has(m.id)){const auxiliary=c.threadPending.get(m.id);c.threadPending.delete(m.id);if(m.result?.thread?.id&&auxiliary)c.auxThreads.add(m.result.thread.id);}
     if(m.id!=null&&!m.method&&c.internal.has(m.id)){const p=c.internal.get(m.id);c.internal.delete(m.id);if(m.error)p.reject(new UserError('Codex chưa nhận lượt tiếp tục.', 'RECOVERY_START'));else p.resolve(m.result);this.trackStart(c,m);return;}
     if(m.id!=null&&!m.method&&typeof m.id==='string'&&m.id.startsWith('pad-auto-')){this.trackStart(c,m);return;}

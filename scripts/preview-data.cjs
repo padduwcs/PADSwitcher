@@ -11,21 +11,28 @@ module.exports = `
   ];
   profiles[0].resetCredits={availableCount:2,credits:[{id:'fixture-reset-a',resetType:'codexRateLimits',status:'available',title:'Reset',expiresAt:reset+86400},{id:'fixture-reset-b',resetType:'codexRateLimits',status:'available',title:'Reset',expiresAt:null}]};
   profiles[1].resetCredits={availableCount:1,credits:null};
-  let state = {version:'1.7.0',vscode:{configuration:'configured',helperPresent:true},profiles:new URLSearchParams(location.search).has('demo')?profiles:[],settings:{workspace:'D:\\\\Projects\\\\MyProject',desktopHome:'C:\\\\Users\\\\Personal\\\\.codex',codexPath:'',autoRefresh:false},busy:false,login:null,canRestore:false,recoveryPending:false,gateway:{status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0}};
-  const publish = () => callback?.(clone(state));
+  let state = {version:'1.9.0',jetbrains:{configuration:'configured',runtimePresent:true},vscode:{configuration:'configured',helperPresent:true},profiles:new URLSearchParams(location.search).has('demo')?profiles:[],settings:{workspace:'D:\\\\Projects\\\\MyProject',desktopHome:'C:\\\\Users\\\\Personal\\\\.codex',codexPath:'',autoRefresh:false},busy:false,login:null,canRestore:false,recoveryPending:false,gateway:{status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0}};
+  state.autoSwitch={enabled:false,order:[]};
+  state.clientRoutes=Object.fromEntries(['vscode','jetbrains','cli'].map(k=>[k,{mode:'shared',profileId:null,autoSwitch:{enabled:false,order:[]}}]));
+  function scopes(){const {scopes:previous,...base}=state.gateway;state.gateway.scopes=Object.fromEntries(['vscode','jetbrains','cli'].map(k=>{const r=state.clientRoutes[k];return [k,{...base,mode:r.mode,profileId:r.mode==='private'?r.profileId:base.profileId,autoSwitch:r.mode==='private'?r.autoSwitch:state.autoSwitch}];}));}
+  const publish = () => {scopes();callback?.(clone(state));};
   window.pad = {
     onState: cb => { callback = cb; },onDevice:cb => {deviceCallback=cb;},
     action:async (command,args={}) => {
       if(command==='prepareReset'){const p=state.profiles.find(p=>p.id===args.id);p.resetAttempt={key:'fixture-reset-key',creditId:args.creditId,status:'prepared'};return {ok:true,result:{...p.resetAttempt,retry:false},state:clone(state)};}
       if(command==='consumeReset'){const p=state.profiles.find(p=>p.id===args.id);if(!args.confirmed||args.key!==p.resetAttempt?.key)return {ok:false,error:{code:'RESET_STALE',message:'Xác nhận đã cũ.'},state:clone(state)};if(p.resetAttempt.status!=='completed'){p.resetCredits.availableCount--;p.resetCredits.credits=p.resetCredits.credits?.slice(1)||null;p.resetAttempt.status='completed';p.quota.forEach(b=>b.windows.forEach(w=>w.usedPercent=0));}publish();return {ok:true,result:{outcome:'reset',quotaRefreshed:true},state:clone(state)};}
-      if (command==='state') return {ok:true,result:clone(state)};
+      if (command==='state') {scopes();return {ok:true,result:clone(state)};}
+      if(command==='clientRoute'){const r=state.clientRoutes[args.scope],reconnect=r.mode!==args.mode;r.mode=args.mode;if(args.mode==='private')r.profileId=args.profileId;if(reconnect&&state.gateway.connected)state.gateway.connected[args.scope]=0;publish();return {ok:true,result:{reconnect},state:clone(state)};}
       if (command==='pick') return {ok:true,result:'D:\\\\Projects\\\\ChosenProject',state:clone(state)};
       if (command==='diagnostics') return {ok:true,result:{version:'codex-cli 0.159.2 (mẫu)',codex:'C:\\\\Programs\\\\Codex\\\\codex.exe',blockers:['Code.exe'],storage:'C:\\\\Users\\\\Personal\\\\AppData\\\\Roaming\\\\PADSwitcher',loginRecovery:false},state:clone(state)};
       if(command==='configureVSCode'){state.vscode={configuration:'configured',helperPresent:true};publish();}
       if(command==='restoreVSCode'){state.vscode={configuration:'notConfigured',helperPresent:true};publish();}
+      if(command==='configureJetBrains'){state.jetbrains={configuration:'configured',runtimePresent:true};publish();}
+      if(command==='restoreJetBrains'){state.jetbrains={configuration:'notConfigured',runtimePresent:true};publish();}
       if (command==='settings') {state.settings={...state.settings,...args};publish();}
-      if (command==='autoSwitchSettings') {if(args.enabled&&args.order.length<2)return {ok:false,error:{code:'INVALID_SETTINGS',message:'Chọn ít nhất hai tài khoản.'},state:clone(state)};state.autoSwitch=clone(args);publish();}
-      if (command==='gateway') {state.gateway={status:'ready',connected:{vscode:1,cli:0,other:0},profileId:args.id,pendingId:null,activeTurns:0,clients:1};publish();}
+      if (command==='autoSwitchSettings') {if(args.enabled&&args.order.length<2)return {ok:false,error:{code:'INVALID_SETTINGS',message:'Chọn ít nhất hai tài khoản.'},state:clone(state)};const policy={enabled:args.enabled,order:clone(args.order)};if(state.clientRoutes[args.scope]?.mode==='private')state.clientRoutes[args.scope].autoSwitch=policy;else state.autoSwitch=policy;publish();}
+      if(command==='gateway'&&state.clientRoutes[args.scope]?.mode==='private'){state.clientRoutes[args.scope].profileId=args.id;publish();return {ok:true,state:clone(state)};}
+      if (command==='gateway') {state.gateway={status:'ready',connected:{vscode:1,cli:0,jetbrains:1,other:0},profileId:args.id,pendingId:null,activeTurns:0,clients:2};publish();}
       if (command==='stopGateway'||command==='forceStopGateway') {state.gateway={status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0};publish();}
       if (command==='import') {state.profiles=clone(profiles);publish();return {ok:true,result:profiles[0].id,state:clone(state)};}
       if (command==='edit') {const p=state.profiles.find(p=>p.id===args.id);Object.assign(p,{label:args.label,notes:args.notes});publish();}

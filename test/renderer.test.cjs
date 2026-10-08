@@ -8,6 +8,28 @@ const html = fs.readFileSync(path.join(__dirname,'../src/renderer/index.html'),'
 const script = fs.readFileSync(path.join(__dirname,'../src/renderer/app.js'),'utf8');
 const mock = require('../scripts/preview-data.cjs');
 const settle = async () => { await new Promise(resolve => setTimeout(resolve,10)); };
+test('scoped UI changes only the selected account and auto-switch policy, and translates separate account setup',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('#use-gateway').click();await settle();
+  d.querySelector('[data-route=jetbrains]').click();assert.equal(d.querySelector('#modal').open,true);
+  d.querySelector('#route-mode').value='private';d.querySelector('#route-mode').dispatchEvent(new w.Event('change'));
+  const ids=[...d.querySelectorAll('.account-card')].map(c=>c.dataset.id);d.querySelector('#route-profile').value=ids[1];
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  assert.equal(d.querySelector('#account-scope').value,'jetbrains');assert(d.querySelector('#route-jetbrains').textContent.includes('Tài khoản riêng'));
+  d.querySelectorAll('.account-card')[1].click();assert.equal(d.querySelector('#use-gateway').disabled,true);
+  d.querySelector('#configure-auto').click();d.querySelector('#auto-enabled').checked=true;d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();assert(d.querySelector('#recovery-title').textContent.includes('Bật'));
+  d.querySelector('#account-scope').value='shared';d.querySelector('#account-scope').dispatchEvent(new w.Event('change'));assert(d.querySelector('#recovery-title').textContent.includes('Tắt'));assert.equal(d.querySelector('#use-gateway').disabled,false);
+  d.querySelector('#account-scope').value='jetbrains';d.querySelector('#account-scope').dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('#use-gateway').disabled,true);
+  d.querySelector('#language-toggle').click();assert(d.querySelector('#route-jetbrains').textContent.includes('Separate account'));
+  d.querySelector('[data-route=jetbrains]').click();assert.equal(d.querySelector('#modal-title').textContent,'Account for JetBrains');assert(d.querySelector('#modal-body').textContent.includes('Later account switches do not need a restart'));
+});
+test('JetBrains distinguishes configured and connected states, translates and never appears as VS Code',async t=>{
+  const w=dom(t,true,s=>{s.jetbrains={configuration:'configured',runtimePresent:true};s.gateway={...s.gateway,status:'ready',connected:{jetbrains:1,vscode:0,cli:0}};});await settle();
+  assert.equal(w.document.querySelector('#jetbrains-live').textContent,'Đang kết nối');assert.equal(w.document.querySelector('#jetbrains-config').textContent,'Đã thiết lập');
+  assert.equal(w.document.querySelector('#connect-jetbrains').disabled,true);assert.equal(w.document.querySelector('#restore-jetbrains').disabled,false);
+  assert(!w.document.querySelector('#vscode-pill').classList.contains('connected'));
+  w.document.querySelector('#language-toggle').click();assert.equal(w.document.querySelector('#jetbrains-live').textContent,'Connected');assert.equal(w.document.querySelector('#connect-jetbrains').textContent,'Set up JetBrains');
+});
 function dom(t,demo = true, editState = null) {
   const window = new JSDOM(html,{url:'http://localhost/'+(demo?'?demo=1':''),runScripts:'outside-only'}).window;
   window.HTMLDialogElement.prototype.showModal = function() {this.setAttribute('open','');};

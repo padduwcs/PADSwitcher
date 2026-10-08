@@ -1,4 +1,4 @@
-# Định tuyến model — PADSwitcher 1.7.0
+# Định tuyến model — PADSwitcher 1.9.0
 
 ## Quyết định triển khai
 
@@ -7,6 +7,22 @@ Tham khảo cơ chế account fallback của 9router, không sao chép bộ dị
 [OpenAI Docs về cấu hình](https://learn.chatgpt.com/docs/config-file/config-advanced) cho phép đặt `openai_base_url` cho provider OpenAI gốc. [Yêu cầu gateway](https://learn.chatgpt.com/docs/enterprise/gateway-compatibility) yêu cầu giữ SSE, history, tool call/result và phân biệt lỗi. Đã đối chiếu mã nguồn OpenAI Codex `rust-v0.160.0`, `model-provider-info/src/lib.rs` và `core/src/client.rs`: HTTP 426 khi kết nối model WebSocket kích hoạt fallback HTTP theo session. Đây là hành vi đã thử bằng binary 0.160.0 trên máy; các bản mới vẫn cần kiểm chứng khi cập nhật.
 
 ## Luồng chính
+
+### Nhóm kết nối
+
+`GatewayHub` giữ nguyên endpoint của helper. Lần `initialize` xác định VS Code,
+JetBrains hoặc CLI; kết nối được gắn vào backend tương ứng suốt phiên. Mặc định
+tất cả dùng backend/router chung. Chế độ riêng tạo backend native, router,
+credential trong bộ nhớ, hàng đợi đổi tài khoản và policy tự đổi riêng cho nhóm đó.
+SQLite của backend riêng nằm trong thư mục runtime riêng; cấu hình Codex hiện có
+vẫn được giữ nguyên. Kho DPAPI, khóa làm mới credential và cooldown quota thuộc
+tài khoản được dùng chung.
+
+Không chuyển một socket đang làm việc sang backend khác. Khi đổi chế độ, hệ thống
+kiểm tra tác vụ, giữ các client không liên quan, chặn lượt mới của client đang đổi
+và chỉ ngắt client đó sau khi thiết lập thành công. Client nối lại một lần bằng
+helper cũ. Backend riêng bị lỗi không tự nối sang tài khoản chung. Đổi tài khoản
+trong cùng chế độ vẫn chờ tác vụ của nhóm đó rồi đổi, giữ kết nối và hội thoại.
 
 1. PADCodex nối extension/CLI vào App Server chính thức như trước. App Server giữ thread, sandbox, công cụ và approvals.
 2. Chỉ tiến trình backend có `openai_base_url` trỏ đến relay loopback; không sửa cấu hình hay auth chung.

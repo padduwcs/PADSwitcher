@@ -13,5 +13,11 @@ PADSwitcher source is licensed under [MIT](LICENSE).
   it uses a locally installed compatible version. OpenAI and Codex names belong to
   their respective owners. PADSwitcher is an independent project.
 
+- JetBrains setup copies the user's installed **@agentclientprotocol/codex-acp 2.1.1**
+  standalone adapter into the private app-data runtime. The adapter is Apache-2.0
+  licensed; its original `LICENSE` is copied alongside it as `LICENSE-codex-acp.txt`.
+  It is not bundled into the PADSwitcher download. See the
+  [upstream project](https://github.com/agentclientprotocol/codex-acp).
+
 The model router was informed by the request-fallback approach in 9router;
 PADSwitcher implements its own relay without copying its provider translation layer.
