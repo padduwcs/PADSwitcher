@@ -25,7 +25,16 @@ app.disableHardwareAcceleration();
       const loadedFonts=await win.webContents.executeJavaScript("document.fonts.ready.then(()=>Array.from(document.fonts).filter(f=>f.family.includes('Be Vietnam Pro')).map(f=>({weight:f.weight,status:f.status})))");
       for(const weight of ['400','500','600'])assert(loadedFonts.some(f=>f.weight===weight&&f.status==='loaded'));
       console.log('Packaged local font loading: passed.');
-      const action=(command,args={})=>win.webContents.executeJavaScript('window.pad.action('+JSON.stringify(command)+','+JSON.stringify(args)+')');
+      const action=async(command,args={})=>{
+        // Startup quota refresh may still own the credential lock on a clean CI
+        // machine. BUSY rejects before performing these fixture-only operations.
+        const retryable=new Set(['import','gateway','autoSwitchSettings','clientRoute','stopGateway']);
+        for(let attempt=0;;attempt++){
+          const response=await win.webContents.executeJavaScript('window.pad.action('+JSON.stringify(command)+','+JSON.stringify(args)+')');
+          if(response.ok||response.error?.code!=='BUSY'||!retryable.has(command)||attempt>=100)return response;
+          await new Promise(resolve=>setTimeout(resolve,100));
+        }
+      };
       const imported=await action('import');assert(imported.ok);const started=await action('gateway',{id:imported.result});assert(started.ok);console.log('Packaged gateway startup passed.');
       assert.equal(started.state.version,require('../package.json').version);assert.equal(started.state.gateway.status,'ready');
       assert.equal(started.state.gateway.modelRouting,'request');
@@ -39,11 +48,11 @@ app.disableHardwareAcceleration();
       await new Promise(resolve=>setTimeout(resolve,80));
       const live=(await action('state')).result;assert.equal(live.gateway.connected.vscode,1);assert.equal(live.gateway.connected.cli,0);
       console.log('Packaged stdio bridge and successful extension handshake indicator passed.');assert.deepEqual((await rpc.request('thread/loaded/list')).data,[]);
-      const separated=await action('clientRoute',{scope:'jetbrains',mode:'private',profileId:imported.result});assert(separated.ok);assert.equal(separated.state.gateway.scopes.jetbrains.mode,'private');
+      const separated=await action('clientRoute',{scope:'jetbrains',mode:'private',profileId:imported.result});assert(separated.ok,'Separate route setup: '+(separated.error?.code||'unknown'));assert.equal(separated.state.gateway.scopes.jetbrains.mode,'private');
       assert.equal(separated.state.gateway.scopes.jetbrains.profileId,imported.result);assert.equal(separated.state.gateway.connected.vscode,1);
       const scopedPolicy=await action('autoSwitchSettings',{scope:'jetbrains',enabled:false,order:[imported.result]});assert(scopedPolicy.ok);
       assert.deepEqual(scopedPolicy.state.clientRoutes.jetbrains.autoSwitch,{enabled:false,order:[imported.result]});
-      const joined=await action('clientRoute',{scope:'jetbrains',mode:'shared'});assert(joined.ok);assert.equal(joined.state.gateway.scopes.jetbrains.mode,'shared');assert.equal(joined.state.gateway.connected.vscode,1);
+      const joined=await action('clientRoute',{scope:'jetbrains',mode:'shared'});assert(joined.ok,'Rejoin route: '+(joined.error?.code||'unknown'));assert.equal(joined.state.gateway.scopes.jetbrains.mode,'shared');assert.equal(joined.state.gateway.connected.vscode,1);
       console.log('Packaged separate native route setup, policy IPC and rejoining preserve the connected extension: passed.');
       win.close();assert.equal(win.isDestroyed(),false);assert.equal(win.isVisible(),false);
       assert.equal((await action('state')).result.gateway.status,'ready');
@@ -51,7 +60,7 @@ app.disableHardwareAcceleration();
       assert.deepEqual(await fs.readFile(path.join(home,'auth.json')),before);
       console.log('Packaged ASAR, native helper extraction/host, stdio bridge, tray close and preserved fixture login: passed.');
       clearTimeout(timer);app.exit(0);
-    }catch(e){clearTimeout(timer);await rpc?.close();console.error('Packaged verification failed:',e.code||e.name);app.exit(1);}
+    }catch(e){clearTimeout(timer);await rpc?.close();const location=String(e.stack||'').split('\n').find(line=>line.includes('electron-packaged-smoke.cjs:'));console.error('Packaged verification failed:',e.code||e.name,e.code==='ERR_ASSERTION'?e.message:'',location?.trim()||'');app.exit(1);}
   }));
   require('../dist/win-unpacked/resources/app.asar/src/main.cjs');
 })().catch(e=>{clearTimeout(timer);console.error('Packaged QA could not initialize:',e.code||e.name,e.message);app.exit(1);});
