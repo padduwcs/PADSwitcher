@@ -539,10 +539,11 @@ class ProfileService extends EventEmitter {
   }
   async settings(input) {
     return this.exclusive(async () => {
-      if(this.gateway&&!['stopped','error'].includes(this.gateway.status))throw new UserError('Dừng gateway trước khi đổi đường dẫn.', 'GATEWAY_RUNNING');
       if (!input || typeof input !== 'object') throw new UserError('Cài đặt không hợp lệ.', 'INVALID_SETTINGS');
       const next = { ...this.state.settings };
       for (const field of ['codexPath','workspace','desktopHome']) if (input[field] !== undefined) { if (typeof input[field] !== 'string' || input[field].length > 2048) throw new UserError('Đường dẫn không hợp lệ.', 'INVALID_SETTINGS'); next[field] = input[field]; }
+      const pathsChanged=['codexPath','workspace','desktopHome'].some(field=>next[field]!==this.state.settings[field]);
+      if(pathsChanged&&this.gateway&&!['stopped','error'].includes(this.gateway.status))throw new UserError('Dừng gateway trước khi đổi đường dẫn.', 'GATEWAY_RUNNING');
       if (next.codexPath) await this.platform.findCodex(next.codexPath);
       await assertDirectory(next.workspace); await assertDirectory(next.desktopHome);
       if (next.desktopHome !== this.state.settings.desktopHome && (this.state.rollback || this.recoveryPending)) throw new UserError('Khôi phục lần chuyển gần nhất trước khi đổi thư mục desktop.', 'ROLLBACK_EXISTS');
@@ -567,7 +568,9 @@ class ProfileService extends EventEmitter {
   async diagnostics() {
     const executable = await this.executable(); const version = await this.platform.run(executable,['--version']);
     const blocked = this.platform.blockers(await this.platform.processes());
-    return { codex: executable, version: /^codex-cli [\w.+-]+$/.test(version) ? version : 'Codex CLI', blockers: [...new Set(blocked.map(p => p.Name))], storage: this.root, loginRecovery: await exists(path.join(this.root,'login','auth.json')) };
+    const view=this.gateway?.view?.(),routes=[['shared',view],...Object.entries(view?.scopes||{}).filter(([,v])=>v.mode==='private')];
+    const modelUsage=routes.filter(([,v])=>v?.usage).map(([scope,v])=>({scope,...v.usage}));
+    return { codex: executable, version: /^codex-cli [\w.+-]+$/.test(version) ? version : 'Codex CLI', blockers: [...new Set(blocked.map(p => p.Name))], storage: this.root, loginRecovery: await exists(path.join(this.root,'login','auth.json')),modelUsage };
   }
   async close() { this.cancelLogin(); }
 }

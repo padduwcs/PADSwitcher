@@ -24,6 +24,7 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run smoke
+      - run: npm run smoke:protocol
       - run: npm run smoke:ui
       - run: npm run dist
       - run: node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs

@@ -1,4 +1,4 @@
-# PADSwitcher 1.9.0 — validation
+# PADSwitcher 1.9.2 — validation
 
 ## Release checks
 
@@ -8,7 +8,8 @@ electron-builder 26.15.3, .NET Framework 4.8 and native Codex 0.160.0.
 | Check | Scope |
 |---|---|
 | `npm run check` | JavaScript syntax |
-| `npm test` | 133 tests: account vault, gateway, router, reset fixtures, UI, lifecycle, private client routes, JetBrains setup/removal and native discovery |
+| `npm test` | 150 tests: account vault, gateway, router, numeric usage diagnostics, reset fixtures, UI, lifecycle, private client routes, JetBrains setup/removal and native discovery |
+| `npm run smoke:protocol` | Real native Codex with an isolated home, synthetic credentials and loopback responses: cache-affinity headers, sticky routing across an in-turn account change, byte-identical quota retry and tools executed once |
 | `npm run smoke` | Isolated Windows DPAPI/storage smoke check |
 | `npm run smoke:ui` | Real Electron startup, CSP, local fonts, light/dark, VI/EN, Refresh alignment, three client cards, compact layout and reset confirmation cancellation |
 | `npm run dist` | Windows portable packaging and native helper compilation |
@@ -18,6 +19,75 @@ electron-builder 26.15.3, .NET Framework 4.8 and native Codex 0.160.0.
 Screenshots in [docs/images](docs/images) use sample accounts. Temporary QA data,
 generated helpers and build output are excluded from source control. Release files
 include a SHA-256 checksum; they are currently unsigned.
+
+## Quota investigation — 2026-10-08
+
+The 1.9.0 relay had three confirmed defects that could increase effective usage
+or provoke native retries. The 1.9.2 fixes were verified without real model
+inference, saved account credentials or usage resets:
+
+- Native Codex 0.160.0 sends `session-id` and `thread-id`; the relay allowed the
+  older underscored names instead. The response's `x-codex-turn-state` was also
+  stripped. Preserve current session/cache metadata in both directions. Keep
+  each account's routing token separate, including when native Codex retains its
+  first token after an in-turn account change. Tokens stay in bounded process
+  memory and are never persisted or logged.
+- A fixed five-minute request deadline could cut off a healthy longer stream.
+  Apply a five-minute **inactivity** timeout instead; a stalled/disconnected stream
+  is still cancelled, with no automatic replay by PADSwitcher.
+- A failed metadata save after a successful backup response could turn that
+  response into a transport error. Retain the in-memory account/cooldown and
+  report the save failure while delivering the original response.
+
+Regression tests additionally cover repeated authentication rejection, exhausted
+backup accounts, no retries after text/tool output, cache/metadata preservation,
+long-lived routing tokens, bounded LRU storage and a stream lasting longer than the inactivity limit.
+The native loopback protocol check fails against the previous router and passes
+against the fixed implementation, with one turn and no duplicate tool execution.
+
+Read-only inspection of recent local usage metadata showed low cached-input
+fractions in routed sessions, consistent with lost cache affinity. Workloads were
+not identical, so this observation does not establish how much quota the defect
+consumed. There is no request-level historical router trace from which to prove
+every past attempt; no exact before/after quota reduction is claimed.
+
+Periodic quota refresh uses account metadata RPCs, not `turn/start` or Responses
+inference. The production Responses router does not invoke legacy continuation
+recovery. Quota retries remain bounded to one attempt per eligible account, with
+one credential refresh on 401; transport failures and partial output do not rotate.
+
+The follow-up audit adds a guard at the continuation RPC entry point and avoids
+creating legacy continuation parameters in production. Current model, reasoning
+effort, input history, tool results and request bytes remain client-owned. The
+native fixture verifies three successful model calls, one quota-rejected attempt,
+one turn and two distinct tools, each executed once. Read-only account inspection
+and an idle connection add no model calls in that fixture.
+
+Sticky-routing state has no arbitrary wall-clock expiry: native Codex retains its
+first token for the whole turn, including long approval/tool waits. Bounded LRU
+storage retains actively used aliases and is cleared when the router shuts down.
+
+Quota polling now runs every minute, prevents overlapping reads and tolerates
+timer jitter and a backwards system-clock change. Polling preferences can be saved
+with an active connection; changing filesystem paths still requires stopping it.
+
+Settings diagnostics expose per-route request/attempt/retry counts and reported
+cached-input tokens. These are process-local numeric counters, not quota billing
+figures. They are neither written to disk nor sent elsewhere, and never retain
+prompts, response text, credentials or account/thread IDs. Parsing is bounded and
+cannot change the forwarded response; malformed or oversized usage events may be
+omitted. Compact JSON responses do not contribute to the SSE completion/token
+totals. Shared routes are listed once and private-route counts are independent.
+
+The native cache percentages in fixtures are synthetic. No live before/after
+quota benchmark or server-side guarantee of cache reuse is claimed. Changing
+accounts can require processing the same long context with a cold cache even
+after these transport defects are fixed.
+
+Protocol references: official Codex 0.160.0
+[session headers](https://github.com/openai/codex/blob/rust-v0.160.0/codex-rs/codex-api/src/requests/headers.rs),
+[cache affinity and turn ownership](https://github.com/openai/codex/blob/rust-v0.160.0/codex-rs/core/src/client.rs),
+and [HTTP stream metadata](https://github.com/openai/codex/blob/rust-v0.160.0/codex-rs/codex-api/src/sse/responses.rs).
 
 ## Routing verification
 

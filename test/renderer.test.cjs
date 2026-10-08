@@ -65,6 +65,15 @@ test('renderer distinguishes depleted quota from ready accounts and marks stale 
   assert.ok(d.querySelector('#detail').textContent.includes('Nguồn: dịch vụ Codex'));
 });
 
+test('model diagnostics distinguish attempts from charges and show minute refresh in both languages',async t=>{
+  const w=dom(t);await settle();const info={modelUsage:[{scope:'shared',requests:2,attempts:3,quotaRetries:1,authRefreshes:0,inputTokens:100,cachedInputTokens:90,lastModel:'gpt-fixture',lastEffort:'medium'}]};
+  const action=w.pad.action;w.pad.action=async(...args)=>{const result=await action(...args);if(args[0]==='diagnostics')result.result.modelUsage=info.modelUsage;return result;};
+  w.document.querySelector('#check-system').click();await settle();const vi=w.document.querySelector('#diagnostics').textContent;assert(vi.includes('90%'));assert(vi.includes('Lần gửi tới model'));assert(vi.includes('không phải số quota bị trừ'));
+  assert(w.document.querySelector('label.check-label').textContent.includes('mỗi phút'));
+  w.document.querySelector('#language-toggle').click();w.document.querySelector('#check-system').click();await settle();const en=w.document.querySelector('#diagnostics').textContent;assert(en.includes('Upstream attempts'));assert(en.includes('not quota charges'));
+  assert(w.document.querySelector('label.check-label').textContent.includes('every minute'));
+});
+
 test('a failed refresh marks the last snapshot stale even when its timestamp is recent',async t => {
   const w = dom(t,true,state => {state.profiles[0].status='error';}); await settle(); const d = w.document;
   assert.ok(d.querySelector('#detail .timestamp').classList.contains('stale'));

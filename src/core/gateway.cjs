@@ -24,7 +24,7 @@ class Gateway {
     this.recovery=new Recovery(this);
     this.knownTurns=new Map();
   }
-  view(){const connected={vscode:0,cli:0,jetbrains:0,other:0};for(const c of this.clients)if(c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
+  view(){const connected={vscode:0,cli:0,jetbrains:0,other:0};for(const c of this.clients)if(c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',usage:this.router?{...this.router.usage}:null,lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
   changed(){this.service.changed();}
   async start(id){
     this.service.get(id);
@@ -197,7 +197,7 @@ class Gateway {
       if(m.id==null){c.front.close(1007);return;}
       if(c.pending.has(m.id)){this.clientError(c,m.id,'Duplicate active request ID.');return;}
       if(this.knownTurns.size>=256){this.clientError(c,m.id,'Too many tracked turns. Stop and restart the gateway.');return;}
-      const key=crypto.randomUUID(),context={client:c,threadId:m.params?.threadId,turnId:null,method:m.method,startParams:continuation(m.params||{}),profileId:this.profileId,auxiliary:c.auxThreads.has(m.params?.threadId)};c.pending.set(m.id,key);c.startContexts.set(m.id,context);this.turns.set(key,context);this.changed();
+      const key=crypto.randomUUID(),context={client:c,threadId:m.params?.threadId,turnId:null,method:m.method,startParams:this.router?null:continuation(m.params||{}),profileId:this.profileId,auxiliary:c.auxThreads.has(m.params?.threadId)};c.pending.set(m.id,key);c.startContexts.set(m.id,context);this.turns.set(key,context);this.changed();
     }
     if(c.back.readyState===WebSocket.OPEN)c.back.send(JSON.stringify(m));
   }
@@ -229,6 +229,7 @@ class Gateway {
     }
   }
   startContinuation(job,params){
+    if(this.router)throw new UserError('Request routing never creates an additional continuation turn.', 'GATEWAY_CONTINUATION_DISABLED');
     const c=job.client,id='pad-auto-'+crypto.randomUUID(),key=crypto.randomUUID();
     const context={client:c,threadId:params.threadId,turnId:null,method:'turn/start',startParams:params,profileId:this.profileId,attempted:job.attempted};c.pending.set(id,key);c.startContexts.set(id,context);this.turns.set(key,context);this.changed();
     return new Promise((resolve,reject)=>{

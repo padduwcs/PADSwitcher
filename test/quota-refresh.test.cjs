@@ -30,3 +30,14 @@ test('a failed background attempt exposes its error and can retry after the cool
   assert.equal(await f.refresh('focus'),false); f.advance(60000);
   f.service.refreshAll=async () => {}; assert.equal(await f.refresh('focus'),true);
 });
+
+test('one-minute periodic refresh tolerates timer jitter and skips overlapping long reads',async()=>{
+  const f=fixture();f.service.state.settings.autoRefresh=true;await f.refresh('startup');f.advance(59990);
+  let release;f.service.refreshAll=()=>new Promise(resolve=>release=resolve);
+  const pending=f.refresh('periodic');f.advance(120000);assert.equal(await f.refresh('periodic'),false);assert.equal(await f.refresh('focus'),false);
+  release();assert.equal(await pending,true);f.service.refreshAll=async()=>{};assert.equal(await f.refresh('periodic'),true);
+});
+
+test('changing the system clock backwards does not suspend quota polling indefinitely',async()=>{
+  const f=fixture();f.service.state.settings.autoRefresh=true;f.advance(120000);await f.refresh('periodic');f.advance(-120000);assert.equal(await f.refresh('periodic'),true);
+});

@@ -27,9 +27,12 @@ test('private quota fallback preserves request bytes and affects only that route
   await service.autoSwitchSettings({scope:'vscode',enabled:true,order:[a.id,b.id]});await service.autoSwitchSettings({scope:'jetbrains',enabled:true,order:[c.id,d.id]});
   const vs=await client('vscode'),jb=await client('jetbrains'),seen=[];
   const g=hub.private.get('vscode');g.router=new ModelRouter(g,{fetch:async(_url,options)=>{seen.push({account:options.headers['chatgpt-account-id'],bytes:Buffer.from(options.body)});return options.headers['chatgpt-account-id']==='fixture-account-a'?new Response(JSON.stringify({error:{type:'usage_limit_reached',resets_in_seconds:900}}),{status:429,headers:{'Content-Type':'application/json'}}):new Response('fixture complete',{headers:{'Content-Type':'text/plain'}});}});await g.router.start();g.router.select(a.id);
+  hub.shared.router=new ModelRouter(hub.shared);hub.private.get('jetbrains').router=new ModelRouter(hub.private.get('jetbrains'));
   const body=JSON.stringify({model:'fixture',input:[{role:'user',content:'Earlier context'},{type:'function_call_output',call_id:'done',output:'Already wrote once'}]});
   const result=await fetch(g.router.baseUrl+'/responses',{method:'POST',headers:{authorization:'Bearer fixture','Content-Type':'application/json'},body});assert.equal(await result.text(),'fixture complete');
   assert.deepEqual(seen.map(s=>s.account),['fixture-account-a','fixture-account-b']);assert(seen[0].bytes.equals(seen[1].bytes));assert.equal(hub.view().scopes.vscode.profileId,b.id);assert.equal(hub.view().scopes.jetbrains.profileId,c.id);assert.equal(hub.view().profileId,a.id);assert(service.state.quotaCooldowns[a.id]>Date.now());
+  assert.equal(hub.view().scopes.vscode.usage.requests,1);assert.equal(hub.view().scopes.vscode.usage.attempts,2);assert.equal(hub.view().scopes.vscode.usage.quotaRetries,1);
+  assert.equal(hub.view().usage.requests,0);assert.equal(hub.view().scopes.jetbrains.usage.requests,0);
   await pause(1100);assert.equal((await vs.request('account/read')).account.email,email('b'));assert.equal((await jb.request('account/read')).account.email,email('c'));
   await service.autoSwitchSettings({scope:'vscode',enabled:false,order:[a.id,b.id]});assert.equal(service.state.clientRoutes.jetbrains.autoSwitch.enabled,true);assert.equal(service.state.autoSwitch.enabled,false);
 });

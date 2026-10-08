@@ -37,7 +37,7 @@ test('an active gateway profile is protected from removal and reauthentication',
   const f=await fixture(t),p=await f.service.capture(auth('b'));f.service.gateway={profileId:p.id,pendingId:null,status:'ready',view:()=>({status:'ready'})};
   await assert.rejects(f.service.remove(p.id),{code:'PROFILE_ACTIVE'});
   await assert.rejects(f.service.addAccount('b',async()=>{},false,p.id),{code:'PROFILE_ACTIVE'});
-  await assert.rejects(f.service.settings({workspace:f.directory}),{code:'GATEWAY_RUNNING'});
+  await assert.rejects(f.service.settings({workspace:f.desktop}),{code:'GATEWAY_RUNNING'});
   assert(await exists(f.service.vault(p.id)));
 });
 
@@ -215,4 +215,19 @@ test('wrong-account reauthentication leaves existing vault intact and retains re
   }};return rpc;};
   await assert.rejects(f.service.addAccount('B',async()=>{},false,id),{code:'IDENTITY_MISMATCH'});assert.deepEqual(await f.service.loadAuth(id),auth('b'));
   assert.ok(await exists(path.join(f.data,'login','auth.json')));assert.equal(f.service.state.profiles.length,1);
+});
+
+test('quota polling preference can change during a live connection while path changes remain blocked',async t=>{
+  const f=await fixture(t);f.service.gateway={status:'ready',view:()=>({status:'ready'})};
+  await f.service.settings({...f.service.state.settings,autoRefresh:false});assert.equal(f.service.state.settings.autoRefresh,false);
+  await f.service.settings({autoRefresh:true});assert.equal(f.service.state.settings.autoRefresh,true);
+  await assert.rejects(f.service.settings({workspace:f.desktop}),{code:'GATEWAY_RUNNING'});assert.equal(f.service.state.settings.workspace,f.directory);
+});
+
+test('diagnostics show each model route once and do not persist numeric telemetry',async t=>{
+  const f=await fixture(t);f.service.platform.blockers=()=>[];
+  const shared={requests:3,attempts:4},own={requests:2,attempts:2};
+  f.service.gateway={view:()=>({usage:shared,scopes:{vscode:{mode:'shared',usage:shared},cli:{mode:'shared',usage:shared},jetbrains:{mode:'private',usage:own}}})};
+  const info=await f.service.diagnostics();assert.deepEqual(info.modelUsage,[{scope:'shared',...shared},{scope:'jetbrains',...own}]);
+  await f.service.save();assert(!(await fs.readFile(f.service.metadataFile,'utf8')).includes('attempts'));
 });

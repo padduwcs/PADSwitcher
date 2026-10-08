@@ -128,7 +128,7 @@ async function start() {
   window.on('focus',() => refresh('focus'));
   window.on('focus',()=>checkIntegration());
   integrationTimer=setInterval(()=>checkIntegration(),3000);
-  timer = setInterval(() => refresh('periodic'), 5 * 60 * 1000);
+  timer = setInterval(() => refresh('periodic'), 60 * 1000);
   window.on('close',event => {
     if (quitting) return;
     if(['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}

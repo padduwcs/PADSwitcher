@@ -1,6 +1,13 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),http=require('node:http');
 const {fixture,auth,jwt}=require('./helpers.cjs'),{ModelRouter}=require('../src/core/model-router.cjs');
+const {Gateway}=require('../src/core/gateway.cjs');
+
+test('production request routing refuses any legacy continuation turn before sending an RPC',async t=>{
+  const f=await fixture(t),g=new Gateway(f.service);g.router={};
+  assert.throws(()=>g.startContinuation({},{}),{code:'GATEWAY_CONTINUATION_DISABLED'});
+  assert.equal(g.turns.size,0);
+});
 test('a routed account and in-flight accounts stay protected even before native auth synchronizes',async t=>{
   const f=await fixture(t),a=await f.service.capture(auth('a')),b=await f.service.capture(auth('b')),c=await f.service.capture(auth('c'));
   const gateway={profileId:a.id,pendingId:null,status:'ready',view:()=>({status:'ready'})};
