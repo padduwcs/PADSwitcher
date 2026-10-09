@@ -17,7 +17,7 @@ async function completed(setup){for(let i=0;i<100&&setup.active();i++)await paus
 function fixture(options={}) {
   const calls=[],prefs={browserInteractionMode:'automatic'},stateStore={read:()=>prefs,update:x=>Object.assign(prefs,x)};
   let config=null,authenticated=true,operation=null,health={service:'codex-chatgpt-web',version:'6.1.6',active_http_turns:0,active_browser_turns:0};
-  const browserHost={get state(){return {authenticated};},activeTraceId:null,currentOperation:()=>null,probeAuthentication:async()=>({authenticated})};
+  const browserHost={get state(){return {authenticated};},activeTraceId:null,currentOperation:()=>null,probeAuthentication:async()=>({authenticated}),waitForSurfaceReady:async()=>{calls.push({channel:'surface-ready'});}};
   const runtimeHost={currentOperation:()=>operation,runtimeConfigSnapshot:()=>({config}),mcpCredentialsConfigured:()=>!!config?.tunnel,setupConnectorName:()=> 'CodexNative2-pad-fixture'};
   const supervisor={readConfig:()=>config,proxyHealthPayload:async()=>health};
   const invoke=async(channel,input)=>{
@@ -37,6 +37,19 @@ test('managed setup snapshot is passive; consent and valid action are required',
   assert.throws(()=>f.start('inference'),{code:'WEB_SETUP_INPUT'});
   assert.throws(()=>f.start('external',{target:'https://evil.test'}),{code:'WEB_SETUP_INPUT'});
   assert.equal(f.calls.length,0);
+});
+test('managed sign-in waits for a visible measured browser before opening authentication',async()=>{
+  const f=fixture();let release;
+  f.browserHost.waitForSurfaceReady=()=>new Promise(r=>release=r);
+  f.start('login');await pause();assert.deepEqual(f.calls.map(x=>x.channel),['show-browser']);
+  assert.equal(f.setup.active(),true);release();await completed(f.setup);
+  assert.deepEqual(f.calls.map(x=>x.channel),['show-browser','launcher:browser-login']);
+});
+test('sign-in can wait for saved-session startup, but other setup cannot compete with it',async()=>{
+  const f=fixture();f.browserHost.currentOperation=()=> 'session refresh';
+  assert.throws(()=>f.start('prepare',{consent:true}),{code:'WEB_SETUP_BUSY'});
+  f.start('login');assert.equal((await completed(f.setup)).status,'completed');
+  assert.deepEqual(f.calls.map(x=>x.channel),['show-browser','surface-ready','launcher:browser-login']);
 });
 test('one-click preparation runs one Web test then installation; saved setup skips both',async()=>{
   const f=fixture();f.start('prepare',{consent:true});assert.equal((await completed(f.setup)).status,'completed');

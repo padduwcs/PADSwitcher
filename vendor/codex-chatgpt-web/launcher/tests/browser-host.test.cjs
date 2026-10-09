@@ -60,6 +60,27 @@ test("failed primary navigation rejects login and an explicit retry replaces the
   await host.openLogin();
   assert.equal(loads(), 1, "an authenticated, valid document is preserved");
 });
+test("PAD sign-in replaces a signed-out home with the login page and preserves an in-progress provider page", async () => {
+  const { host, contents, loads } = primaryLoginFixture();
+  let destination;
+  const load = contents.loadURL;
+  contents.loadURL = async url => { destination=url;await load(url); };
+  await host.openLogin({ directSignIn:true });
+  assert.equal(destination,"https://chatgpt.com/auth/login");assert.equal(loads(),1);
+  contents.getURL=()=> "https://accounts.google.com/o/oauth2/auth";
+  await host.openLogin({ directSignIn:true });
+  assert.equal(loads(),1,"the user's provider sign-in is not reset");
+});
+test("explicit reload recovers login without unlocking other setup or any active Web turn", () => {
+  let reloads=0;
+  const fixture={activeTraceId:null,manualOperation:"ChatGPT login",activeView:()=>({webContents:{navigationHistory:{},reload:()=>reloads++}}),snapshot:()=>({})};
+  BrowserHost.prototype.navigate.call(fixture,"reload");assert.equal(reloads,1);
+  for(const action of ["back","forward"])assert.throws(()=>BrowserHost.prototype.navigate.call(fixture,action),/locked during ChatGPT login/);
+  fixture.manualOperation="browser smoke test";assert.throws(()=>BrowserHost.prototype.navigate.call(fixture,"reload"),/locked during browser smoke test/);
+  fixture.manualOperation="ChatGPT login";fixture.activeTraceId="running-turn";
+  assert.throws(()=>BrowserHost.prototype.navigate.call(fixture,"reload"),/locked while ChatGPT is running a Codex turn/);
+  assert.equal(reloads,1);
+});
 
 test("only failed main-frame loads and renderer exits invalidate the primary login document", async () => {
   const { host, contents, loads } = primaryLoginFixture();

@@ -1,5 +1,25 @@
 # PADSwitcher 1.9.2 — validation
 
+## GPT Web sign-in recovery — 1.11.1
+
+- Reproduced the signed-out embedded page stopping at a blank `Just a moment...`
+  document. Fresh disposable profiles also loaded the normal ChatGPT guest page;
+  this does not establish that security checks will always clear.
+- Managed sign-in waits for measured browser bounds and opens `/auth/login`
+  directly. It can wait behind the existing saved-session refresh without
+  starting a competing refresh. An in-progress provider page is preserved.
+- Explicit reload is allowed only during ordinary ChatGPT login; active model
+  turns and other browser operations remain locked. No automatic login, reload,
+  inference retry or native fallback was added.
+- Local root suite: 192 passing tests; native quota/cache regression: 50 passing
+  cases across Web disabled/enabled. Launcher login tests cover direct entry,
+  provider-page preservation, surface readiness and navigation isolation.
+- No owner login, live model turn or Full/MCP tool operation was performed.
+- A disposable account in the rebuilt packaged companion reached the actual
+  `https://chatgpt.com/auth/login` page with Google/Apple/email sign-in choices.
+  No credentials were entered and no model turn was submitted. Complete owner
+  sign-in still needs to be verified; this is not a claim of Cloudflare bypass.
+
 ## Release checks
 
 Local environment: Windows x64, Node.js 24.18.1, Electron 44.5.1,

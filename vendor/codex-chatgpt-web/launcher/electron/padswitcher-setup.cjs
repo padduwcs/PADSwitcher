@@ -7,7 +7,7 @@ const URLS = Object.freeze({
   plugins: 'https://chatgpt.com/#settings/Plugins',
 });
 const MESSAGES = Object.freeze({
-  login: 'Đang mở trang đăng nhập ChatGPT. Hoàn tất đăng nhập rồi quay lại PADSwitcher.',
+  login: 'Đang chờ bạn đăng nhập trong cửa sổ ChatGPT. Nếu trang trắng, bấm nút tải lại ở thanh trên.',
   authentication: 'Đang kiểm tra phiên đăng nhập.',
   smoke: 'Đang kiểm tra trình duyệt bằng một lượt ChatGPT Web.',
   install: 'Đang cài model và khởi động bộ chạy Web.',
@@ -44,7 +44,8 @@ function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStor
     if (requests.has(input.requestId)) return {accepted: true, duplicate: true};
     if (requests.size >= 1000) throw setupError('WEB_SETUP_LIMIT', 'Đã đạt giới hạn thao tác của phiên thiết lập. Mở lại PADSwitcher khi không còn lượt chạy.');
     if (active() || runtimeHost.currentOperation() || browserHost.activeTraceId
-      || browserHost.currentOperation() && browserHost.currentOperation() !== 'ChatGPT login') {
+      || browserHost.currentOperation() && browserHost.currentOperation() !== 'ChatGPT login'
+        && !(input.action === 'login' && browserHost.currentOperation() === 'session refresh')) {
       throw setupError('WEB_SETUP_BUSY', 'Chờ lượt Web hoặc thao tác thiết lập đang chạy hoàn tất.');
     }
     if (stateStore.read().browserInteractionMode !== 'automatic') {
@@ -76,7 +77,7 @@ function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStor
     }).catch(() => {
       // Do not expose upstream errors, commands or secrets to the PAD renderer.
       job.status = 'failed';
-      job.message = ({login: 'Chưa mở được đăng nhập. Thử mở lại khi thao tác hiện tại hoàn tất.',
+      job.message = ({login: 'Chưa hoàn tất đăng nhập. Nếu trang trắng, mở lại đăng nhập; chưa cần thiết lập model hay công cụ.',
         authentication: 'Chưa đăng nhập ChatGPT. Bấm Đăng nhập rồi quay lại.',
         smoke: 'Kiểm tra trình duyệt chưa thành công. Kiểm tra đăng nhập/mạng; chỉ thử lại khi bạn bấm nút.',
         install: 'Chưa cài xong model. Lượt kiểm tra đã thành công được giữ lại; bấm Thiết lập tự động để tiếp tục.',
@@ -91,7 +92,10 @@ function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStor
     const health = config ? await supervisor.proxyHealthPayload(config).catch(() => null) : null;
     if (health?.active_http_turns || health?.active_browser_turns) throw Error('Web turn active');
     if (input.action === 'external') { await invoke('launcher:open-external', URLS[input.target]); return; }
-    if (input.action === 'login') { await showBrowser(); await invoke('launcher:browser-login'); return; }
+    if (input.action === 'login') {
+      await showBrowser(); await browserHost.waitForSurfaceReady();
+      await invoke('launcher:browser-login'); return;
+    }
     step('authentication');
     if (browserHost.state.authenticated !== true) throw Error('Sign in required');
     const auth = await browserHost.probeAuthentication();

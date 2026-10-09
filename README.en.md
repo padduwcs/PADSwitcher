@@ -1,5 +1,8 @@
 # PADSwitcher
 
+**Fixed in 1.11.1:** GPT Web opens the sign-in page directly and allows an explicit
+reload during sign-in. Navigation remains locked during model turns.
+
 **New in 1.11.0:** an integrated **GPT Web** setup wizard in Vietnamese/English
 checks the browser and installs models after sign-in. It manages isolated Web
 accounts, guides tool connections and resumes partial setup. Web is off by

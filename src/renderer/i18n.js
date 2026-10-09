@@ -48,6 +48,8 @@ window.padUI = (() => {
     'Đã sẵn sàng. Bấm Hoàn tất và sử dụng.':'Ready. Click Finish and start.',
     'Đang xác định kết quả thiết lập. Chờ cập nhật trạng thái; ứng dụng không tự gửi lại thao tác.':'Checking the setup result. Wait for a status update; the app does not resend the operation.',
     'Đang mở trang đăng nhập ChatGPT. Hoàn tất đăng nhập rồi quay lại PADSwitcher.':'Opening ChatGPT sign-in. Finish signing in, then return to PADSwitcher.',
+    'Đang chờ bạn đăng nhập trong cửa sổ ChatGPT. Nếu trang trắng, bấm nút tải lại ở thanh trên.':'Waiting for you to sign in in the ChatGPT window. If the page is blank, use Reload in its toolbar.',
+    'Chưa hoàn tất đăng nhập. Nếu trang trắng, mở lại đăng nhập; chưa cần thiết lập model hay công cụ.':'Sign-in is incomplete. If the page is blank, reopen sign-in; model and tool setup can wait.',
     'Đang kiểm tra phiên đăng nhập.':'Checking sign-in.','Đang kiểm tra trình duyệt bằng một lượt ChatGPT Web.':'Checking the browser with one ChatGPT Web turn.',
     'Đang cài model và khởi động bộ chạy Web.':'Installing models and starting the Web runtime.',
     'Đang kết nối công cụ.':'Connecting tools.','Đang kiểm tra bộ chạy và quyền truy cập công cụ.':'Checking the runtime and tool access.',

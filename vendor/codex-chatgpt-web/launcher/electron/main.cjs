@@ -645,7 +645,7 @@ function registerIpc({ logger, stateStore }) {
   handle("launcher:manual-prompt-copy", (_event, tabId) => browserHost.copyManualPrompt(tabId));
   handle("launcher:manual-prompt-sent", (_event, tabId) => browserHost.confirmManualSent(tabId));
   handle("launcher:browser-login", async () => {
-    const browser = await browserHost.openLogin();
+    const browser = await browserHost.openLogin({ directSignIn: PAD_MANAGED });
     if (browser.authenticated) {
       const state = stateStore.update({ sessionRefreshReminderAt: nextSessionRefreshReminderAt() });
       send("launcher:state-changed", state);

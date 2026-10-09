@@ -1,5 +1,8 @@
 # PADSwitcher
 
+**Sửa ở 1.11.1:** GPT Web mở thẳng trang đăng nhập và cho phép tải lại khi đăng
+nhập gặp trang trắng, giữ khóa điều hướng trong lượt model.
+
 **Mới ở 1.11.0:** trình thiết lập **GPT Web** ngay trong PADSwitcher, có tiếng
 Việt/Anh, tự kiểm tra và cài model sau khi đăng nhập. Quản lý nhiều tài khoản Web,
 kết nối công cụ theo từng bước và giữ tiến độ khi lỗi. Mặc định tắt; giữ tuyến Codex hiện có.

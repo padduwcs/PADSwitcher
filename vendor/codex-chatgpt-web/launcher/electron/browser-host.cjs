@@ -27,6 +27,7 @@ const {
 } = require("./browser-state.cjs");
 
 const TEMPORARY_CHAT_URL = "https://chatgpt.com/?temporary-chat=true";
+const CHATGPT_LOGIN_URL = "https://chatgpt.com/auth/login";
 const CHATGPT_ORIGIN = "https://chatgpt.com";
 const IDLE_BROWSER_URL = "data:text/html;charset=utf-8,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Cmeta%20charset%3D%22utf-8%22%3E%3Ctitle%3ECodex%20Web%20GPT%3C%2Ftitle%3E%3C%2Fhead%3E%3Cbody%3E%3C%2Fbody%3E%3C%2Fhtml%3E#codex-web-gpt-browser-host";
 const PRIMARY_VIEW_BOOTSTRAP_TIMEOUT_MS = 10_000;
@@ -2040,7 +2041,7 @@ class BrowserHost {
     if (this.activeTraceId) {
       throw new Error("Browser navigation is locked while ChatGPT is running a Codex turn");
     }
-    if (this.manualOperation) {
+    if (this.manualOperation && !(this.manualOperation === "ChatGPT login" && action === "reload")) {
       throw new Error(`Browser navigation is locked during ${this.manualOperation}`);
     }
     const contents = this.activeView().webContents;
@@ -2608,7 +2609,7 @@ class BrowserHost {
     });
   }
 
-  openLogin() {
+  openLogin({ directSignIn = false } = {}) {
     requireAutomaticBrowserInspection(this, "Automated ChatGPT sign-in verification");
     if (this.state.authenticated && !this.primaryNavigationError) {
       this.activateHomeSurface();
@@ -2634,8 +2635,9 @@ class BrowserHost {
         this.show();
         this.logger.info("browser.login_opened");
         const current = this.view.webContents.getURL();
-        if (this.primaryNavigationError || this.reauthenticationRequired || !current.startsWith(CHATGPT_ORIGIN)) {
-          await this.view.webContents.loadURL(TEMPORARY_CHAT_URL);
+        if (this.primaryNavigationError || this.reauthenticationRequired
+          || (directSignIn ? !allowedAuthUrl(current) : !current.startsWith(CHATGPT_ORIGIN))) {
+          await this.view.webContents.loadURL(directSignIn ? CHATGPT_LOGIN_URL : TEMPORARY_CHAT_URL);
         }
         await this.probeAuthentication();
         const authenticated = await this.waitForAuthenticated();

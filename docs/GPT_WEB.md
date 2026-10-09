@@ -1,4 +1,4 @@
-# GPT Web trong PADSwitcher 1.11.0
+# GPT Web trong PADSwitcher 1.11.1
 
 GPT Web là chức năng bổ sung, mặc định tắt. Trang **Tài khoản** tiếp tục quản lý
 đăng nhập Codex; trang **GPT Web** quản lý phiên đăng nhập ChatGPT riêng.
@@ -12,7 +12,11 @@ khóa này không dùng để gọi model API.
 2. Mở **GPT Web → Thêm tài khoản Web**, đặt tên dễ nhận biết.
 3. Trình thiết lập mở ngay trong PADSwitcher (hoặc bấm **Đăng nhập & thiết lập**
    trên tài khoản có sẵn). Bấm **Đăng nhập ChatGPT**, đăng nhập trong cửa sổ
-   trình duyệt riêng rồi quay lại PADSwitcher. Trạng thái được cập nhật tự động.
+   trình duyệt riêng rồi quay lại PADSwitcher. Nút này mở thẳng trang đăng nhập;
+   không cần tìm nút Log in trên trang chat. Trạng thái được cập nhật tự động.
+   Nếu trang trắng hoặc tải mãi, bấm **tải lại** ở thanh trên của cửa sổ ChatGPT.
+   Tải lại chỉ được phép trong lúc đăng nhập; vẫn bị chặn khi có lượt model hoặc
+   kiểm tra trình duyệt đang chạy. Không tự tải lại, gửi prompt hay thử lại đăng nhập.
 4. Chọn **Chỉ trò chuyện** hoặc **Trò chuyện và lập trình**. Đồng ý chạy một lượt
    kiểm tra ChatGPT Web rồi bấm **Thiết lập tự động**. Ứng dụng chạy kiểm tra,
    cài model và khởi động bộ chạy tuần tự. Lượt kiểm tra dùng giới hạn Web của
