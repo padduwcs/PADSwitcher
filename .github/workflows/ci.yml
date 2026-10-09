@@ -30,12 +30,12 @@ jobs:
       - run: npm run smoke:protocol:web-enabled
       - run: npm run smoke:ui
       - run: npm run dist
+      - name: Install launcher Electron for bridge and launcher tests
+        run: node vendor/codex-chatgpt-web/launcher/node_modules/electron/install.js
       - name: Web bridge tests (Bun)
         working-directory: vendor/codex-chatgpt-web
         shell: pwsh
         run: '& "${{ github.workspace }}/artifacts/build-tools/node_modules/@oven/bun-windows-x64/bin/bun.exe" test ./tests'
-      - name: Install launcher Electron for Node-based tests
-        run: node vendor/codex-chatgpt-web/launcher/node_modules/electron/install.js
       - name: Web launcher tests (Node)
         working-directory: vendor/codex-chatgpt-web/launcher
         run: node --test tests/*.test.cjs
