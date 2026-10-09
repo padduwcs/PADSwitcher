@@ -195,6 +195,7 @@ export interface LauncherApi {
   windowState(): Promise<{ fullScreen: boolean; maximized: boolean }>;
   windowControl(action: "close" | "minimize" | "zoom"): void;
   onWindowStateChanged(listener: (state: { fullScreen: boolean; maximized: boolean }) => void): () => void;
+  onPadBrowser(listener: (active: boolean) => void): () => void;
   onConnectorNamesChanged(listener: (names: Pick<LauncherSnapshot, "connectorName" | "connectorNames">) => void): () => void;
   onStateChanged(listener: (state: LauncherState) => void): () => void;
   onBrowserState(listener: (state: BrowserState) => void): () => void;

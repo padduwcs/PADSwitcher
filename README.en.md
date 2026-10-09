@@ -1,8 +1,9 @@
 # PADSwitcher
 
-**New in 1.10.0:** a separate **GPT Web** page manages multiple isolated ChatGPT
-sessions and adds account-qualified Web models to Codex through PADSwitcher.
-It is off by default. Existing native routing remains in place.
+**New in 1.11.0:** an integrated **GPT Web** setup wizard in Vietnamese/English
+checks the browser and installs models after sign-in. It manages isolated Web
+accounts, guides tool connections and resumes partial setup. Web is off by
+default; existing native Codex routing remains in place.
 See [setup, operation and validation scope (Vietnamese)](docs/GPT_WEB.md).
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">

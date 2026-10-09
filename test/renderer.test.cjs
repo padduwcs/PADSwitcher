@@ -8,6 +8,49 @@ const html = fs.readFileSync(path.join(__dirname,'../src/renderer/index.html'),'
 const script = fs.readFileSync(path.join(__dirname,'../src/renderer/app.js'),'utf8');
 const mock = require('../scripts/preview-data.cjs');
 const settle = async () => { await new Promise(resolve => setTimeout(resolve,10)); };
+test('Web wizard runs a complete chat setup with explicit consent and one prepare click; native settings stay unchanged',async t=>{
+  const w=dom(t);await settle();const d=w.document,commands=[];const action=w.pad.action;
+  w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
+  d.querySelector('#web-add').click();d.querySelector('#web-label').value='New Web';
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  assert.equal(d.querySelector('#web-wizard').open,true);
+  assert(!commands.some(x=>x.command==='webSetup'));
+  d.querySelector('[name="web-purpose"][value="chat"]').click();
+  d.querySelector('#web-wizard-signin').click();await settle();
+  assert.equal(d.querySelector('#web-wizard-auto').disabled,true);
+  d.querySelector('#web-smoke-consent').click();assert.equal(d.querySelector('#web-wizard-auto').disabled,false);
+  d.querySelector('#web-wizard-auto').click();d.querySelector('#web-wizard-auto').click();await settle();
+  assert.equal(commands.filter(x=>x.command==='webSetup'&&x.args.action==='prepare').length,1);
+  assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),false);
+  d.querySelector('#web-wizard-done').click();await settle();
+  assert.equal(d.querySelector('#web-wizard').open,false);assert.equal(d.querySelector('#web-state').textContent,'Đang bật');
+  assert(!commands.some(x=>['useGateway','autoSwitchSettings','refresh','configureVSCode'].includes(x.command)));
+});
+test('Web coding setup hides finish until tool verification and clears secret input after submission or dismissal',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('#web-add').click();d.querySelector('#web-label').value='Coding Web';
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  d.querySelector('#web-wizard-signin').click();await settle();d.querySelector('#web-smoke-consent').click();
+  d.querySelector('#web-wizard-auto').click();await settle();
+  assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),true);
+  const secret='sk-PRIVATE_FIXTURE_ONLY';d.querySelector('#web-tunnel-key').value=secret;d.querySelector('#web-tunnel-id').value='tunnel_'+'a'.repeat(32);
+  d.querySelector('#web-wizard-connect').click();await settle();
+  assert.equal(d.querySelector('#web-tunnel-key').value,'');assert.equal(d.querySelector('#web-plugin-guide').classList.contains('hidden'),false);
+  assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),true);
+  d.querySelector('#web-wizard-verify').click();await settle();assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),false);
+  assert(!JSON.stringify({...w.localStorage}).includes(secret));d.querySelector('#web-tunnel-key').value=secret;d.querySelector('#web-wizard-later').click();
+  assert.equal(d.querySelector('#web-tunnel-key').value,'');
+});
+test('Web wizard translates, keeps account text literal, and never runs tests just by reopening',async t=>{
+  const w=dom(t);await settle();const d=w.document,commands=[];const action=w.pad.action;
+  w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
+  d.querySelector('[data-web-open]').click();await settle();d.querySelector('#language-toggle').click();
+  assert.equal(d.querySelector('#web-wizard-title').textContent,'Set up GPT Web');
+  assert.equal(d.querySelector('#web-wizard-account').textContent,'ChatGPT cá nhân');
+  assert.equal(d.querySelector('#web-wizard-done').textContent,'Finish and start');
+  assert(!commands.some(x=>x.command==='webSetup'));d.querySelector('#web-wizard-later').click();
+  d.querySelector('[data-web-open]').click();await settle();assert(!commands.some(x=>x.command==='webSetup'));
+});
 test('Web setup gives the next action and only enables signed-in ready accounts',async t=>{
   for(const [status,authenticated,expected,disabled] of [
     ['stopped',false,'Đăng nhập & thiết lập',true],
@@ -59,6 +102,7 @@ function dom(t,demo = true, editState = null) {
   }
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/i18n.js'),'utf8'));
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/web.js'),'utf8'));
+  window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/web-setup.js'),'utf8'));
   window.eval(script); t.after(() => window.close()); return window;
 }
 test('renderer shows a useful empty state and disables quota refresh with no accounts',async t => {

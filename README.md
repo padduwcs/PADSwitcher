@@ -1,7 +1,8 @@
 # PADSwitcher
 
-**Mới ở 1.10.0:** trang **GPT Web**, quản lý nhiều phiên ChatGPT riêng và chọn
-model Web trong Codex qua PADSwitcher. Mặc định tắt; giữ tuyến Codex hiện có.
+**Mới ở 1.11.0:** trình thiết lập **GPT Web** ngay trong PADSwitcher, có tiếng
+Việt/Anh, tự kiểm tra và cài model sau khi đăng nhập. Quản lý nhiều tài khoản Web,
+kết nối công cụ theo từng bước và giữ tiến độ khi lỗi. Mặc định tắt; giữ tuyến Codex hiện có.
 Xem [thiết lập, cách dùng và phạm vi kiểm chứng](docs/GPT_WEB.md).
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">

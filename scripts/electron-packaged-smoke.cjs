@@ -47,6 +47,8 @@ Object.defineProperty(process,'resourcesPath',{value:path.resolve(__dirname,'../
       assert.equal(started.state.web.runtimeAvailable,true,'Packaged main must find the bundled Web companion');
       const webAdded=await action('webAdd',{label:'Packaged account fixture'});assert(webAdded.ok);
       const webSelected=await action('webSelect',{id:webAdded.result});assert(webSelected.ok);
+      const invalidSetup=await action('webSetup',{id:webAdded.result,action:'inference',requestId:'invalid-setup-fixture'});
+      assert.equal(invalidSetup.ok,false);assert.equal(invalidSetup.error.code,'WEB_SETUP_INPUT');assert.equal(invalidSetup.state.gateway.status,'ready');
       assert.equal(webSelected.state.web.selectedId,webAdded.result);assert.equal(webSelected.state.web.enabled,false);
       const webRemoved=await action('webRemove',{id:webAdded.result});assert(webRemoved.ok);
       assert.deepEqual(webRemoved.state.web.profiles,[]);assert.equal(webRemoved.state.gateway.status,'ready');

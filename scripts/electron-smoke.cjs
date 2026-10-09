@@ -23,7 +23,7 @@ let timeout;
         await fs.mkdir(path.join(root,'assets/fonts'),{recursive:true});
         for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf','OFL.txt'])await fs.copyFile(path.join(__dirname,'../src/assets/fonts',file),path.join(root,'assets/fonts',file));
         for (const file of ['padswitcher-symbol.png','padswitcher-logo.png','padswitcher-emblem.png']) await fs.copyFile(path.join(__dirname,'../src/assets',file),path.join(root,'assets',file));
-        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','web.js','app.js']) {
+        for (const file of ['index.html','styles.css','branding.css','themes.css','web-setup.css','i18n.js','web.js','web-setup.js','app.js']) {
           let content = await fs.readFile(path.join(__dirname,'../src/renderer',file),'utf8');
           if (file === 'index.html') content = content.replace('<script src="app.js" defer></script>','<script src="preview.js" defer></script><script src="app.js" defer></script>');
           await fs.writeFile(path.join(fixtureRoot,file),content);
@@ -54,6 +54,17 @@ let timeout;
           await fs.writeFile(path.join(root,page+'-sample.png'),frame);
           const overflow=await preview.webContents.executeJavaScript('document.documentElement.scrollWidth>document.documentElement.clientWidth');assert.equal(overflow,false);
         }
+        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('[data-page=web]').click();document.querySelector('#web-add').click();document.querySelector('#web-label').value='GPT Web · Setup preview';document.querySelector('#modal-form').dispatchEvent(new Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,100));})()");
+        const wizardLogin=await preview.webContents.executeJavaScript("({open:document.querySelector('#web-wizard').open,disabled:document.querySelector('#web-wizard-auto').disabled,overflow:document.querySelector('#web-wizard').scrollWidth>document.querySelector('#web-wizard').clientWidth})");
+        assert.equal(wizardLogin.open,true);assert.equal(wizardLogin.disabled,true);assert.equal(wizardLogin.overflow,false);
+        await new Promise(resolve=>setTimeout(resolve,200));
+        const loginFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,frame)=>resolve(frame.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'web-wizard-login.png'),loginFrame);
+        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#web-wizard-signin').click();await new Promise(r=>setTimeout(r,100));document.querySelector('#web-smoke-consent').click();document.querySelector('#web-wizard-auto').click();await new Promise(r=>setTimeout(r,100));})()");
+        const wizardTools=await preview.webContents.executeJavaScript("({tools:!document.querySelector('#web-wizard-tools').classList.contains('hidden'),finish:!document.querySelector('#web-wizard-finish').classList.contains('hidden')})");assert.equal(wizardTools.tools,true);assert.equal(wizardTools.finish,false);
+        preview.setSize(1000,680);await new Promise(resolve=>setTimeout(resolve,200));
+        const toolsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,frame)=>resolve(frame.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'web-wizard-tools.png'),toolsFrame);
+        const compactWizard=await preview.webContents.executeJavaScript("({overflow:document.querySelector('#web-wizard').scrollWidth>document.querySelector('#web-wizard').clientWidth,viewport:document.querySelector('#web-wizard').getBoundingClientRect().bottom<=innerHeight})");assert.equal(compactWizard.overflow,false);assert.equal(compactWizard.viewport,true);
+        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#web-wizard-later').click();const rows=document.querySelectorAll('[data-web-open]');await window.pad.action('webRemove',{id:rows[rows.length-1].dataset.webOpen});})()");preview.setSize(1260,840);
         const help = await preview.webContents.executeJavaScript("(async()=>{document.querySelector('[data-page=help]').click();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {visible:!document.querySelector('#help-page').classList.contains('hidden'),active:document.querySelector('.nav.active').dataset.page};})()");
         assert.equal(help.visible,true); assert.equal(help.active,'help');
         await new Promise(resolve => setTimeout(resolve,200));

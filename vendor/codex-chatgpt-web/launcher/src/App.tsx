@@ -367,6 +367,11 @@ function LauncherShell({
   const browserSurfaceActive = surface === "browser"
     && !(compactSidebar && sidebarOpen)
     && !biggerContextRecommendationOpen;
+  useEffect(() => api!.onPadBrowser(() => {
+    setSurface("browser");
+    setSidebarOpen(false);
+    setBiggerContextRecommendationOpen(false);
+  }), []);
   const needsBrowser = snapshot.state.browserInteractionMode === "automatic"
     && browser?.authenticated !== true;
   const needsSetup = !needsBrowser && !interactionSetupComplete;

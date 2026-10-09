@@ -83,6 +83,13 @@ the optional Web branch disabled and enabled. `npm run smoke:protocol:web-enable
 checks real native Codex cache affinity, quota fallback and tool execution while
 GPT Web is enabled. None of these commands uses real inference quota.
 Both use disposable data. See [GPT_WEB.md](GPT_WEB.md) for setup and limitations.
+Managed setup lives in `src/renderer/web-setup.js` and the companion's
+`electron/padswitcher-setup.cjs`. It invokes the launcher's existing guarded
+handlers through an authenticated, bounded asynchronous job endpoint. Owner
+polling only reads job status. Unit fixtures cover explicit smoke consent,
+duplicate IDs, lost acknowledgements, partial setup recovery, secret redaction
+and refusal while Web turns are active. Companion smoke exercises signed-out
+failure before inference, invalid input/Origin, body limits and clean shutdown.
 
 | Folder | Purpose |
 |---|---|

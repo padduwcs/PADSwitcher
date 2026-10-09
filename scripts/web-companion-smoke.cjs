@@ -28,6 +28,21 @@ const windows=require('../src/core/windows.cjs');
     assert.equal((await fetch(da.endpoint+'/status')).status,401);
     assert.equal((await fetch(da.endpoint+'/status',{headers:{authorization:'Bearer '+da.token,origin:'https://example.test'}})).status,401);
     const publicView=JSON.stringify(service.view());assert(!publicView.includes(da.token));assert(!publicView.includes(da.endpoint));
+    assert.equal(sa.setup.supported,true);assert.equal(sb.setup.supported,true);
+    const requestId=crypto.randomUUID();
+    const post=(body,headers={})=>fetch(da.endpoint+'/setup',{method:'POST',headers:{authorization:'Bearer '+da.token,'content-type':'application/json',...headers},body:JSON.stringify(body)});
+    assert.equal((await post({action:'prepare',requestId})).status,400); // no consent, no inference
+    assert.equal((await post({action:'external',requestId,target:'https://example.test'})).status,400);
+    assert.equal((await post({action:'login',requestId},{origin:'https://example.test'})).status,401);
+    assert.equal((await post({padding:'x'.repeat(9000)})).status,413);
+    // A disposable signed-out account fails at authentication before smoke/install.
+    await service.setupCommand(a,{action:'prepare',requestId,consent:true});
+    const setupDeadline=Date.now()+15000;let setupStatus=await service.refreshStatus(a);
+    while(setupStatus.setup.job.status==='running'&&Date.now()<setupDeadline){await new Promise(r=>setTimeout(r,100));setupStatus=await service.refreshStatus(a);}
+    assert.equal(setupStatus.setup.job.status,'failed');assert.equal(setupStatus.setup.job.step,'authentication');
+    assert.equal(setupStatus.setup.prepared,false);assert.equal(setupStatus.setup.smokePassed,false);
+    assert.equal((await post({action:'prepare',requestId,consent:true})).status,202);
+    assert.equal((await service.refreshStatus(a)).setup.job.id,requestId);
     await assert.rejects(service.enable(),{code:'WEB_SETUP_REQUIRED'});
     for(const id of [a,b]){const until=Date.now()+15000;while((await service.refreshStatus(id)).operation&&Date.now()<until)await new Promise(r=>setTimeout(r,250));}
     await service.disable();assert.equal(service.children.size,0);

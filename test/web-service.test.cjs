@@ -37,6 +37,15 @@ test('Web requests bypass native credentials, native quota counters, sticky rout
   assert.equal(f.router.usage.requests,0);assert.equal(f.router.usage.quotaRetries,0);assert.equal(f.router.profileId,f.a.id);assert.deepEqual(await fs.readFile(f.service.metadataFile),before);
   assert(!JSON.stringify(f.web.view()).includes('baseUrl'));assert(!JSON.stringify(f.web.view()).includes('LOCAL FIXTURE'));assert(!JSON.stringify(f.web.view()).includes('NATIVE-'));
 });
+test('managed Web setup blocks only Web inference and leaves native requests, cache and quota accounting normal',async t=>{
+  const f=await fixture(t),request={model:'native',input:[{role:'user',content:'ISOLATED FIXTURE'}],prompt_cache_key:'KEEP'};
+  f.web.setupPending.set(f.wa,'pending-setup-fixture');
+  const blocked=await f.call({model:qualify(f.wa,'chatgpt-web/gpt-6-sol'),input:[]});assert.equal(blocked.status,409);await blocked.text();
+  assert.equal(f.seen.length,0);assert.equal(f.bundles.length,0);
+  const native=await f.call(request);assert.equal(native.status,200);await native.text();
+  assert.equal(f.nativeSeen.length,1);assert.deepEqual(JSON.parse(f.nativeSeen[0].bytes),request);
+  assert.equal(f.router.usage.requests,1);assert.equal(f.router.usage.quotaRetries,0);assert.equal(f.seen.length,0);
+});
 test('native request bytes, cache headers and quota retries stay unchanged with Web enabled or disabled',async t=>{
   for(const enabled of [true,false]){
     const f=await fixture(t,{nativeHandler:(req,res,entry)=>{if(entry.headers['chatgpt-account-id']===f.a.id){res.writeHead(429,{'content-type':'application/json'});res.end('{"error":{"type":"usage_limit_reached"}}');}else{res.writeHead(200,{'content-type':'text/event-stream','x-codex-turn-state':'cache-b'});res.end(completed);}}});

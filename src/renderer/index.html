@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
-<title>PADSwitcher</title><link rel="icon" type="image/png" href="../assets/padswitcher-emblem.png"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="branding.css"><link rel="stylesheet" href="themes.css"><script src="i18n.js"></script><script src="web.js" defer></script><script src="app.js" defer></script>
+<title>PADSwitcher</title><link rel="icon" type="image/png" href="../assets/padswitcher-emblem.png"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="branding.css"><link rel="stylesheet" href="themes.css"><link rel="stylesheet" href="web-setup.css"><script src="i18n.js"></script><script src="web.js" defer></script><script src="web-setup.js" defer></script><script src="app.js" defer></script>
 </head>
 <body>
 <aside class="sidebar">
@@ -51,7 +51,7 @@
     <div id="web-error" class="banner hidden" role="status"></div>
     <div id="web-empty" class="panel web-empty"><h2>Thêm tài khoản ChatGPT đầu tiên</h2><p>Đăng nhập riêng cho từng tài khoản. Phiên Codex đã lưu được giữ nguyên.</p></div>
     <div id="web-accounts" class="web-accounts" aria-label="Tài khoản GPT Web"></div>
-    <div class="panel web-guide"><h2>Cách sử dụng GPT Web</h2><ol><li>Thêm tài khoản Web. Tên này chỉ để bạn nhận biết tài khoản.</li><li>Bấm Đăng nhập &amp; thiết lập ở tài khoản đó. Đăng nhập ChatGPT và làm theo các bước trong cửa sổ vừa mở.</li><li>Khi tài khoản hiện Sẵn sàng, bấm Bật GPT Web.</li><li>Giữ kết nối Codex bật như thường lệ. Mở lại CLI hoặc Reload Window trong VS Code, mở chat mới rồi chọn model có nhãn (Web · tên tài khoản).</li></ol><details class="disclosure"><summary>Muốn đọc file, sửa code hoặc chạy terminal?</summary><p>Trong cửa sổ thiết lập, chọn Full và làm theo hướng dẫn kết nối công cụ (MCP). Nếu chỉ cần chat, chọn Browser-only.</p></details><details class="disclosure"><summary>Đổi tài khoản hoặc quay về Codex thường</summary><p>Chọn tài khoản Web khác rồi mở chat mới. Chat cũ giữ tài khoản ban đầu. Muốn dùng Codex thường, mở chat mới và chọn model thường; có thể tắt GPT Web ở đây.</p><p>Mỗi lần chỉ chạy một lượt Web. Web không tự đổi tài khoản khi hết giới hạn và không tự chuyển sang Codex thường khi lỗi.</p></details></div>
+    <div class="panel web-guide"><h2>Cách sử dụng GPT Web</h2><ol><li>Thêm tài khoản rồi bấm Đăng nhập &amp; thiết lập.</li><li>Đăng nhập ChatGPT, chọn nhu cầu và bấm Thiết lập tự động ngay trong PADSwitcher.</li><li>Bấm Hoàn tất và sử dụng. Mở lại CLI hoặc Reload Window một lần, mở chat mới rồi chọn model Web.</li></ol><p>Sau khi bật máy, mở PADSwitcher trước. Phiên đăng nhập và thiết lập được giữ lại; GPT Web tự khởi động nếu lần trước đang bật.</p><details class="disclosure"><summary>Đổi tài khoản hoặc quay về Codex thường</summary><p>Chọn tài khoản Web khác rồi mở chat mới. Chat cũ giữ tài khoản ban đầu. Muốn dùng Codex thường, mở chat mới và chọn model thường; có thể tắt GPT Web ở đây.</p><p>Mỗi lần chỉ chạy một lượt Web. Web không tự đổi tài khoản khi hết giới hạn và không tự chuyển sang Codex thường khi lỗi.</p></details></div>
   </section>
   <section id="settings-page" class="page hidden">
     <div class="page-heading"><div><h1>Cài đặt</h1></div></div>
@@ -71,6 +71,44 @@
 </main>
 <dialog id="modal" aria-labelledby="modal-title"><form id="modal-form"><div class="modal-heading"><div><div class="eyebrow" id="modal-eyebrow">PADSWITCHER</div><h2 id="modal-title">Thêm tài khoản</h2></div><button type="button" id="modal-close" class="icon-button" aria-label="Đóng">×</button></div><div id="modal-body"></div><div class="modal-actions"><button type="button" class="button secondary" id="modal-cancel">Hủy</button><button type="submit" class="button primary" id="modal-submit">Tiếp tục</button></div></form></dialog>
 <div id="login-bar" class="login-bar hidden"><span class="spinner"></span><div><b>Hoàn tất đăng nhập trên OpenAI</b><small id="login-detail">Chọn tài khoản bạn muốn thêm trong trình duyệt.</small></div><button class="button secondary" id="cancel-login">Hủy đăng nhập</button></div>
+<dialog id="web-wizard" aria-labelledby="web-wizard-title">
+  <div class="modal-heading"><div><div class="eyebrow">GPT WEB</div><h2 id="web-wizard-title">Thiết lập GPT Web</h2><p id="web-wizard-account" data-literal></p></div><button type="button" id="web-wizard-close" class="icon-button" aria-label="Đóng">×</button></div>
+  <ol class="web-steps" aria-label="Tiến độ thiết lập"><li>1. Đăng nhập</li><li>2. Tự động</li><li>3. Công cụ</li><li>4. Sử dụng</li></ol>
+  <div id="web-wizard-progress" class="banner" role="status" aria-live="polite" data-literal></div>
+  <section id="web-wizard-login" class="web-wizard-section">
+    <h3>1. Đăng nhập tài khoản ChatGPT</h3><p>Đăng nhập trong cửa sổ trình duyệt riêng, rồi quay lại đây. Không cần sao chép cookie hoặc token.</p>
+    <button type="button" class="button primary" id="web-wizard-signin">Đăng nhập ChatGPT</button>
+  </section>
+  <fieldset id="web-purpose"><legend>Bạn muốn sử dụng thế nào?</legend><label class="check-label"><input type="radio" name="web-purpose" value="chat"> Chỉ trò chuyện</label><label class="check-label"><input type="radio" name="web-purpose" value="tools" checked> Trò chuyện và lập trình: đọc file, terminal, sửa code</label></fieldset>
+  <section id="web-wizard-prepare" class="web-wizard-section">
+    <h3>2. Để PADSwitcher thiết lập tự động</h3><p>Ứng dụng tự kiểm tra trình duyệt, cài model và khởi động bộ chạy. Nếu lỗi, ứng dụng dừng tại bước đó.</p>
+    <label class="check-label" id="web-consent-label"><input type="checkbox" id="web-smoke-consent"> Tôi đồng ý chạy một lượt kiểm tra ChatGPT Web. Lượt này sử dụng giới hạn Web của tài khoản.</label>
+    <button type="button" class="button primary" id="web-wizard-auto">Thiết lập tự động</button>
+  </section>
+  <section id="web-wizard-tools" class="web-wizard-section">
+    <h3>3. Kết nối công cụ lập trình</h3>
+    <p id="web-tools-ready" class="hidden">Đã xác minh công cụ. Bạn có thể hoàn tất và sử dụng.</p>
+    <div id="web-tools-config">
+      <p>Thực hiện một lần cho tài khoản này. Các trang mở trong trình duyệt của bạn; dùng đúng tài khoản và workspace gắn với ChatGPT đã đăng nhập.</p>
+      <div id="web-tunnel-new"><h4>Tạo thông tin kết nối trên OpenAI</h4><div class="integration-actions"><button type="button" class="button secondary" data-web-external="tunnels">Mở trang tạo tunnel</button><button type="button" class="button secondary" data-web-external="keys">Mở trang tạo API key</button></div>
+      <p class="field-help">Tạo tunnel cần quyền Tunnels Read + Manage. Dùng API key thường có quyền Tunnels Read + Use. Không dùng Admin key.</p>
+      <label for="web-tunnel-id">Tunnel ID</label><input id="web-tunnel-id" spellcheck="false" autocomplete="off" placeholder="tunnel_…">
+      <label for="web-tunnel-key">API key</label><input id="web-tunnel-key" type="password" spellcheck="false" autocomplete="off" placeholder="sk-…"><p class="field-help">Khóa chỉ phục vụ kết nối công cụ và được lưu riêng cho tài khoản Web.</p></div>
+      <p id="web-tunnel-saved" class="hidden">Đã lưu thông tin kết nối. Không cần tạo lại tunnel hoặc nhập lại khóa.</p>
+      <button type="button" class="button primary" id="web-wizard-connect">Kết nối công cụ</button>
+      <div id="web-plugin-guide" class="hidden"><h4>Cho phép ChatGPT sử dụng công cụ</h4><p>Tên plugin phải giống chính xác tên bên dưới:</p><div class="path-field"><input id="web-connector-name" readonly data-literal aria-label="Tên plugin"><button type="button" class="button secondary" id="web-wizard-copy">Sao chép tên</button></div>
+      <button type="button" class="button secondary" data-web-external="plugins">Mở cài đặt plugin ChatGPT</button>
+      <ol><li>Bấm dấu + → Add custom MCP server. Nếu được yêu cầu, bật Developer Mode.</li><li>Dán tên đã sao chép. Chọn Connection: Tunnel và đúng tunnel đã tạo.</li><li>Chọn xác thực None / No authentication. Tạo và cài plugin; cho phép các thao tác cần dùng.</li><li>Quay lại đây và bấm Xác minh công cụ.</li></ol>
+      <p class="field-help">Nếu không có mục thêm plugin hoặc không thấy tunnel, kiểm tra quyền tài khoản, workspace và chính sách tổ chức.</p>
+      <button type="button" class="button primary" id="web-wizard-verify">Xác minh công cụ</button></div>
+    </div>
+  </section>
+  <section id="web-wizard-finish" class="web-wizard-section">
+    <h3>4. Bắt đầu sử dụng</h3><p id="web-wizard-mode" data-literal></p><p>Hoàn tất sẽ chọn tài khoản này và bật GPT Web. Sau đó Reload Window trong VS Code hoặc mở lại CLI qua PADSwitcher một lần, mở chat mới và chọn model có nhãn Web.</p>
+    <p>Sau khi bật máy, mở PADSwitcher trước. Không cần thiết lập lại nếu phiên đăng nhập còn hợp lệ.</p><button type="button" class="button primary" id="web-wizard-done">Hoàn tất và sử dụng</button>
+  </section>
+  <div class="web-wizard-footer"><button type="button" class="button ghost" id="web-wizard-refresh">Kiểm tra trạng thái</button><button type="button" class="button ghost" id="web-wizard-advanced">Mở cửa sổ nâng cao</button><button type="button" class="button secondary" id="web-wizard-later">Để sau</button></div>
+</dialog>
 <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 </body>
 </html>

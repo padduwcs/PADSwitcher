@@ -5,8 +5,9 @@ const http = require('node:http');
 const crypto = require('node:crypto');
 const {writePrivateFileAtomic} = require('./atomic-file.cjs');
 
-// No login cookies, tunnel keys or prompts cross this control surface.
-async function startPadControl({coreHome, supervisor, browserHost, runtimeHost, showWindow, quit, stateStore}) {
+// Login cookies/prompts never cross this surface. Tunnel credentials are accepted
+// only by authenticated bounded setup POSTs and never returned in status/errors.
+async function startPadControl({coreHome, supervisor, browserHost, runtimeHost, showWindow, quit, stateStore, setup}) {
   const file = path.join(coreHome, 'runtime', 'pad-control.json');
   const token = crypto.randomBytes(32).toString('base64url');
   let heartbeat = Date.now(), closing = false;
@@ -23,12 +24,26 @@ async function startPadControl({coreHome, supervisor, browserHost, runtimeHost, 
         heartbeat = Date.now(); showWindow(); res.end('{}'); return;
       }
       if (req.method === 'POST' && req.url === '/shutdown') {
-        if (runtimeHost.currentOperation() || browserHost.currentOperation() && browserHost.currentOperation() !== 'ChatGPT login') return fail(409, 'operation_active');
+        if (setup?.active() || runtimeHost.currentOperation() || browserHost.currentOperation() && browserHost.currentOperation() !== 'ChatGPT login') return fail(409, 'operation_active');
         // Finish the owned runtime drain before acknowledging. Exit only AFTER the
         // response has been flushed, so the manager cannot mistake exit for failure.
         await supervisor.shutdown({cancelActiveTurns:false,force:false});
         res.end('{"ok":true}');
         res.once('finish', () => { setTimeout(() => { void quit(); }, 25); });
+        return;
+      }
+      if (req.method === 'POST' && req.url === '/setup' && setup) {
+        heartbeat = Date.now();
+        const chunks = []; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 8192) return fail(413, 'setup_too_large'); chunks.push(chunk); }
+        let input;
+        try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+        catch { return fail(400, 'WEB_SETUP_INPUT'); }
+        try {
+          const result = setup.start(input);
+          res.writeHead(202, {'Content-Type':'application/json','Cache-Control':'no-store'});
+          res.end(JSON.stringify(result));
+        } catch(error) { return fail(error.code === 'WEB_SETUP_BUSY' ? 409 : 400, error.code || 'WEB_SETUP_INPUT'); }
         return;
       }
       if (req.method === 'GET' && req.url === '/status') {
@@ -40,7 +55,8 @@ async function startPadControl({coreHome, supervisor, browserHost, runtimeHost, 
           configured:!!config, ready:health?.service === 'codex-chatgpt-web' && health.version === config?.releaseVersion,
           mode:config?.mode || null, interactionMode:config?.browserInteractionMode || null,
           activeHttp:health?.active_http_turns || 0, activeBrowser:health?.active_browser_turns || 0,
-          operation:runtimeHost.currentOperation() || browserHost.currentOperation() || null,
+          operation:setup?.active() ? 'PADSwitcher setup' : runtimeHost.currentOperation() || browserHost.currentOperation() || null,
+          setup:setup?.snapshot() || null,
           browserSmokePassed:prefs.browserSmokePassed === true,
           // This URL is private manager state; never included in PAD renderer state.
           baseUrl:config ? `http://127.0.0.1:${config.port}/v1/` : null})); return;

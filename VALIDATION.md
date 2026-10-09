@@ -146,6 +146,40 @@ redirect rejection, disconnects and profile lifecycle protection.
 
 ## Limits
 
+### GPT Web setup wizard 1.11.0 — 2026-10-09
+
+- 189 PADSwitcher unit/integration tests pass; the native quota/router suite
+  passes all 50 comparisons with the Web branch disabled and enabled. The
+  native router, gateway, recovery and quota refresher source is unchanged.
+- Managed setup invokes existing launcher safety checks, with asynchronous job
+  status and bounded authenticated POSTs. Tests cover consent before the single
+  Web smoke turn, rejection while Web tasks are active, duplicate IDs, lost POST
+  acknowledgements, stopped failures, saved-test continuation and runtime repair
+  without another smoke turn. Native inference remains usable during Web setup.
+- Full setup cannot be enabled or used through the managed route until runtime
+  and connector verification completes. Failed checks keep the account in setup;
+  errors/status never expose tunnel API keys. Credentials disappear from wizard
+  inputs after submission/dismissal and are not stored in renderer preferences.
+- The actual packaged companion accepts the setup endpoint only with its owner
+  capability, rejects browser Origin, malformed actions, missing consent and
+  bodies over 8 KiB. A disposable signed-out profile fails at authentication
+  before smoke/model setup; a duplicate request does not replay it. Private
+  native auth/config hashes remain unchanged, and both companions stop cleanly.
+- Real Codex protocol fixtures preserve native payload/cache and execute each
+  of two tools once, both with Web enabled on the native path and with synthetic
+  Web replies. No owner inference quota is used.
+- Electron screenshots cover the integrated wizard at normal/compact sizes,
+  alongside existing light/dark and Vietnamese/English page checks. Chat-only
+  setup and coding setup are driven through UI fixtures; the finish button stays
+  unavailable until tools are verified. Packaged main/helper, resource discovery,
+  separate native routes and the NSIS double-launch check pass.
+- Vendored launcher tests: 375 pass, 5 environment-specific skips, 0 failures
+  locally. Bridge tests and GitHub CI are checked separately before delivery.
+- **Owner ChatGPT login, a real Web reply and real Full/MCP tool execution still
+  require the owner's first connection.** Fixtures do not establish account-side
+  service availability or permissions. PADSwitcher is not restarted during
+  deployment because the owner's current conversation uses its native gateway.
+
 ### GPT Web 1.10.1 — 2026-10-09
 
 - All 171 PADSwitcher tests pass, including 20 Web isolation/regression tests.

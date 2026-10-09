@@ -64,6 +64,13 @@ async function start() {
         case 'webAdd': result=await web.add(args.label);break;
         case 'webSelect': await web.select(args.id);break;
         case 'webOpen': await web.open(args.id);break;
+        case 'webLaunchSetup': await web.exclusive(()=>web.launch(args.id,false));break;
+        case 'webSetup': result=await web.setupCommand(args.id,{action:args.action,requestId:args.requestId,consent:args.consent,reuse:args.reuse,tunnelId:args.tunnelId,runtimeKey:args.runtimeKey,target:args.target});break;
+        case 'webCopyConnector': {
+          const s=await web.refreshStatus(args.id);const name=s.setup?.connectorName;
+          if(typeof name!=='string'||!name)throw new UserError('Mở thiết lập GPT Web trước.','WEB_SETUP_REQUIRED');
+          clipboard.writeText(name);break;
+        }
         case 'webEnable': await web.enable();break;
         case 'webDisable': await web.disable();break;
         case 'webRemove': await web.remove(args.id);break;

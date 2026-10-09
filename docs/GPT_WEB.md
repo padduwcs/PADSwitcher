@@ -1,32 +1,58 @@
-# GPT Web trong PADSwitcher 1.10.1
+# GPT Web trong PADSwitcher 1.11.0
 
 GPT Web là chức năng bổ sung, mặc định tắt. Trang **Tài khoản** tiếp tục quản lý
 đăng nhập Codex; trang **GPT Web** quản lý phiên đăng nhập ChatGPT riêng.
-Không cần nhập API key, access token hoặc cookie vào PADSwitcher.
+Đăng nhập bằng trình duyệt riêng, không sao chép access token hoặc cookie.
+Chỉ trò chuyện không cần API key. Công cụ lập trình cần API key cho tunnel/MCP;
+khóa này không dùng để gọi model API.
 
 ## Thiết lập lần đầu
 
 1. Bật kết nối Codex của PADSwitcher như trước.
 2. Mở **GPT Web → Thêm tài khoản Web**, đặt tên dễ nhận biết.
-3. Bấm **Đăng nhập & thiết lập**. Cửa sổ GPT Web riêng xuất hiện; đăng nhập
-   ChatGPT trong trình duyệt do cửa sổ này mở, chạy kiểm tra trình duyệt và
-   hoàn tất thiết lập model theo các bước trên màn hình.
-4. Chọn **Browser-only** nếu chỉ chat. Muốn dùng công cụ đọc file, sửa code,
-   terminal: chọn **Full**, hoàn tất MCP/tunnel và xác minh công cụ trong
-   cửa sổ thiết lập. Tên connector có mã tài khoản; dùng đúng tên và URL mà
-   cửa sổ hướng dẫn cung cấp. Không dùng chung connector giữa hai hồ sơ.
-5. Quay lại PADSwitcher, chọn tài khoản vừa thiết lập rồi **Bật GPT Web**.
-   Chỉ bật được khi đăng nhập và bộ chạy đã sẵn sàng ở chế độ tự động.
+3. Trình thiết lập mở ngay trong PADSwitcher (hoặc bấm **Đăng nhập & thiết lập**
+   trên tài khoản có sẵn). Bấm **Đăng nhập ChatGPT**, đăng nhập trong cửa sổ
+   trình duyệt riêng rồi quay lại PADSwitcher. Trạng thái được cập nhật tự động.
+4. Chọn **Chỉ trò chuyện** hoặc **Trò chuyện và lập trình**. Đồng ý chạy một lượt
+   kiểm tra ChatGPT Web rồi bấm **Thiết lập tự động**. Ứng dụng chạy kiểm tra,
+   cài model và khởi động bộ chạy tuần tự. Lượt kiểm tra dùng giới hạn Web của
+   tài khoản. Không chạy khi chỉ mở thiết lập hoặc khởi động ứng dụng.
+5. Nếu chỉ chat, bấm **Hoàn tất và sử dụng**. Nếu dùng lập trình, làm tiếp phần
+   **Kết nối công cụ** ngay trong trình thiết lập:
+   - Mở trang tunnel và API key bằng hai nút trên màn hình. Dùng đúng tài khoản,
+     tổ chức/workspace gắn với ChatGPT. Tạo tunnel cần Tunnels Read + Manage;
+     API key thường để dùng tunnel cần Tunnels Read + Use, không dùng Admin key.
+   - Nhập Tunnel ID và API key → **Kết nối công cụ**. Khóa được xóa khỏi ô nhập
+     sau khi gửi hoặc đóng cửa sổ; bộ chạy lưu thông tin riêng cho hồ sơ Web.
+   - **Sao chép tên** → **Mở cài đặt plugin ChatGPT**. Thêm custom MCP server,
+     dùng đúng tên, Connection: Tunnel, đúng tunnel, xác thực None. Tạo/cài
+     plugin và cho phép các thao tác cần dùng. Nếu giao diện yêu cầu, bật
+     Developer Mode. Khả năng thêm plugin phụ thuộc quyền và chính sách workspace.
+   - Quay lại PADSwitcher → **Xác minh công cụ**. Chỉ sau khi kiểm tra thành
+     công mới bấm **Hoàn tất và sử dụng**. Nút này chọn tài khoản và bật GPT Web.
 6. Reload Window trong VS Code, mở lại CLI hoặc chat JetBrains một lần để
    cập nhật danh sách model. Mở **hội thoại mới** và chọn model có hậu tố
    **(Web · tên tài khoản)**. Model thường tiếp tục dùng tuyến Codex hiện có.
 
-Có thể lặp lại bước 2–4 để thêm nhiều tài khoản. Chức năng Web cần Chrome hoặc
-Edge tương thích theo hướng dẫn của bộ chạy. Khả năng model và Full/MCP phụ
-thuộc tài khoản ChatGPT; PADSwitcher chỉ hiển thị những model đã được bộ chạy
-thiết lập. Cửa sổ bộ chạy hiện dùng tiếng Anh; trang quản lý có tiếng Việt/Anh.
+Có thể lặp lại thiết lập cho nhiều tài khoản; mỗi tài khoản dùng tên connector
+riêng, không dùng chung connector giữa hai hồ sơ. Khả năng model và Full/MCP
+phụ thuộc tài khoản ChatGPT. Trình thiết lập có tiếng Việt/Anh; cửa sổ trình
+duyệt/nâng cao của bộ chạy vẫn dùng tiếng Anh. Không cần chọn nút Full riêng:
+kết nối công cụ sẽ chuyển cấu hình riêng của tài khoản sang Full.
+
+Nếu kiểm tra lỗi, ứng dụng dừng tại bước đó. Bấm nút để chủ động thử lại;
+không tự phát lại thao tác. Kiểm tra trình duyệt đã thành công được giữ lại
+khi cài model lỗi. Thông tin tunnel đã lưu có thể kết nối lại mà không nhập
+khóa. Khi bộ chạy đã có cấu hình nhưng chưa sẵn sàng, dùng **Khởi động lại bộ
+chạy Web**; không gửi thêm lượt kiểm tra. **Mở cửa sổ nâng cao** dành cho xử lý
+chi tiết hoặc chuyển chế độ về With Automation nếu trước đó đã dùng Zero Risk.
 
 ## Sử dụng hằng ngày
+
+- **Sau khi bật máy:** mở shortcut PADSwitcher trước. Kết nối Codex và GPT Web
+  tự khôi phục nếu lần trước đang bật; tính năng đã tắt vẫn tắt. Không cần chạy
+  thiết lập/kiểm tra hoặc tạo tunnel lại. Nếu phiên hết hạn, đăng nhập lại hồ sơ
+  cũ. Khởi động lại máy không yêu cầu tạo chat mới khi vẫn dùng tài khoản cũ.
 
 - **Đổi tài khoản Web:** chọn tài khoản khác ở trang GPT Web, chờ tài khoản
   sẵn sàng, cập nhật danh sách model rồi mở chat mới với model của tài khoản đó.
@@ -52,6 +78,10 @@ của PADSwitcher 1.9.2. Chỉ model có định danh `chatgpt-web/pad-<id>/...`
 qua tuyến Web. Tuyến này không lấy token Codex, không gọi router quota và
 không tự chuyển sang tuyến Codex. Việc kiểm tra trạng thái định kỳ chỉ đọc
 trạng thái bộ chạy; không sinh câu trả lời model.
+Thiết lập Web khóa riêng việc gửi Web khi thao tác đang chạy; model Codex thường
+vẫn hoạt động. Mỗi thao tác có request ID để tránh chạy trùng khi mất phản hồi.
+Kênh điều khiển yêu cầu capability, từ chối browser Origin và giới hạn POST
+thiết lập ở 8 KiB. Cookie và khóa không xuất hiện trong trạng thái/log trả về UI.
 
 Mỗi hồ sơ có thư mục `CODEX_HOME`, cấu hình bridge và dữ liệu trình duyệt riêng
 dưới `%APPDATA%\PADSwitcher\data\gpt-web\profiles\<id>`. Thiết lập bridge chỉ

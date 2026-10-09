@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld("codexWebLauncher", {
   windowState: () => ipcRenderer.invoke("launcher:window-state"),
   windowControl: (action) => ipcRenderer.send("launcher:window-control", action),
   onWindowStateChanged: (listener) => subscription("launcher:window-state-changed", listener),
+  onPadBrowser: (listener) => subscription("launcher:pad-browser", listener),
   onConnectorNamesChanged: (listener) => subscription("launcher:connector-names-changed", listener),
   onStateChanged: (listener) => subscription("launcher:state-changed", listener),
   onBrowserState: (listener) => subscription("launcher:browser-state", listener),

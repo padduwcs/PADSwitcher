@@ -22,6 +22,19 @@ module.exports = `
     action:async (command,args={}) => {
       if(command==='webAdd'){const id=crypto.randomUUID();state.web.profiles.push({id,label:args.label,status:'stopped',selected:false});if(!state.web.selectedId)state.web.selectedId=id;publish();return {ok:true,result:id,state:clone(state)};}
       if(command==='webSelect'){state.web.selectedId=args.id;state.web.profiles.forEach(p=>p.selected=p.id===args.id);publish();}
+      if(command==='webLaunchSetup'){
+        const p=state.web.profiles.find(p=>p.id===args.id);
+        p.setup||={supported:true,prepared:p.status==='ready',smokePassed:p.status==='ready',credentialsConfigured:p.mode==='full',toolsVerified:p.mode==='full',connectorName:'CodexNative2-pad-preview',job:null};
+        if(p.status==='stopped')p.status='setup';publish();
+      }
+      if(command==='webSetup'){
+        const p=state.web.profiles.find(p=>p.id===args.id);
+        if(args.action==='login')p.authenticated=true;
+        if(args.action==='prepare'){p.setup.prepared=true;p.setup.smokePassed=true;p.status='ready';p.mode='browseronly';}
+        if(args.action==='connect'){p.setup.credentialsConfigured=true;p.setup.toolsVerified=false;p.mode='full';}
+        if(args.action==='verify')p.setup.toolsVerified=true;
+        p.setup.job={id:args.requestId,action:args.action,status:'completed'};publish();return {ok:true,result:{accepted:true},state:clone(state)};
+      }
       if(command==='webEnable'){state.web.enabled=true;publish();}
       if(command==='webDisable'){state.web.enabled=false;state.web.profiles.forEach(p=>p.status='stopped');publish();}
       if(command==='webRemove'){state.web.profiles=state.web.profiles.filter(p=>p.id!==args.id);if(state.web.selectedId===args.id)state.web.selectedId=state.web.profiles[0]?.id||null;publish();}

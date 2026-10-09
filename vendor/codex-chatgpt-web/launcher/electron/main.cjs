@@ -538,6 +538,8 @@ function syncBrowserPreferences(stateStore, config) {
   return state;
 }
 
+const padSetupHandlers = new Map();
+let padSetup;
 function registerIpc({ logger, stateStore }) {
   const runtimeChannels = new Set([
     "launcher:setup-core", "launcher:setup-mcp", "launcher:uninstall-integration",
@@ -548,10 +550,20 @@ function registerIpc({ logger, stateStore }) {
     "launcher:browser-passkey-login", "launcher:browser-logout", "launcher:browser-smoke",
     "launcher:limits-setup", "launcher:update-install", "launcher:complete-onboarding",
   ]);
-  const handle = (channel, handler) => registerLoggedIpc(ipcMain, logger, channel, async (...args) => {
-    if (runtimeChannels.has(channel)) await runtimeStartup;
-    return handler(...args);
-  });
+  const managedChannels = new Set(['launcher:browser-login','launcher:browser-smoke','launcher:setup-core','launcher:setup-mcp','launcher:mcp-verify','launcher:open-external']);
+  const handle = (channel, handler) => {
+    const guarded = async (...args) => {
+      if (runtimeChannels.has(channel)) await runtimeStartup;
+      return handler(...args);
+    };
+    if (PAD_MANAGED && managedChannels.has(channel)) padSetupHandlers.set(channel, guarded);
+    return registerLoggedIpc(ipcMain, logger, channel, async (...args) => {
+      if (PAD_MANAGED && padSetup?.active() && (runtimeChannels.has(channel) || channel === 'launcher:browser-login')) {
+        throw new Error('Finish managed setup in PADSwitcher before starting another operation');
+      }
+      return guarded(...args);
+    });
+  };
   handle("launcher:limits", () => limitsController.snapshot());
   handle("launcher:limits-setup", async () => {
     if (runtimeHost.currentOperation()) throw new Error("Finish the current launcher operation before checking Limits.");
@@ -1068,7 +1080,7 @@ async function requestQuit() {
   }
   shutdownInProgress = true;
   try {
-    const activeOperation = runtimeHost?.currentOperation() || browserHost?.currentOperation();
+    const activeOperation = PAD_MANAGED && padSetup?.active() ? 'PADSwitcher setup' : runtimeHost?.currentOperation() || browserHost?.currentOperation();
     if (activeOperation && !(PAD_MANAGED && activeOperation === 'ChatGPT login')) {
       throw new Error(`Wait for ${activeOperation} to finish before quitting Codex Web GPT`);
     }
@@ -1249,8 +1261,23 @@ async function start() {
     logger,
   });
   registerIpc({ logger, stateStore });
-  if (PAD_MANAGED) await require('./padswitcher-control.cjs').startPadControl({coreHome:CORE_HOME,
-    supervisor:runtimeSupervisor,browserHost,runtimeHost,showWindow:showMainWindow,quit:requestQuit,stateStore});
+  if (PAD_MANAGED) {
+    padSetup = require('./padswitcher-setup.cjs').createPadSetup({
+      invoke: async (channel, ...args) => {
+        await runtimeStartup;
+        const handler = padSetupHandlers.get(channel);
+        if (!handler) throw new Error('Unsupported managed setup operation');
+        return handler({sender: mainWindow.webContents}, ...args);
+      }, browserHost, runtimeHost, supervisor:runtimeSupervisor, stateStore, version:app.getVersion(),
+      showBrowser: async () => {
+        showMainWindow();
+        if (!mainWindowReadyToShow) await new Promise(resolve => mainWindow.once('ready-to-show', resolve));
+        send('launcher:pad-browser', true);
+      },
+    });
+    await require('./padswitcher-control.cjs').startPadControl({coreHome:CORE_HOME,
+      supervisor:runtimeSupervisor,browserHost,runtimeHost,showWindow:showMainWindow,quit:requestQuit,stateStore,setup:padSetup});
+  }
   const trayAvailable = createTray(logger, stateStore.read().language);
   if (startHidden && !trayAvailable) mainWindow.once("ready-to-show", () => showMainWindow());
   const launcherSmokeTest = process.argv.includes("--launcher-smoke-test");
