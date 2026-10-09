@@ -8,64 +8,80 @@ const html = fs.readFileSync(path.join(__dirname,'../src/renderer/index.html'),'
 const script = fs.readFileSync(path.join(__dirname,'../src/renderer/app.js'),'utf8');
 const mock = require('../scripts/preview-data.cjs');
 const settle = async () => { await new Promise(resolve => setTimeout(resolve,10)); };
-test('Web wizard runs a complete chat setup with explicit consent and one prepare click; native settings stay unchanged',async t=>{
+test('adding a ChatGPT account is one dialog: it connects, selects and enables without native changes',async t=>{
   const w=dom(t);await settle();const d=w.document,commands=[];const action=w.pad.action;
   w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
+  d.querySelector('[data-page=web]').click();
   d.querySelector('#web-add').click();d.querySelector('#web-label').value='New Web';
   d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
-  assert.equal(d.querySelector('#web-wizard').open,true);
+  const added=commands.find(x=>x.command==='webAdd');assert(added);
+  const connect=commands.find(x=>x.command==='webConnect');assert.equal(connect.args.activate,true);
   assert(!commands.some(x=>x.command==='webSetup'));
-  d.querySelector('[name="web-purpose"][value="chat"]').click();
-  d.querySelector('#web-wizard-signin').click();await settle();
-  assert.equal(d.querySelector('#web-wizard-auto').disabled,true);
-  d.querySelector('#web-smoke-consent').click();assert.equal(d.querySelector('#web-wizard-auto').disabled,false);
-  d.querySelector('#web-wizard-auto').click();d.querySelector('#web-wizard-auto').click();await settle();
-  assert.equal(commands.filter(x=>x.command==='webSetup'&&x.args.action==='prepare').length,1);
-  assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),false);
-  d.querySelector('#web-wizard-done').click();await settle();
-  assert.equal(d.querySelector('#web-wizard').open,false);assert.equal(d.querySelector('#web-state').textContent,'Đang bật');
+  await new Promise(r=>setTimeout(r,60));
+  assert.equal(d.querySelector('#web-state').textContent,'Đang bật');
+  assert(d.querySelector('#web-selected').textContent.includes('New Web'));
+  assert(d.querySelector('#toasts').textContent.includes('Đã kết nối New Web'));
   assert(!commands.some(x=>['useGateway','autoSwitchSettings','refresh','configureVSCode'].includes(x.command)));
 });
-test('Web coding setup hides finish until tool verification and clears secret input after submission or dismissal',async t=>{
-  const w=dom(t);await settle();const d=w.document;
-  d.querySelector('#web-add').click();d.querySelector('#web-label').value='Coding Web';
-  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
-  d.querySelector('#web-wizard-signin').click();await settle();d.querySelector('#web-smoke-consent').click();
-  d.querySelector('#web-wizard-auto').click();await settle();
-  assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),true);
+test('a connecting account shows progress, can reopen sign-in or cancel, and never shows setup controls',async t=>{
+  const w=dom(t);w.padPreviewConnectMs=60000;await settle();const d=w.document,commands=[];const action=w.pad.action;
+  w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
+  const card=()=>[...d.querySelectorAll('.web-account')].find(x=>x.textContent.includes('Tài khoản Web dự phòng'));
+  assert(card().textContent.includes('Chưa kết nối'));
+  card().querySelector('[data-web-connect]').click();await settle();
+  assert(card().classList.contains('connecting'));assert(card().textContent.includes('Đăng nhập ChatGPT trong cửa sổ vừa mở'));
+  assert.equal(card().querySelector('[data-web-tools]'),null);
+  card().querySelector('[data-web-connect]').click();await settle();
+  assert.equal(commands.filter(x=>x.command==='webConnect').length,2);
+  card().querySelector('[data-web-cancel]').click();await settle();
+  assert.equal(card().classList.contains('connecting'),false);assert(commands.some(x=>x.command==='webCancelConnect'));
+  assert(!commands.some(x=>x.command==='webSetup'));
+});
+test('failed connection shows the reason and detail, translates, and offers Retry',async t=>{
+  const w=dom(t,true,s=>{s.web.profiles[1].flow={running:false,step:'error',error:'Kiểm tra trình duyệt chưa thành công. Kiểm tra đăng nhập/mạng; chỉ thử lại khi bạn bấm nút.',detail:'ChatGPT composer not found'};});await settle();
+  const d=w.document,card=d.querySelectorAll('.web-account')[1];
+  assert(card.querySelector('.web-flow-error').textContent.includes('ChatGPT composer not found'));
+  assert.equal(card.querySelector('[data-web-connect]').textContent,'Thử lại');
+  d.querySelector('#language-toggle').click();
+  assert.equal(d.querySelectorAll('.web-account')[1].querySelector('[data-web-connect]').textContent,'Retry');
+  assert(d.querySelectorAll('.web-account')[1].querySelector('.web-flow-error').textContent.includes('Details:'));
+});
+test('coding tools are optional: the dialog opens passively, verifies before use and clears the secret',async t=>{
+  const w=dom(t);await settle();const d=w.document,commands=[];const action=w.pad.action;
+  d.querySelector('[data-web-tools]').click();await settle();
+  assert.equal(d.querySelector('#web-tools-ready').classList.contains('hidden'),false);d.querySelector('#web-wizard-close').click();
+  d.querySelectorAll('.web-account')[1].querySelector('[data-web-connect]').click();await new Promise(r=>setTimeout(r,60));
+  w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
+  d.querySelectorAll('.web-account')[1].querySelector('[data-web-tools]').click();await settle();
+  assert.equal(d.querySelector('#web-wizard').open,true);assert(!commands.some(x=>x.command==='webSetup'));
+  assert.equal(d.querySelector('#web-plugin-guide').classList.contains('hidden'),true);
   const secret='sk-PRIVATE_FIXTURE_ONLY';d.querySelector('#web-tunnel-key').value=secret;d.querySelector('#web-tunnel-id').value='tunnel_'+'a'.repeat(32);
   d.querySelector('#web-wizard-connect').click();await settle();
   assert.equal(d.querySelector('#web-tunnel-key').value,'');assert.equal(d.querySelector('#web-plugin-guide').classList.contains('hidden'),false);
-  assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),true);
-  d.querySelector('#web-wizard-verify').click();await settle();assert.equal(d.querySelector('#web-wizard-finish').classList.contains('hidden'),false);
-  assert(!JSON.stringify({...w.localStorage}).includes(secret));d.querySelector('#web-tunnel-key').value=secret;d.querySelector('#web-wizard-later').click();
-  assert.equal(d.querySelector('#web-tunnel-key').value,'');
+  assert.equal(d.querySelector('#web-tools-ready').classList.contains('hidden'),true);
+  d.querySelector('#web-wizard-verify').click();await settle();assert.equal(d.querySelector('#web-tools-ready').classList.contains('hidden'),false);
+  assert(!JSON.stringify({...w.localStorage}).includes(secret));
+  d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#web-wizard-title').textContent,'Coding tools');
+  assert.equal(d.querySelector('#web-wizard-account').textContent,'Tài khoản Web dự phòng');
+  d.querySelector('#web-tunnel-key').value=secret;d.querySelector('#web-wizard-later').click();
+  assert.equal(d.querySelector('#web-tunnel-key').value,'');assert.equal(d.querySelector('#web-wizard').open,false);
 });
-test('Web wizard translates, keeps account text literal, and never runs tests just by reopening',async t=>{
-  const w=dom(t);await settle();const d=w.document,commands=[];const action=w.pad.action;
-  w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
-  d.querySelector('[data-web-open]').click();await settle();d.querySelector('#language-toggle').click();
-  assert.equal(d.querySelector('#web-wizard-title').textContent,'Set up GPT Web');
-  assert.equal(d.querySelector('#web-wizard-account').textContent,'ChatGPT cá nhân');
-  assert.equal(d.querySelector('#web-wizard-done').textContent,'Finish and start');
-  assert(!commands.some(x=>x.command==='webSetup'));d.querySelector('#web-wizard-later').click();
-  d.querySelector('[data-web-open]').click();await settle();assert(!commands.some(x=>x.command==='webSetup'));
-});
-test('Web setup gives the next action and only enables signed-in ready accounts',async t=>{
-  for(const [status,authenticated,expected,disabled] of [
-    ['stopped',false,'Đăng nhập & thiết lập',true],
-    ['setup',false,'Đăng nhập & thiết lập',true],
-    ['ready',true,'Bật GPT Web',false]
+test('Web page gives the next action and only enables connected accounts',async t=>{
+  for(const [status,connected,expected,disabled] of [
+    ['stopped',false,'Bấm Kết nối',true],
+    ['signedOut',false,'Bấm Kết nối',true],
+    ['stopped',true,'Bấm Bật GPT Web',false],
+    ['ready',false,'Bấm Bật GPT Web',false]
   ]){
-    const w=dom(t,true,state=>{state.web.profiles=[{id:'web-fixture',label:'Fixture account',status,authenticated,selected:true}];state.web.selectedId='web-fixture';});await settle();
-    const d=w.document;assert(d.querySelector('#web-next-step').textContent.includes(expected));
+    const w=dom(t,true,state=>{state.web.profiles=[{id:'web-fixture',label:'Fixture account',status,connected,authenticated:status==='ready',selected:true}];state.web.selectedId='web-fixture';});await settle();
+    const d=w.document;assert(d.querySelector('#web-next-step').textContent.includes(expected),status);
     assert.equal(d.querySelector('#web-enable').disabled,disabled);
-    assert.equal(d.querySelector('[data-web-open]').disabled,false);
     assert(!d.querySelector('#web-page').textContent.includes('npm'));
-    d.querySelector('#language-toggle').click();assert(d.querySelector('#web-next-step').textContent.includes(status==='ready'?'Enable GPT Web':'Sign in & set up'));
+    d.querySelector('#language-toggle').click();assert(d.querySelector('#web-next-step').textContent.includes(disabled?'Click Connect':'Enable GPT Web'));
   }
   const w=dom(t,true,state=>{state.web.runtimeAvailable=false;});await settle();
-  assert.equal(w.document.querySelector('[data-web-open]').disabled,true);
+  assert.equal(w.document.querySelector('#web-add').disabled,true);
+  assert.equal(w.document.querySelector('[data-web-connect]').disabled,true);
   assert.equal(w.document.querySelector('#web-runtime-hint').classList.contains('hidden'),false);
   assert(w.document.querySelector('#web-runtime-hint').textContent.includes('khay hệ thống'));
 });

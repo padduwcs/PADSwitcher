@@ -353,6 +353,23 @@ function showMainWindow() {
   mainWindow.focus();
 }
 
+// Windows refuses focus requests from a background process, so a plain show() leaves the
+// PADSwitcher-requested sign-in window behind the app the user is looking at. A brief
+// always-on-top pulse raises it without keeping it pinned above other windows.
+function bringMainWindowToFront() {
+  showMainWindow();
+  if (!PAD_MANAGED || !mainWindow || mainWindow.isDestroyed()) return;
+  const raise = () => {
+    if (mainWindow.isDestroyed()) return;
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.show();
+    mainWindow.focus();
+    app.focus({ steal: true });
+    setTimeout(() => { if (!mainWindow.isDestroyed()) mainWindow.setAlwaysOnTop(false); }, 1500);
+  };
+  if (mainWindowReadyToShow) raise(); else mainWindow.once("ready-to-show", raise);
+}
+
 async function openWebUrl(url) {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
@@ -1080,7 +1097,7 @@ async function requestQuit() {
   }
   shutdownInProgress = true;
   try {
-    const activeOperation = PAD_MANAGED && padSetup?.active() ? 'PADSwitcher setup' : runtimeHost?.currentOperation() || browserHost?.currentOperation();
+    const activeOperation = PAD_MANAGED && padSetup?.blocking() ? 'PADSwitcher setup' : runtimeHost?.currentOperation() || browserHost?.currentOperation();
     if (activeOperation && !(PAD_MANAGED && activeOperation === 'ChatGPT login')) {
       throw new Error(`Wait for ${activeOperation} to finish before quitting Codex Web GPT`);
     }
@@ -1137,6 +1154,13 @@ async function start() {
   }
   app.commandLine.appendSwitch("remote-debugging-address", "127.0.0.1");
   app.commandLine.appendSwitch("remote-debugging-port", String(cdpPort));
+  if (PAD_MANAGED) {
+    // The managed window is opened by a background process and Windows may keep it behind
+    // PADSwitcher. Chromium then treats the occluded page as hidden and ChatGPT stays on its
+    // blank "Loading" shell. Keep owned pages rendering whether or not they are in front.
+    app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
+    app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+  }
 
   await app.whenReady();
 
@@ -1269,14 +1293,16 @@ async function start() {
         if (!handler) throw new Error('Unsupported managed setup operation');
         return handler({sender: mainWindow.webContents}, ...args);
       }, browserHost, runtimeHost, supervisor:runtimeSupervisor, stateStore, version:app.getVersion(),
-      showBrowser: async () => {
-        showMainWindow();
+      showBrowser: async (front = false) => {
+        if (front) bringMainWindowToFront(); else showMainWindow();
         if (!mainWindowReadyToShow) await new Promise(resolve => mainWindow.once('ready-to-show', resolve));
         send('launcher:pad-browser', true);
-      },
+      }, logger,
     });
     await require('./padswitcher-control.cjs').startPadControl({coreHome:CORE_HOME,
-      supervisor:runtimeSupervisor,browserHost,runtimeHost,showWindow:showMainWindow,quit:requestQuit,stateStore,setup:padSetup});
+      supervisor:runtimeSupervisor,browserHost,runtimeHost,showWindow:bringMainWindowToFront,
+      hideWindow:() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide(); },
+      quit:requestQuit,stateStore,setup:padSetup});
   }
   const trayAvailable = createTray(logger, stateStore.read().language);
   if (startHidden && !trayAvailable) mainWindow.once("ready-to-show", () => showMainWindow());

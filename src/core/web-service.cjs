@@ -9,6 +9,7 @@ const {atomicWrite,assertDirectory,readLimited,exists,profilePath} = require('./
 const {UserError} = require('./errors.cjs');
 const models = require('./web-models.cjs');
 const wait = ms => new Promise(resolve => setTimeout(resolve,ms));
+class FlowCancelled extends Error {}
 const MAX_CATALOG = 4*1024*1024;
 async function freePort() {
   const s = net.createServer(); await new Promise((r,j)=>{s.once('error',j);s.listen(0,'127.0.0.1',r);});
@@ -30,27 +31,32 @@ class WebService extends EventEmitter {
     super(); this.root=path.resolve(root);this.options=options;this.platform=options.platform;
     this.file=path.join(this.root,'accounts.json');this.bindingFile=path.join(this.root,'bindings.json');
     this.state={version:1,enabled:false,selectedId:null,profiles:[]};this.children=new Map();this.statuses=new Map();this.rows=new Map();
-    this.bindings={};this.busy=false;this.active=0;this.pollFlight=null;this.lastError=null;this.closed=false;this.setupPending=new Map();
+    this.bindings={};this.busy=false;this.active=0;this.pollFlight=null;this.lastError=null;this.closed=false;this.setupPending=new Map();this.flows=new Map();
     this.fetch=options.fetch||fetch;this.spawn=options.spawn||spawn;
   }
   get enabled(){return this.state.enabled&&!this.closed;}
   get(id){const p=this.state.profiles.find(p=>p.id===id);if(!p)throw new UserError('Không tìm thấy tài khoản GPT Web.','WEB_ACCOUNT_MISSING');return p;}
   home(id){this.get(id);return profilePath(path.join(this.root,'profiles'),id);}
   view(){return {enabled:this.enabled,selectedId:this.state.selectedId,busy:this.busy,active:this.active,lastError:this.lastError,
-    runtimeAvailable:this.options.available?.()===true,setupLocked:this.setupPending.size>0,
+    runtimeAvailable:this.options.available?.()===true,setupLocked:this.setupBlocking(),
     profiles:this.state.profiles.map(p=>{const s=this.statuses.get(p.id);return {id:p.id,label:p.label,selected:p.id===this.state.selectedId,
       status:s?.ready?(s.authenticated?(s.mode==='full'&&s.setup?.toolsVerified===false?'setup':'ready'):'signedOut'):this.children.has(p.id)?'setup':'stopped',
       mode:s?.mode||null,runtimeReady:s?.ready===true,authenticated:s?.authenticated===true,operation:s?.operation||null,setup:s?.setup||null,
+      connected:p.connected===true,flow:this.flowView(p.id),
       modelCount:(this.rows.get(p.id)||[]).filter(r=>r.visibility==='list').length};})};}
+  // A pending sign-in only waits for the person; it does not use ChatGPT and must not pause
+  // Web turns or setup on other accounts. Every other setup action keeps the global Web lock.
+  setupBlocking(){return [...this.setupPending.values()].some(x=>x.action!=='login');}
+  flowView(id){const f=this.flows.get(id);return f?{step:f.step,message:f.message,error:f.error,detail:f.detail||null,running:f.running}:null;}
   changed(){this.emit('change',this.view());}
   async init(){
     await fs.mkdir(path.join(this.root,'profiles'),{recursive:true});await assertDirectory(this.root);await this.platform?.protectDirectory(this.root);
     if(await exists(this.file)){
       const x=JSON.parse((await readLimited(this.file,1024*1024)).toString('utf8'));
       if(x.version!==1||typeof x.enabled!=='boolean'||!Array.isArray(x.profiles)||x.profiles.length>50)throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');
-      const ids=new Set();for(const p of x.profiles){profilePath(path.join(this.root,'profiles'),p.id);if(ids.has(p.id)||typeof p.label!=='string'||!p.label.trim()||p.label.length>80)throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');ids.add(p.id);}
+      const ids=new Set();for(const p of x.profiles){profilePath(path.join(this.root,'profiles'),p.id);if(ids.has(p.id)||typeof p.label!=='string'||!p.label.trim()||p.label.length>80||p.connected!==undefined&&typeof p.connected!=='boolean')throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');ids.add(p.id);}
       if(x.selectedId!==null&&!ids.has(x.selectedId))throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');
-      this.state={version:1,enabled:x.enabled,selectedId:x.selectedId,profiles:x.profiles.map(p=>({id:p.id,label:p.label}))};
+      this.state={version:1,enabled:x.enabled,selectedId:x.selectedId,profiles:x.profiles.map(p=>({id:p.id,label:p.label,...(p.connected===true?{connected:true}:{})}))};
     }else await this.save();
     if(await exists(this.bindingFile)){
       const x=JSON.parse((await readLimited(this.bindingFile,1024*1024)).toString('utf8'));
@@ -69,7 +75,7 @@ class WebService extends EventEmitter {
     const p={id:crypto.randomUUID(),label:clean};this.state.profiles.push(p);if(!this.state.selectedId)this.state.selectedId=p.id;
     try{await fs.mkdir(this.home(p.id),{recursive:true});await this.save();}catch(e){this.state.profiles=this.state.profiles.filter(x=>x.id!==p.id);if(this.state.selectedId===p.id)this.state.selectedId=null;throw e;}return p.id;
   });}
-  async select(id){return this.exclusive(async()=>{this.get(id);const old=this.state.selectedId;this.state.selectedId=id;try{await this.save();}catch(e){this.state.selectedId=old;throw e;}this.lastError=null;if(this.enabled)await this.launch(id,true);});}
+  async select(id){return this.exclusive(async()=>{this.get(id);const old=this.state.selectedId;this.state.selectedId=id;try{await this.save();}catch(e){this.state.selectedId=old;throw e;}this.lastError=null;if(this.enabled)await this.launch(id,false);});}
   async descriptor(id){
     const child=this.children.get(id);if(!child||child.exitCode!==null||child.signalCode!==null)throw Error('Companion not running');
     const file=path.join(this.home(id),'core','runtime','pad-control.json');
@@ -122,6 +128,79 @@ class WebService extends EventEmitter {
     throw new UserError('Bộ chạy GPT Web chưa sẵn sàng. Kiểm tra cửa sổ thiết lập GPT Web.','WEB_START_FAILED');
   }
   async open(id){return this.exclusive(async()=>this.launch(id,true));}
+  // One-click connection: sign in (only if needed), one setup check + model install, then use.
+  // It runs in the background and reports progress through view().flow; it never retries a
+  // failed step by itself, and it never touches native Codex credentials or routing.
+  async connect(id,{activate=false}={}){
+    this.get(id);
+    const current=this.flows.get(id);
+    if(current?.running){if(current.step==='login')await this.control(id,'/show',{}).catch(()=>{});return;}
+    if(!this.options.available?.())throw new UserError('Không tìm thấy bộ chạy GPT Web. Hãy thoát PADSwitcher ở khay hệ thống rồi mở lại bản mới nhất.','WEB_RUNTIME_MISSING');
+    if(this.closed||this.stopping)throw new UserError('GPT Web đã dừng hoặc đang dừng.','WEB_STOPPED');
+    const flow={running:true,cancelled:false,step:'start',message:'Đang mở bộ chạy GPT Web…',error:null};
+    this.flows.set(id,flow);this.changed();
+    flow.done=this.runFlow(id,flow,activate===true);
+  }
+  async cancelConnect(id){
+    const flow=this.flows.get(id);
+    if(flow?.running)flow.cancelled=true;else this.flows.delete(id);
+    this.changed();
+    if(!this.children.has(id))return;
+    // Release an unused account's runtime (including a pending sign-in); keep the account in use.
+    if(!this.inUse(id)&&!this.active)await this.stopChild(id).catch(()=>this.control(id,'/hide',{}).catch(()=>{}));
+    else await this.control(id,'/hide',{}).catch(()=>{});
+  }
+  async whenIdle(action){for(let i=0;i<120&&this.busy;i++)await wait(250);return action();}
+  async runFlow(id,flow,activate){
+    const step=(name,message)=>{if(flow.cancelled)throw new FlowCancelled();flow.step=name;flow.message=message;this.changed();};
+    try{
+      await this.whenIdle(()=>this.launch(id,false));
+      let s=await this.refreshStatus(id);
+      if(!s.setup?.supported)throw new UserError('Bộ chạy GPT Web chưa hỗ trợ kết nối nhanh. Thoát PADSwitcher ở khay hệ thống rồi mở lại bản mới nhất.','WEB_SETUP_UNAVAILABLE');
+      if(!s.authenticated){
+        step('login','Đăng nhập ChatGPT trong cửa sổ vừa mở. PADSwitcher tự tiếp tục khi bạn đăng nhập xong.');
+        s=await this.flowAction(id,flow,'login');
+      }
+      if(!s.setup?.prepared||!s.ready){
+        step('prepare','Đang kiểm tra ChatGPT và cài model Web (khoảng 1 phút, gửi một tin nhắn kiểm tra ngắn)…');
+        s=await this.flowAction(id,flow,'prepare',{consent:true});
+      }
+      step('finish','Đang bật GPT Web…');
+      await this.control(id,'/hide',{}).catch(()=>{});
+      const profile=this.get(id);
+      if(!profile.connected){profile.connected=true;await this.save().catch(()=>{});}
+      if(activate||!this.state.selectedId)await this.whenIdle(()=>this.select(id));
+      if(activate&&!this.enabled)await this.whenIdle(()=>this.enable());
+      this.flows.delete(id);this.emit('connected',{id,label:profile.label,enabled:this.enabled});this.changed();
+    }catch(error){
+      if(flow.cancelled||error instanceof FlowCancelled){this.flows.delete(id);this.changed();return;}
+      flow.running=false;flow.step='error';
+      flow.error=error instanceof UserError?error.message:'Không kết nối được GPT Web. Bấm Thử lại.';flow.detail=error?.detail||null;
+      this.changed();
+    }
+  }
+  async flowAction(id,flow,action,extra={}){
+    let s=await this.refreshStatus(id),requestId;const job=s.setup?.job;
+    if(action==='login'&&job?.action==='login'&&job.status==='running'){
+      // An earlier sign-in is still waiting: reuse it and bring its window forward.
+      requestId=job.id;if(!this.setupPending.has(id))this.setupPending.set(id,{requestId,action});
+      await this.control(id,'/show',{}).catch(()=>{});
+    }else{
+      requestId=crypto.randomUUID();
+      await this.whenIdle(()=>this.setupCommand(id,{action,requestId,...extra}));
+    }
+    for(let failures=0;;){
+      await wait(this.options.flowPollMs??1000);
+      if(flow.cancelled)throw new FlowCancelled();
+      if(!this.children.has(id))throw new UserError('Bộ chạy GPT Web đã dừng. Bấm Thử lại.','WEB_START_FAILED');
+      try{s=await this.refreshStatus(id);failures=0;}
+      catch{if(++failures>=10)throw new UserError('Mất kết nối với bộ chạy GPT Web. Bấm Thử lại.','WEB_START_FAILED');continue;}
+      const current=s.setup?.job;
+      if(current?.id!==requestId||current.status==='running')continue;
+      if(current.status==='completed'||action==='login'&&s.authenticated)return s;
+      throw Object.assign(new UserError(current.message||'Thiết lập GPT Web chưa hoàn tất.','WEB_SETUP_FAILED'),{detail:typeof current.detail==='string'?current.detail.slice(0,300):null});
+    }
+  }
   async setupCommand(id,input){return this.exclusive(async()=>{
     this.get(id);
     if(this.active)throw new UserError('Chờ lượt Web đang chạy hoàn tất trước khi thiết lập.','WEB_ACTIVE');
@@ -129,8 +208,8 @@ class WebService extends EventEmitter {
     await this.launch(id,false);
     const status=await this.refreshStatus(id);
     if(!status.setup?.supported)throw new UserError('Bộ chạy này chưa có thiết lập nhanh. Thoát PADSwitcher ở khay khi hết lượt chạy rồi mở lại bản mới.','WEB_SETUP_UNAVAILABLE');
-    if(status.setup.job?.status==='running'||this.setupPending.size)throw new UserError('Chờ thao tác thiết lập hiện tại hoàn tất.','WEB_SETUP_BUSY');
-    this.setupPending.set(id,input.requestId);
+    if(status.setup.job?.status==='running'||this.setupPending.has(id)||this.setupBlocking())throw new UserError('Chờ thao tác thiết lập hiện tại hoàn tất.','WEB_SETUP_BUSY');
+    this.setupPending.set(id,{requestId:input.requestId,action:input.action});
     try {
       const result=await this.control(id,'/setup',input);
       await this.refreshStatus(id);this.lastError=null;return result;
@@ -144,22 +223,25 @@ class WebService extends EventEmitter {
   async refreshStatus(id){
     const s=await this.control(id,'/status');const url=s.baseUrl?new URL(s.baseUrl):null;
     if(s.version!==1||s.pid!==this.children.get(id)?.pid||(url&&(url.protocol!=='http:'||url.hostname!=='127.0.0.1'||!url.port||url.pathname!=='/v1/'||url.username||url.password||url.search||url.hash)))throw Error('Invalid companion status');
-    this.statuses.set(id,s);if(s.setup?.job?.id===this.setupPending.get(id)&&s.setup?.job?.status!=='running')this.setupPending.delete(id);return s;
+    this.statuses.set(id,s);if(s.setup?.job?.id===this.setupPending.get(id)?.requestId&&s.setup?.job?.status!=='running')this.setupPending.delete(id);return s;
   }
   async poll(){if(this.pollFlight||this.closed)return;this.pollFlight=(async()=>{const before=JSON.stringify(this.view());await Promise.all([...this.children.keys()].map(async id=>{try{await this.control(id,'/heartbeat',{});await this.refreshStatus(id);}catch{this.statuses.delete(id);}}));if(before!==JSON.stringify(this.view()))this.changed();})();try{await this.pollFlight;}finally{this.pollFlight=null;}}
   async enable(){return this.exclusive(async()=>{
-    if(this.active||this.setupPending.size)throw new UserError('Chờ lượt Web hoặc thiết lập hoàn tất trước khi bật.','WEB_ACTIVE');
+    if(this.active||this.setupBlocking())throw new UserError('Chờ lượt Web hoặc thiết lập hoàn tất trước khi bật.','WEB_ACTIVE');
     if(!this.state.selectedId)throw new UserError('Thêm và chọn tài khoản GPT Web trước.','WEB_ACCOUNT_MISSING');
     await this.launch(this.state.selectedId,false);const s=await this.refreshStatus(this.state.selectedId);
     if(!s.ready||!s.authenticated||s.operation||s.interactionMode!=='automatic'||s.mode==='full'&&s.setup?.toolsVerified===false)throw new UserError('Đăng nhập và hoàn tất thiết lập GPT Web trước. Nếu dùng công cụ, cần xác minh kết nối thành công.','WEB_SETUP_REQUIRED');
     this.state.enabled=true;try{await this.save();}catch(e){this.state.enabled=false;throw e;}this.lastError=null;
   });}
-  async stopChildren(){for(const id of [...this.children.keys()]){
-    const child=this.children.get(id),result=await this.control(id,'/shutdown',{},30000);
+  async stopChildren(){for(const id of [...this.children.keys()])await this.stopChild(id);}
+  async stopChild(id){
+    const child=this.children.get(id);if(!child)return;
+    const result=await this.control(id,'/shutdown',{},30000);
     if(result.ok!==true)throw new UserError('Chờ thao tác GPT Web hoàn tất trước khi tắt.','WEB_BUSY');
     const deadline=Date.now()+30000;while(this.children.get(id)===child&&Date.now()<deadline)await wait(100);
     if(this.children.get(id)===child)throw new UserError('Bộ chạy GPT Web chưa dừng. Hãy chờ rồi thử lại.','WEB_STOP_FAILED');
-  }}
+  }
+  inUse(id){return this.enabled&&id===this.state.selectedId;}
   async disable(){return this.exclusive(async()=>{
     if(this.launchFlight)throw new UserError('Chờ bộ chạy GPT Web khởi động hoàn tất trước khi tắt.','WEB_BUSY');
     if(this.active)throw new UserError('Chờ lượt GPT Web đang chạy hoàn tất trước khi tắt.','WEB_ACTIVE');
@@ -171,7 +253,9 @@ class WebService extends EventEmitter {
     }finally{this.stopping=false;}
   });}
   async remove(id){return this.exclusive(async()=>{
-    this.get(id);if(this.active||this.launchFlight||this.enabled&&id===this.state.selectedId||this.children.has(id))throw new UserError('Tắt GPT Web và đóng bộ chạy của tài khoản trước khi xóa.','WEB_ACCOUNT_ACTIVE');
+    this.get(id);if(this.flows.get(id)?.running)throw new UserError('Hủy kết nối đang chạy của tài khoản trước khi xóa.','WEB_ACCOUNT_ACTIVE');
+    if(!this.active&&!this.launchFlight&&!this.inUse(id)&&this.children.has(id))await this.stopChild(id);
+    if(this.active||this.launchFlight||this.inUse(id)||this.children.has(id))throw new UserError('Tắt GPT Web và đóng bộ chạy của tài khoản trước khi xóa.','WEB_ACCOUNT_ACTIVE');
     // Retain private login data in trash rather than silently destroy sessions.
     const home=this.home(id),trash=path.join(this.root,'trash');await fs.mkdir(trash,{recursive:true});await assertDirectory(trash);await assertDirectory(home);
     const destination=profilePath(trash,id);await fs.rename(home,destination);
@@ -179,7 +263,7 @@ class WebService extends EventEmitter {
     // Keep the hashed ownership tombstone: deleting a login must not make an old
     // Web conversation eligible for native inference after a restart.
     try{await this.save();}catch(e){this.state=previous;await fs.rename(destination,home);throw e;}
-    this.rows.delete(id);this.statuses.delete(id);
+    this.rows.delete(id);this.statuses.delete(id);this.flows.delete(id);
   });}
   async augmentModels(response){
     if(!this.enabled)return response;
@@ -221,7 +305,7 @@ class WebService extends EventEmitter {
       errorResponse(res,400,'web_model_not_supported','Select a PADSwitcher Web model in a new conversation.');return true;
     }
     // One physical Web request at a time across accounts. No queue or automatic replay.
-    if(this.active||this.setupPending.size){errorResponse(res,409,'web_busy','Another GPT Web request or setup is active. Wait for it to finish.');return true;}
+    if(this.active||this.setupBlocking()){errorResponse(res,409,'web_busy','Another GPT Web request or setup is active. Wait for it to finish.');return true;}
     const key=models.threadKey(req,body),owner=key&&this.bindings[key];
     if(owner&&owner!==binding.id){errorResponse(res,409,'web_account_thread_mismatch','This conversation belongs to another Web account. Open a new conversation.');return true;}
     this.active++;this.changed();

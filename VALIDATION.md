@@ -1,5 +1,23 @@
 # PADSwitcher 1.9.2 — validation
 
+## GPT Web one-click connection — 1.12.0
+
+- Root cause of the blank sign-in page reproduced with the packaged companion: the
+  managed window opened behind the foreground app, Chromium's native occlusion
+  tracking treated it as hidden and ChatGPT stayed on its `Loading` shell. Bringing
+  the window forward rendered the page immediately.
+- Fix verified on the rebuilt companion with VS Code in front and a disposable
+  profile: the window is raised above other apps and `chatgpt.com/auth/login`
+  renders its Google/Apple/phone/email choices; `/hide` hides it again.
+- Real `WebService` + packaged companion, disposable root: Connect reaches the
+  sign-in step in about 7 s without taking the global Web lock; Cancel shuts the
+  unused companion down while sign-in is still pending. No credentials were entered.
+- Root suite: 199 passing tests; native quota/cache regression 50 cases with Web
+  disabled/enabled; native and Web protocol fixtures and the UI smoke pass.
+  Vendored launcher tests: 378 pass, 5 environment-specific skips.
+- **Not yet verified with a real ChatGPT account:** completing sign-in, the setup
+  check turn, model install, a Web reply and Full/MCP tools.
+
 ## GPT Web sign-in recovery — 1.11.1
 
 - Reproduced the signed-out embedded page stopping at a blank `Just a moment...`

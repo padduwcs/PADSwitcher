@@ -1,11 +1,9 @@
 # PADSwitcher
 
-**Sửa ở 1.11.1:** GPT Web mở thẳng trang đăng nhập và cho phép tải lại khi đăng
-nhập gặp trang trắng, giữ khóa điều hướng trong lượt model.
-
-**Mới ở 1.11.0:** trình thiết lập **GPT Web** ngay trong PADSwitcher, có tiếng
-Việt/Anh, tự kiểm tra và cài model sau khi đăng nhập. Quản lý nhiều tài khoản Web,
-kết nối công cụ theo từng bước và giữ tiến độ khi lỗi. Mặc định tắt; giữ tuyến Codex hiện có.
+**Mới ở 1.12.0:** **GPT Web** kết nối bằng một nút: bấm **Thêm tài khoản ChatGPT**,
+đăng nhập trong cửa sổ vừa mở, PADSwitcher tự kiểm tra, cài model và bật. Sửa lỗi
+cửa sổ đăng nhập trắng ("Loading") do mở phía sau ứng dụng khác. Lỗi hiển thị lý do
+cụ thể. Công cụ lập trình (MCP) tách thành bước tùy chọn. Tuyến Codex thường giữ nguyên.
 Xem [thiết lập, cách dùng và phạm vi kiểm chứng](docs/GPT_WEB.md).
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">

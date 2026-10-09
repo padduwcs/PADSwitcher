@@ -316,7 +316,7 @@ $('#restore-trash').onclick = async () => {
     if (restored) { selectedId = restored.result; navigate('accounts'); render(); }
   },'Khôi phục hồ sơ');
 };
-window.padWebUI?.setup({call,showModal,closeModal});
+window.padWebUI?.setup({call,showModal,closeModal,toast});
 api.onState(next => { state = next; render(); });
 api.onDevice(device => { $('#login-detail').textContent = ui.t(`Mã thiết bị: ${device.userCode} · Nhập mã trên trang OpenAI vừa mở.`); });
 api.onRefreshError?.(error => toast(ui.error(error),true));

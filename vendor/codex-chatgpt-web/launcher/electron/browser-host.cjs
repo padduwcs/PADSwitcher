@@ -28,6 +28,8 @@ const {
 
 const TEMPORARY_CHAT_URL = "https://chatgpt.com/?temporary-chat=true";
 const CHATGPT_LOGIN_URL = "https://chatgpt.com/auth/login";
+// PADSwitcher waits for the person rather than failing a slow provider/2FA sign-in after 3 minutes.
+const MANAGED_LOGIN_TIMEOUT_MS = process.env.PADSWITCHER_WEB_MANAGED === "1" ? 15 * 60_000 : undefined;
 const CHATGPT_ORIGIN = "https://chatgpt.com";
 const IDLE_BROWSER_URL = "data:text/html;charset=utf-8,%3C!doctype%20html%3E%3Chtml%3E%3Chead%3E%3Cmeta%20charset%3D%22utf-8%22%3E%3Ctitle%3ECodex%20Web%20GPT%3C%2Ftitle%3E%3C%2Fhead%3E%3Cbody%3E%3C%2Fbody%3E%3C%2Fhtml%3E#codex-web-gpt-browser-host";
 const PRIMARY_VIEW_BOOTSTRAP_TIMEOUT_MS = 10_000;
@@ -2649,7 +2651,7 @@ class BrowserHost {
           }
         }
         await this.probeAuthentication();
-        const authenticated = await this.waitForAuthenticated();
+        const authenticated = await this.waitForAuthenticated(MANAGED_LOGIN_TIMEOUT_MS);
         await this.runSessionInspection(false);
         return authenticated;
       });

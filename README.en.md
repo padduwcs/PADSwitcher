@@ -1,12 +1,10 @@
 # PADSwitcher
 
-**Fixed in 1.11.1:** GPT Web opens the sign-in page directly and allows an explicit
-reload during sign-in. Navigation remains locked during model turns.
-
-**New in 1.11.0:** an integrated **GPT Web** setup wizard in Vietnamese/English
-checks the browser and installs models after sign-in. It manages isolated Web
-accounts, guides tool connections and resumes partial setup. Web is off by
-default; existing native Codex routing remains in place.
+**New in 1.12.0:** **GPT Web** connects with one button: click **Add ChatGPT
+account**, sign in in the window that opens, and PADSwitcher checks the account,
+installs models and enables Web. Fixes the blank ("Loading") sign-in window that
+opened behind other apps. Failures show a specific reason. Coding tools (MCP) are a
+separate optional step. Native Codex routing is unchanged.
 See [setup, operation and validation scope (Vietnamese)](docs/GPT_WEB.md).
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">

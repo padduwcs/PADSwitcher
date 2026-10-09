@@ -21,6 +21,16 @@ module.exports = `
     onState: cb => { callback = cb; },onDevice:cb => {deviceCallback=cb;},
     action:async (command,args={}) => {
       if(command==='webAdd'){const id=crypto.randomUUID();state.web.profiles.push({id,label:args.label,status:'stopped',selected:false});if(!state.web.selectedId)state.web.selectedId=id;publish();return {ok:true,result:id,state:clone(state)};}
+      if(command==='webConnect'){
+        const p=state.web.profiles.find(p=>p.id===args.id);
+        if(!p.flow?.running){
+          p.flow={running:true,step:'login',message:'Đăng nhập ChatGPT trong cửa sổ vừa mở. PADSwitcher tự tiếp tục khi bạn đăng nhập xong.',error:null};publish();
+          setTimeout(()=>{if(!p.flow?.running)return;Object.assign(p,{flow:null,status:'ready',authenticated:true,connected:true,mode:p.mode||'browseronly'});
+            p.setup={supported:true,prepared:true,smokePassed:true,credentialsConfigured:false,toolsVerified:false,connectorName:'CodexNative2-pad-preview',job:null};
+            if(args.activate){state.web.selectedId=p.id;state.web.profiles.forEach(x=>x.selected=x.id===p.id);state.web.enabled=true;}publish();},Number(window.padPreviewConnectMs??20));
+        }
+      }
+      if(command==='webCancelConnect'){const p=state.web.profiles.find(p=>p.id===args.id);p.flow=null;publish();}
       if(command==='webSelect'){state.web.selectedId=args.id;state.web.profiles.forEach(p=>p.selected=p.id===args.id);publish();}
       if(command==='webLaunchSetup'){
         const p=state.web.profiles.find(p=>p.id===args.id);

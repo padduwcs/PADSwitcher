@@ -7,7 +7,7 @@ const {writePrivateFileAtomic} = require('./atomic-file.cjs');
 
 // Login cookies/prompts never cross this surface. Tunnel credentials are accepted
 // only by authenticated bounded setup POSTs and never returned in status/errors.
-async function startPadControl({coreHome, supervisor, browserHost, runtimeHost, showWindow, quit, stateStore, setup}) {
+async function startPadControl({coreHome, supervisor, browserHost, runtimeHost, showWindow, hideWindow, quit, stateStore, setup}) {
   const file = path.join(coreHome, 'runtime', 'pad-control.json');
   const token = crypto.randomBytes(32).toString('base64url');
   let heartbeat = Date.now(), closing = false;
@@ -23,8 +23,11 @@ async function startPadControl({coreHome, supervisor, browserHost, runtimeHost, 
       if (req.method === 'POST' && req.url === '/show') {
         heartbeat = Date.now(); showWindow(); res.end('{}'); return;
       }
+      if (req.method === 'POST' && req.url === '/hide') {
+        heartbeat = Date.now(); hideWindow?.(); res.end('{}'); return;
+      }
       if (req.method === 'POST' && req.url === '/shutdown') {
-        if (setup?.active() || runtimeHost.currentOperation() || browserHost.currentOperation() && browserHost.currentOperation() !== 'ChatGPT login') return fail(409, 'operation_active');
+        if (setup?.blocking() || runtimeHost.currentOperation() || browserHost.currentOperation() && browserHost.currentOperation() !== 'ChatGPT login') return fail(409, 'operation_active');
         // Finish the owned runtime drain before acknowledging. Exit only AFTER the
         // response has been flushed, so the manager cannot mistake exit for failure.
         await supervisor.shutdown({cancelActiveTurns:false,force:false});

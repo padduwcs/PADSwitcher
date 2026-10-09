@@ -16,6 +16,11 @@ Local changes:
   native rows, budgets and feature settings are not rewritten;
 - Web protocol uses native mode and cannot replay across account boundaries;
 - read-only rollout resolution may use the PADSwitcher-provided native home.
+- managed setup bridge (`padswitcher-setup.cjs`) with redacted failure reasons;
+  waiting for sign-in is passive and never blocks quitting;
+- managed windows keep rendering when occluded (`CalculateNativeWinOcclusion`
+  disabled) and the sign-in window is raised in front; `/hide` hides it again;
+- managed sign-in waits up to 15 minutes instead of 3.
 
 The upstream browser, MCP capability checks, turn broker, tool approvals,
 compaction, cancellation and runtime integrity checks are retained.

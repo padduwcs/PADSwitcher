@@ -150,3 +150,76 @@ test('active Web requests block setup; opening/status remain passive and Full ca
   f.web.active=0;f.status.mode='full';f.status.setup.toolsVerified=false;
   await assert.rejects(f.web.enable(),{code:'WEB_SETUP_REQUIRED'});assert.equal(f.web.enabled,false);assert.equal(f.sent.length,0);
 });
+test('managed failures report a short redacted reason; waiting for sign-in never blocks quitting',async()=>{
+  let release;const gate=new Promise(r=>release=r);
+  const f=fixture({invoke:async channel=>{if(channel==='launcher:browser-login')await gate;if(channel==='launcher:browser-smoke')throw Error('Composer missing sk-fixtureSecretNeverRender123456789 at https://chatgpt.com/c?token=abc');}});
+  f.start('login');await pause();assert.equal(f.setup.active(),true);assert.equal(f.setup.blocking(),false);
+  release();await completed(f.setup);
+  f.start('prepare',{consent:true});assert.equal(f.setup.blocking(),true);const job=await completed(f.setup);
+  assert.equal(job.status,'failed');assert(job.detail.includes('Composer missing'));
+  assert(!job.detail.includes('fixtureSecret'));assert(!job.detail.includes('token=abc'));
+});
+async function flowFixture(t,{authenticated=false,prepared=false,loginPolls=3,failPrepare=false}={}){
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'pad-web-flow-')),web=new WebService(root,{available:()=>true,flowPollMs:1});
+  await web.init();const id=await web.add('Flow');const sent=[],child={pid:321,exitCode:null,signalCode:null};
+  web.launch=async()=>{web.children.set(id,child);};
+  const status={version:1,pid:321,ready:prepared,authenticated,interactionMode:'automatic',mode:prepared?'browseronly':null,setup:{supported:true,prepared,job:null}};
+  let polls=0;
+  web.control=async(_id,route,input)=>{
+    if(route==='/heartbeat')return {};
+    if(route==='/status'){
+      const job=status.setup.job;
+      if(job?.status==='running'&&job.action==='login'&&++polls>=loginPolls){status.authenticated=true;job.status='completed';}
+      if(job?.status==='running'&&job.action==='prepare'){
+        if(failPrepare)Object.assign(job,{status:'failed',message:'Kiểm tra trình duyệt chưa thành công.',detail:'Composer missing'});
+        else{Object.assign(status,{ready:true,mode:'browseronly'});status.setup.prepared=true;job.status='completed';}
+      }
+      return structuredClone(status);
+    }
+    sent.push({route,input});
+    if(route==='/setup'){status.setup.job={id:input.requestId,action:input.action,status:'running'};return {accepted:true};}
+    if(route==='/shutdown'){web.children.delete(id);return {ok:true};}
+    return {};
+  };
+  t.after(async()=>{clearInterval(web.timer);await fs.rm(root,{recursive:true,force:true});});
+  const run=async(options)=>{await web.connect(id,options);const flow=web.flows.get(id);await flow?.done;};
+  return {web,id,sent,status,run,root};
+}
+test('one-click connection signs in, prepares once, hides the runtime, selects and enables',async t=>{
+  const f=await flowFixture(t);f.web.state.selectedId=null;
+  await f.run({activate:true});
+  assert.deepEqual(f.sent.map(x=>x.route+(x.input?.action?':'+x.input.action:'')),['/setup:login','/setup:prepare','/hide']);
+  assert.equal(f.sent[1].input.consent,true);
+  assert.equal(f.web.enabled,true);assert.equal(f.web.state.selectedId,f.id);assert.equal(f.web.flows.size,0);
+  assert.equal(f.web.view().profiles[0].connected,true);
+  const saved=JSON.parse(await fs.readFile(path.join(f.root,'accounts.json'),'utf8'));assert.equal(saved.profiles[0].connected,true);assert.equal(saved.enabled,true);
+});
+test('an already signed-in, prepared account connects without sign-in or another check turn',async t=>{
+  const f=await flowFixture(t,{authenticated:true,prepared:true});
+  await f.run({activate:true});
+  assert.deepEqual(f.sent.map(x=>x.route),['/hide']);assert.equal(f.web.enabled,true);
+});
+test('a failed check stops with its reason and detail; nothing is retried automatically',async t=>{
+  const f=await flowFixture(t,{authenticated:true,failPrepare:true});
+  await f.run({activate:true});
+  const flow=f.web.view().profiles[0].flow;
+  assert.equal(flow.running,false);assert.equal(flow.error,'Kiểm tra trình duyệt chưa thành công.');assert.equal(flow.detail,'Composer missing');
+  assert.equal(f.sent.filter(x=>x.input?.action==='prepare').length,1);assert.equal(f.web.enabled,false);
+  await f.web.cancelConnect(f.id);assert.equal(f.web.view().profiles[0].flow,null);
+});
+test('cancelling a pending sign-in releases the unused runtime and leaves no error',async t=>{
+  const f=await flowFixture(t,{loginPolls:1e9});
+  await f.web.connect(f.id,{activate:true});const flow=f.web.flows.get(f.id);
+  for(let i=0;i<200&&flow.step!=='login';i++)await new Promise(r=>setTimeout(r,1));
+  assert.equal(f.web.view().profiles[0].flow.step,'login');assert.equal(f.web.view().setupLocked,false);
+  await f.web.connect(f.id);assert.equal(f.sent.filter(x=>x.input?.action==='login').length,1);assert(f.sent.some(x=>x.route==='/show'));
+  await f.web.cancelConnect(f.id);await flow.done;
+  assert.equal(f.web.flows.size,0);assert(f.sent.some(x=>x.route==='/shutdown'));assert.equal(f.web.enabled,false);
+});
+test('only non-login setup holds the global Web lock',async t=>{
+  const f=await parentFixture(t);
+  f.web.setupPending.set('other',{requestId:crypto.randomUUID(),action:'login'});
+  assert.equal(f.web.setupBlocking(),false);assert.equal(f.web.view().setupLocked,false);
+  await f.web.setupCommand(f.id,{action:'prepare',requestId:crypto.randomUUID(),consent:true});
+  assert.equal(f.web.setupBlocking(),true);assert.equal(f.web.view().setupLocked,true);
+});

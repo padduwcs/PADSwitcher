@@ -7,7 +7,7 @@ const URLS = Object.freeze({
   plugins: 'https://chatgpt.com/#settings/Plugins',
 });
 const MESSAGES = Object.freeze({
-  login: 'Đang chờ bạn đăng nhập trong cửa sổ ChatGPT. Nếu trang trắng, bấm nút tải lại ở thanh trên.',
+  login: 'Đang chờ bạn đăng nhập trong cửa sổ ChatGPT. PADSwitcher tự tiếp tục khi xong.',
   authentication: 'Đang kiểm tra phiên đăng nhập.',
   smoke: 'Đang kiểm tra trình duyệt bằng một lượt ChatGPT Web.',
   install: 'Đang cài model và khởi động bộ chạy Web.',
@@ -16,7 +16,18 @@ const MESSAGES = Object.freeze({
   external: 'Đang mở trang thiết lập.',
 });
 function setupError(code, message) { return Object.assign(new Error(message), {code}); }
-function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStore, version, showBrowser}) {
+// Upstream errors explain most failures (network, sign-in, ChatGPT UI drift). Return a short,
+// redacted reason so the owner can act on it; keys, bearer values and URL queries never leave.
+function publicReason(error) {
+  const text = String(error instanceof Error ? error.message : error || '')
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-…')
+    .replace(/Bearer\s+\S+/gi, 'Bearer …')
+    .replace(/(https?:\/\/[^\s?#]+)[?#]\S*/g, '$1')
+    .replace(/[A-Za-z0-9_-]{40,}/g, '…')
+    .replace(/\s+/g, ' ').trim();
+  return text.length > 240 ? text.slice(0, 237) + '…' : text;
+}
+function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStore, version, showBrowser, logger}) {
   let job = null;
   const requests = new Set();
   const snapshot = () => {
@@ -33,6 +44,8 @@ function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStor
     };
   };
   const active = () => job?.status === 'running';
+  // Waiting for the person to sign in is passive: it must not block quitting or stopping.
+  const blocking = () => active() && job.action !== 'login';
   const step = name => { job.step = name; job.message = MESSAGES[name]; };
   function start(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input)
@@ -72,12 +85,13 @@ function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStor
     job = {id: input.requestId, action: input.action, status: 'running', step: input.action, message: MESSAGES[input.action] || MESSAGES.authentication};
     void run(input).then(() => {
       job.status = 'completed'; job.message = input.action === 'login'
-        ? 'Trang đăng nhập đã mở. Hoàn tất đăng nhập rồi quay lại PADSwitcher.'
+        ? 'Đã đăng nhập ChatGPT.'
         : input.action === 'external' ? 'Trang thiết lập đã mở.' : 'Đã hoàn tất bước thiết lập.';
-    }).catch(() => {
-      // Do not expose upstream errors, commands or secrets to the PAD renderer.
+    }).catch(error => {
       job.status = 'failed';
-      job.message = ({login: 'Chưa hoàn tất đăng nhập. Nếu trang trắng, mở lại đăng nhập; chưa cần thiết lập model hay công cụ.',
+      job.detail = publicReason(error);
+      logger?.error('pad.setup_failed', {action: input.action, step: job.step, message: job.detail});
+      job.message = ({login: 'Chưa hoàn tất đăng nhập ChatGPT.',
         authentication: 'Chưa đăng nhập ChatGPT. Bấm Đăng nhập rồi quay lại.',
         smoke: 'Kiểm tra trình duyệt chưa thành công. Kiểm tra đăng nhập/mạng; chỉ thử lại khi bạn bấm nút.',
         install: 'Chưa cài xong model. Lượt kiểm tra đã thành công được giữ lại; bấm Thiết lập tự động để tiếp tục.',
@@ -93,7 +107,7 @@ function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStor
     if (health?.active_http_turns || health?.active_browser_turns) throw Error('Web turn active');
     if (input.action === 'external') { await invoke('launcher:open-external', URLS[input.target]); return; }
     if (input.action === 'login') {
-      await showBrowser(); await browserHost.waitForSurfaceReady();
+      await showBrowser(true); await browserHost.waitForSurfaceReady();
       await invoke('launcher:browser-login'); return;
     }
     step('authentication');
@@ -119,6 +133,6 @@ function createPadSetup({invoke, browserHost, runtimeHost, supervisor, stateStor
       if (report.ok !== true) throw Error('Verification failed');
     }
   }
-  return {start, snapshot, active};
+  return {start, snapshot, active, blocking};
 }
-module.exports = {createPadSetup};
+module.exports = {createPadSetup, publicReason};
