@@ -1,6 +1,6 @@
 # PADSwitcher 1.9.2 — validation
 
-## GPT Web one-click connection — 1.12.0
+## GPT Web one-click connection — 1.12.1
 
 - Root cause of the blank sign-in page reproduced with the packaged companion: the
   managed window opened behind the foreground app, Chromium's native occlusion

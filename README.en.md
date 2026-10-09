@@ -1,6 +1,6 @@
 # PADSwitcher
 
-**New in 1.12.0:** **GPT Web** connects with one button: click **Add ChatGPT
+**New in 1.12.1:** **GPT Web** connects with one button: click **Add ChatGPT
 account**, sign in in the window that opens, and PADSwitcher checks the account,
 installs models and enables Web. Fixes the blank ("Loading") sign-in window that
 opened behind other apps. Failures show a specific reason. Coding tools (MCP) are a

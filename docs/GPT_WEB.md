@@ -1,4 +1,4 @@
-# GPT Web trong PADSwitcher 1.12.0
+# GPT Web trong PADSwitcher 1.12.1
 
 GPT Web là chức năng bổ sung, mặc định tắt. Trang **Tài khoản** tiếp tục quản lý
 đăng nhập Codex; trang **GPT Web** quản lý phiên đăng nhập ChatGPT riêng.
