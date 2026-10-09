@@ -490,10 +490,10 @@ test("browser preference IPC commits only after setup succeeds and refuses activ
     let api;
     vm.runInNewContext(preloadSource, { require: () => ({
       contextBridge: { exposeInMainWorld: (_name, value) => { api = value; } },
-      ipcRenderer: { invoke: (actualChannel, enabled) => {
+      ipcRenderer: Object.assign(new (require("node:events").EventEmitter)(), { invoke: (actualChannel, enabled) => {
         assert.equal(actualChannel, channel);
         return handler(null, enabled);
-      } },
+      } }),
     }) });
     const changing = api[method](true);
     assert.equal(state[property], false);
