@@ -2637,7 +2637,16 @@ class BrowserHost {
         const current = this.view.webContents.getURL();
         if (this.primaryNavigationError || this.reauthenticationRequired
           || (directSignIn ? !allowedAuthUrl(current) : !current.startsWith(CHATGPT_ORIGIN))) {
-          await this.view.webContents.loadURL(directSignIn ? CHATGPT_LOGIN_URL : TEMPORARY_CHAT_URL);
+          try {
+            await this.view.webContents.loadURL(directSignIn ? CHATGPT_LOGIN_URL : TEMPORARY_CHAT_URL);
+          } catch (error) {
+            // Explicit Reload or an auth redirect can replace the initial navigation.
+            // Keep the same login waiter; never replay navigation or model requests.
+            const contents = this.view.webContents;
+            const url = contents.isDestroyed() ? "" : contents.getURL();
+            if (!isAbortedNavigationError(error)
+              || !(allowedAuthUrl(url) || url.startsWith(`${CHATGPT_ORIGIN}/`))) throw error;
+          }
         }
         await this.probeAuthentication();
         const authenticated = await this.waitForAuthenticated();

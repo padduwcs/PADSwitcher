@@ -81,6 +81,16 @@ test("explicit reload recovers login without unlocking other setup or any active
   assert.throws(()=>BrowserHost.prototype.navigate.call(fixture,"reload"),/locked while ChatGPT is running a Codex turn/);
   assert.equal(reloads,1);
 });
+test("replacing the initial login navigation keeps its waiter but real network failures are returned", async () => {
+  const { host, contents } = primaryLoginFixture();let navigations=0;
+  contents.loadURL=async()=>{navigations++;throw Object.assign(new Error("ERR_ABORTED"),{code:-3});};
+  await host.openLogin({directSignIn:true});assert.equal(navigations,1,"no implicit navigation retry");
+  contents.loadURL=async()=>{throw Object.assign(new Error("ERR_NAME_NOT_RESOLVED"),{code:-105});};
+  await assert.rejects(host.openLogin({directSignIn:true}),/ERR_NAME_NOT_RESOLVED/);
+  contents.getURL=()=> "https://unexpected.example/";
+  contents.loadURL=async()=>{throw Object.assign(new Error("ERR_ABORTED"),{code:-3});};
+  await assert.rejects(host.openLogin({directSignIn:true}),/ERR_ABORTED/);
+});
 
 test("only failed main-frame loads and renderer exits invalidate the primary login document", async () => {
   const { host, contents, loads } = primaryLoginFixture();
