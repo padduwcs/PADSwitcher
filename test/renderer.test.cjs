@@ -8,6 +8,24 @@ const html = fs.readFileSync(path.join(__dirname,'../src/renderer/index.html'),'
 const script = fs.readFileSync(path.join(__dirname,'../src/renderer/app.js'),'utf8');
 const mock = require('../scripts/preview-data.cjs');
 const settle = async () => { await new Promise(resolve => setTimeout(resolve,10)); };
+test('Web setup gives the next action and only enables signed-in ready accounts',async t=>{
+  for(const [status,authenticated,expected,disabled] of [
+    ['stopped',false,'Đăng nhập & thiết lập',true],
+    ['setup',false,'Đăng nhập & thiết lập',true],
+    ['ready',true,'Bật GPT Web',false]
+  ]){
+    const w=dom(t,true,state=>{state.web.profiles=[{id:'web-fixture',label:'Fixture account',status,authenticated,selected:true}];state.web.selectedId='web-fixture';});await settle();
+    const d=w.document;assert(d.querySelector('#web-next-step').textContent.includes(expected));
+    assert.equal(d.querySelector('#web-enable').disabled,disabled);
+    assert.equal(d.querySelector('[data-web-open]').disabled,false);
+    assert(!d.querySelector('#web-page').textContent.includes('npm'));
+    d.querySelector('#language-toggle').click();assert(d.querySelector('#web-next-step').textContent.includes(status==='ready'?'Enable GPT Web':'Sign in & set up'));
+  }
+  const w=dom(t,true,state=>{state.web.runtimeAvailable=false;});await settle();
+  assert.equal(w.document.querySelector('[data-web-open]').disabled,true);
+  assert.equal(w.document.querySelector('#web-runtime-hint').classList.contains('hidden'),false);
+  assert(w.document.querySelector('#web-runtime-hint').textContent.includes('khay hệ thống'));
+});
 test('scoped UI changes only the selected account and auto-switch policy, and translates separate account setup',async t=>{
   const w=dom(t);await settle();const d=w.document;
   d.querySelector('#use-gateway').click();await settle();

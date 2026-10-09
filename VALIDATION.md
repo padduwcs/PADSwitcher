@@ -146,9 +146,9 @@ redirect rejection, disconnects and profile lifecycle protection.
 
 ## Limits
 
-### GPT Web 1.10.0 — 2026-10-09
+### GPT Web 1.10.1 — 2026-10-09
 
-- All 170 PADSwitcher tests pass, including 20 Web isolation/regression tests.
+- All 171 PADSwitcher tests pass, including 20 Web isolation/regression tests.
   Native compressed request bytes, cache/session headers and quota fallback are
   checked with Web enabled and disabled.
 - The existing 25 native router/usage tests also run with the actual Web branch
@@ -171,6 +171,15 @@ redirect rejection, disconnects and profile lifecycle protection.
   setup cannot enable Web. Both stop cleanly; native auth/config hashes stay equal.
 - Electron UI startup, sandbox/CSP, existing pages and the new Web page pass at
   normal/compact sizes, Vietnamese/English and light/dark themes.
+- The native NSIS portable-wrapper fixture reproduces missing helper/Web files
+  when the 1.10.0 build is opened twice while its first instance remains active.
+  The 1.10.1 per-launch extraction option preserves all first-instance resources
+  and cleans only the exiting launch's temporary folder. No native service or
+  account data is loaded by this fixture. Packaged main also explicitly verifies
+  discovery of the bundled Web runtime rather than a development build path.
+- Web setup presents the next action for the selected account and enables the
+  Web toggle only after a signed-in account reports ready. Missing-runtime
+  guidance no longer asks a portable user to run developer build commands.
 - The managed daemon catalog endpoint is tested with a real Bun listener. It
   requires control authentication and generates Web rows without upstream/model
   calls. The PAD catalog augmentation preserves native rows and returns the

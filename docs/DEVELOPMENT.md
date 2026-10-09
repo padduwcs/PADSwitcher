@@ -22,6 +22,7 @@ npm test
 npm run smoke
 npm run smoke:ui
 npm run dist
+npm run smoke:portable
 node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
 ```
 
@@ -33,6 +34,15 @@ credits or require logging into a real account. The packaged smoke check runs af
 `dist/PADSwitcher-<version>-Windows.exe`. GitHub Actions checks and builds on Windows.
 For a release, publish the tested executable and its SHA-256 file through GitHub Releases.
 The portable build currently has no code-signing certificate or automatic updater.
+
+`smoke:portable` builds a disposable NSIS fixture with the production portable
+options, launches it twice and verifies that the second launch preserves the first
+instance's native-helper and Web resource files. It never loads real account data.
+With the pinned electron-builder 26.15.3, `portable.unpackDirName: true` leaves
+`UNPACK_DIR_NAME` undefined and uses a unique `$PLUGINSDIR/app` for each launch.
+This prevents a second launch from deleting resources still used by the first.
+The builder's schema describes `false` for this behavior, but its pinned executable
+code uses `true`; the wrapper regression check verifies the actual result.
 
 ## Optional real-account diagnostics
 

@@ -30,6 +30,7 @@ jobs:
       - run: npm run smoke:protocol:web-enabled
       - run: npm run smoke:ui
       - run: npm run dist
+      - run: npm run smoke:portable
       - name: Install launcher Electron for bridge and launcher tests
         run: node vendor/codex-chatgpt-web/launcher/node_modules/electron/install.js
       - name: Web bridge tests (Bun)

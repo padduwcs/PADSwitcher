@@ -9,10 +9,13 @@ window.padWebUI = (() => {
     const p=w.profiles.find(p=>p.id===w.selectedId);$('#web-selected').textContent=p?p.label:ui.t('Chưa chọn tài khoản Web');
     $('#web-selected').setAttribute('data-literal','');
     $('#web-runtime-hint').classList.toggle('hidden',w.runtimeAvailable);
+    const next=!p?'Bước tiếp theo: bấm Thêm tài khoản Web.':w.enabled?'Đã bật. Mở chat mới trong Codex và chọn model có nhãn (Web · tên tài khoản).':p.status==='ready'?'Tài khoản đã sẵn sàng. Bấm Bật GPT Web để sử dụng.':'Bước tiếp theo: bấm Đăng nhập & thiết lập ở tài khoản bên dưới.';
+    $('#web-next-step').textContent=ui.t(next);$('#web-next-step').setAttribute('data-literal','');
+    $('#web-next-step').classList.toggle('hidden',!w.runtimeAvailable);
     $('#web-error').classList.toggle('hidden',!w.lastError);$('#web-error').textContent=w.lastError||'';
     $('#web-empty').classList.toggle('hidden',w.profiles.length>0);
     $('#web-add').disabled=w.busy;
-    $('#web-enable').disabled=w.busy||!w.runtimeAvailable||!p||w.enabled;
+    $('#web-enable').disabled=w.busy||!w.runtimeAvailable||!p||p.status!=='ready'||!p.authenticated||w.enabled;
     $('#web-disable').disabled=w.busy||!w.enabled&&!w.profiles.some(p=>p.status!=='stopped');
     $('#web-refresh').disabled=w.busy;
     const names={ready:'Sẵn sàng',signedOut:'Cần đăng nhập',setup:'Cần thiết lập',stopped:'Chưa mở'};

@@ -97,7 +97,7 @@ class WebService extends EventEmitter {
     this.launchFlight=flight;try{await flight;}finally{if(this.launchFlight===flight)this.launchFlight=null;}
   }
   async startChild(profile,show){
-    if(!this.options.available?.())throw new UserError('Chưa có bộ chạy GPT Web. Chạy npm run web:build rồi mở lại PADSwitcher.','WEB_RUNTIME_MISSING');
+    if(!this.options.available?.())throw new UserError('Không tìm thấy bộ chạy GPT Web. Hãy thoát PADSwitcher ở khay hệ thống rồi mở lại bản mới nhất.','WEB_RUNTIME_MISSING');
     const accountRoot=this.home(profile.id),core=path.join(accountRoot,'core'),privateCodex=path.join(accountRoot,'codex');
     for(const folder of [accountRoot,core,privateCodex,path.join(accountRoot,'browser-data')]){await fs.mkdir(folder,{recursive:true});await assertDirectory(folder);await this.platform?.protectDirectory(folder);}
     const env={...process.env};
