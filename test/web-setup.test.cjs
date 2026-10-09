@@ -223,3 +223,16 @@ test('only non-login setup holds the global Web lock',async t=>{
   await f.web.setupCommand(f.id,{action:'prepare',requestId:crypto.randomUUID(),consent:true});
   assert.equal(f.web.setupBlocking(),true);assert.equal(f.web.view().setupLocked,true);
 });
+test('a slow first start waits for the runtime and reports a retryable timeout only after the limit',async t=>{
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'pad-web-slow-')),events=new (require('node:events').EventEmitter)();
+  const web=new WebService(root,{available:()=>true,nativeHome:()=>root,startTimeoutMs:600,invocation:()=>({executable:'x',args:[],cwd:root}),
+    spawn:()=>Object.assign(events,{pid:7,exitCode:null,signalCode:null})});
+  await web.init();const id=await web.add('Slow');let ready=false,calls=0;
+  web.control=async(_id,route)=>{calls++;if(!ready)throw Error('not yet');return route==='/status'?{version:1,pid:7,ready:false}:{};};
+  web.refreshStatus=async()=>({});
+  t.after(async()=>{clearInterval(web.timer);await fs.rm(root,{recursive:true,force:true});});
+  setTimeout(()=>{ready=true;},300);
+  await web.launch(id,false);assert(calls>1);
+  web.children.delete(id);ready=false;
+  await assert.rejects(web.launch(id,false),{code:'WEB_START_FAILED'});
+});

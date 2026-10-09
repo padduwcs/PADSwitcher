@@ -123,9 +123,11 @@ class WebService extends EventEmitter {
     let spawnError=false;
     child.on('error',()=>{spawnError=true;if(this.children.get(profile.id)===child)this.children.delete(profile.id);this.lastError='Không mở được bộ chạy GPT Web.';this.changed();});
     child.on('exit',()=>{if(this.children.get(profile.id)===child){this.children.delete(profile.id);this.statuses.delete(profile.id);this.rows.delete(profile.id);this.setupPending.delete(profile.id);this.changed();}});
-    const deadline=Date.now()+60000;
+    // The first launch of a freshly extracted portable build can take minutes while Windows scans the
+    // new files; give it time rather than reporting a failure for a runtime that is still starting.
+    const deadline=Date.now()+(this.options.startTimeoutMs??300000);
     while(Date.now()<deadline){if(spawnError||child.exitCode!==null||child.signalCode!==null)break;try{await this.control(profile.id,'/heartbeat',{});await this.refreshStatus(profile.id);this.changed();return;}catch{}await wait(250);}
-    throw new UserError('Bộ chạy GPT Web chưa sẵn sàng. Kiểm tra cửa sổ thiết lập GPT Web.','WEB_START_FAILED');
+    throw new UserError('Bộ chạy GPT Web khởi động quá lâu hoặc đã dừng. Bấm Thử lại; lần mở đầu sau khi cập nhật có thể mất 1–2 phút.','WEB_START_FAILED');
   }
   async open(id){return this.exclusive(async()=>this.launch(id,true));}
   // One-click connection: sign in (only if needed), one setup check + model install, then use.
@@ -137,7 +139,7 @@ class WebService extends EventEmitter {
     if(current?.running){if(current.step==='login')await this.control(id,'/show',{}).catch(()=>{});return;}
     if(!this.options.available?.())throw new UserError('Không tìm thấy bộ chạy GPT Web. Hãy thoát PADSwitcher ở khay hệ thống rồi mở lại bản mới nhất.','WEB_RUNTIME_MISSING');
     if(this.closed||this.stopping)throw new UserError('GPT Web đã dừng hoặc đang dừng.','WEB_STOPPED');
-    const flow={running:true,cancelled:false,step:'start',message:'Đang mở bộ chạy GPT Web…',error:null};
+    const flow={running:true,cancelled:false,step:'start',message:'Đang mở bộ chạy GPT Web. Lần mở đầu sau khi cập nhật có thể mất 1–2 phút…',error:null};
     this.flows.set(id,flow);this.changed();
     flow.done=this.runFlow(id,flow,activate===true);
   }

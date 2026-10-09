@@ -39,7 +39,7 @@ window.padUI = (() => {
     'Bấm Kết nối ở tài khoản bên dưới.':'Click Connect on the account below.',
     'Đã chọn tài khoản cho chat Web mới. Mở chat mới để dùng.':'Selected for new Web chats. Start a new chat to use it.',
     'Cửa sổ đăng nhập ChatGPT sẽ mở. Đăng nhập xong, PADSwitcher tự kiểm tra bằng một tin nhắn ngắn, cài model và bật GPT Web.':'A ChatGPT sign-in window will open. After you sign in, PADSwitcher checks the account with one short message, installs models and enables GPT Web.',
-    'Đang mở bộ chạy GPT Web…':'Opening the GPT Web runtime…',
+    'Đang mở bộ chạy GPT Web. Lần mở đầu sau khi cập nhật có thể mất 1–2 phút…':'Opening the GPT Web runtime. The first launch after an update can take 1–2 minutes…','Bộ chạy GPT Web khởi động quá lâu hoặc đã dừng. Bấm Thử lại; lần mở đầu sau khi cập nhật có thể mất 1–2 phút.':'The GPT Web runtime took too long to start or stopped. Click Retry; the first launch after an update can take 1–2 minutes.','Đang mở bộ chạy GPT Web…':'Opening the GPT Web runtime…',
     'Đăng nhập ChatGPT trong cửa sổ vừa mở. PADSwitcher tự tiếp tục khi bạn đăng nhập xong.':'Sign in to ChatGPT in the window that opened. PADSwitcher continues automatically once you are signed in.',
     'Đang kiểm tra ChatGPT và cài model Web (khoảng 1 phút, gửi một tin nhắn kiểm tra ngắn)…':'Checking ChatGPT and installing Web models (about 1 minute, sends one short test message)…',
     'Đang bật GPT Web…':'Enabling GPT Web…',
