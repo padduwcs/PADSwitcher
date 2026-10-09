@@ -40,6 +40,7 @@ function dom(t,demo = true, editState = null) {
     window.pad.action = async (...args) => { const response = await action(...args); if (args[0] === 'state') editState(response.result); return response; };
   }
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/i18n.js'),'utf8'));
+  window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/web.js'),'utf8'));
   window.eval(script); t.after(() => window.close()); return window;
 }
 test('renderer shows a useful empty state and disables quota refresh with no accounts',async t => {

@@ -123,6 +123,9 @@ class ModelRouter {
       if(req.method==='POST'){
         try{body=decodeRequest(bytes,req.headers['content-encoding']);}catch{this.error(res,400,'invalid_request','Invalid model request.');return;}
       }
+      // Optional Web branch runs BEFORE credential loading, quota policy and usage counters.
+      // A native request returns false and continues through the original byte-preserving relay.
+      if(this.options.webTransport&&await this.options.webTransport.handle(route,req,res,bytes,body,controller.signal,touch))return;
       const track=req.method==='POST'&&route.startsWith('responses'),observe=track?observeUsage(this.usage):()=>{};
       if(track){this.usage.requests++;this.usage.lastModel=typeof body?.model==='string'&&/^[a-z0-9_.-]{1,80}$/i.test(body.model)?body.model:null;this.usage.lastEffort=['none','minimal','low','medium','high','xhigh','max'].includes(body?.reasoning?.effort)?body.reasoning.effort:null;}
       const canReplay=replayable(body),attempted=new Set(),deadline=Date.now()+120000;
@@ -146,7 +149,8 @@ class ModelRouter {
             this.error(res,409,'unsupported_account_plan','Only confirmed personal Free, Plus and Pro accounts can use this model route.');return;
           }
           if(track){this.usage.attempts++;if(lastQuota&&!refreshed)this.usage.quotaRetries++;}
-          const response=await (this.options.fetch||fetch)(new URL(suffix,this.upstream),{method:req.method,headers:this.headers(req.headers,bundle,id),body:req.method==='POST'?bytes:undefined,redirect:'error',signal:controller.signal});touch();
+          let response=await (this.options.fetch||fetch)(new URL(suffix,this.upstream),{method:req.method,headers:this.headers(req.headers,bundle,id),body:req.method==='POST'?bytes:undefined,redirect:'error',signal:controller.signal});touch();
+          if(route==='models'&&response.ok&&this.options.webTransport?.enabled)response=await this.options.webTransport.augmentModels(response);
           if(response.status===401&&!refreshed){await response.body?.cancel();refreshed=true;if(track)this.usage.authRefreshes++;continue;}
           let prefix=[],quota=null,streamReader=null;
           if(!response.ok){

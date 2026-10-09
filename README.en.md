@@ -1,5 +1,10 @@
 # PADSwitcher
 
+**New in 1.10.0:** a separate **GPT Web** page manages multiple isolated ChatGPT
+sessions and adds account-qualified Web models to Codex through PADSwitcher.
+It is off by default. Existing native routing remains in place.
+See [setup, operation and validation scope (Vietnamese)](docs/GPT_WEB.md).
+
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
 
 Manage your personal Codex accounts on Windows: check remaining quota, switch accounts and keep working in VS Code, the CLI or JetBrains AI Assistant. Light/dark themes and Vietnamese/English UI.

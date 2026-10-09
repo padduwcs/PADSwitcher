@@ -13,12 +13,18 @@ module.exports = `
   profiles[1].resetCredits={availableCount:1,credits:null};
   let state = {version:'1.9.0',jetbrains:{configuration:'configured',runtimePresent:true},vscode:{configuration:'configured',helperPresent:true},profiles:new URLSearchParams(location.search).has('demo')?profiles:[],settings:{workspace:'D:\\\\Projects\\\\MyProject',desktopHome:'C:\\\\Users\\\\Personal\\\\.codex',codexPath:'',autoRefresh:false},busy:false,login:null,canRestore:false,recoveryPending:false,gateway:{status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0}};
   state.autoSwitch={enabled:false,order:[]};
+  state.web={enabled:false,runtimeAvailable:true,busy:false,active:0,selectedId:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',profiles:new URLSearchParams(location.search).has('demo')?[{id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',label:'ChatGPT cá nhân',status:'ready',authenticated:true,mode:'full',selected:true},{id:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',label:'Tài khoản Web dự phòng',status:'stopped',selected:false}]:[]};
   state.clientRoutes=Object.fromEntries(['vscode','jetbrains','cli'].map(k=>[k,{mode:'shared',profileId:null,autoSwitch:{enabled:false,order:[]}}]));
   function scopes(){const {scopes:previous,...base}=state.gateway;state.gateway.scopes=Object.fromEntries(['vscode','jetbrains','cli'].map(k=>{const r=state.clientRoutes[k];return [k,{...base,mode:r.mode,profileId:r.mode==='private'?r.profileId:base.profileId,autoSwitch:r.mode==='private'?r.autoSwitch:state.autoSwitch}];}));}
   const publish = () => {scopes();callback?.(clone(state));};
   window.pad = {
     onState: cb => { callback = cb; },onDevice:cb => {deviceCallback=cb;},
     action:async (command,args={}) => {
+      if(command==='webAdd'){const id=crypto.randomUUID();state.web.profiles.push({id,label:args.label,status:'stopped',selected:false});if(!state.web.selectedId)state.web.selectedId=id;publish();return {ok:true,result:id,state:clone(state)};}
+      if(command==='webSelect'){state.web.selectedId=args.id;state.web.profiles.forEach(p=>p.selected=p.id===args.id);publish();}
+      if(command==='webEnable'){state.web.enabled=true;publish();}
+      if(command==='webDisable'){state.web.enabled=false;state.web.profiles.forEach(p=>p.status='stopped');publish();}
+      if(command==='webRemove'){state.web.profiles=state.web.profiles.filter(p=>p.id!==args.id);if(state.web.selectedId===args.id)state.web.selectedId=state.web.profiles[0]?.id||null;publish();}
       if(command==='prepareReset'){const p=state.profiles.find(p=>p.id===args.id);p.resetAttempt={key:'fixture-reset-key',creditId:args.creditId,status:'prepared'};return {ok:true,result:{...p.resetAttempt,retry:false},state:clone(state)};}
       if(command==='consumeReset'){const p=state.profiles.find(p=>p.id===args.id);if(!args.confirmed||args.key!==p.resetAttempt?.key)return {ok:false,error:{code:'RESET_STALE',message:'Xác nhận đã cũ.'},state:clone(state)};if(p.resetAttempt.status!=='completed'){p.resetCredits.availableCount--;p.resetCredits.credits=p.resetCredits.credits?.slice(1)||null;p.resetAttempt.status='completed';p.quota.forEach(b=>b.windows.forEach(w=>w.usedPercent=0));}publish();return {ok:true,result:{outcome:'reset',quotaRefreshed:true},state:clone(state)};}
       if (command==='state') {scopes();return {ok:true,result:clone(state)};}

@@ -146,6 +146,41 @@ redirect rejection, disconnects and profile lifecycle protection.
 
 ## Limits
 
+### GPT Web 1.10.0 — 2026-10-09
+
+- All 170 PADSwitcher tests pass, including 20 Web isolation/regression tests.
+  Native compressed request bytes, cache/session headers and quota fallback are
+  checked with Web enabled and disabled.
+- The existing 25 native router/usage tests also run with the actual Web branch
+  both disabled and enabled (50 checks). This includes partial/stalled streams,
+  healthy long streams, auth rejection, same-byte fallback, sticky cache tokens,
+  native usage accounting and invalid JSON values. Web disconnects/redirects do
+  not replay, rotate or load native credentials. Native inference continues
+  independently while a Web response is active.
+- Concurrent companion launches are serialized and launch/stop/remove races are
+  guarded. Web catalog rows disable parallel-agent advertising; native metadata
+  and native parallel-agent settings are preserved.
+- Real native Codex uses the account-qualified Web route with synthetic loopback
+  replies: two dynamic tools execute once each, one completed turn, no native
+  credentials read, no native model requests or quota retries.
+- A separate real-native Codex fixture runs the original sticky-state/tool/fallback
+  sequence with GPT Web enabled and no Web runtime available. It produces exactly
+  the same four native requests and two tool executions as the baseline.
+- Two real packaged companion processes use disposable browser/core/Codex homes.
+  Their capabilities differ; unauthorized/origin requests are rejected; incomplete
+  setup cannot enable Web. Both stop cleanly; native auth/config hashes stay equal.
+- Electron UI startup, sandbox/CSP, existing pages and the new Web page pass at
+  normal/compact sizes, Vietnamese/English and light/dark themes.
+- The managed daemon catalog endpoint is tested with a real Bun listener. It
+  requires control authentication and generates Web rows without upstream/model
+  calls. The PAD catalog augmentation preserves native rows and returns the
+  original response if Web augmentation fails or exceeds its size limit.
+- **Live ChatGPT sign-in, Web chat and Full/MCP tools have not been tested with
+  the owner's account.** They require account-owner setup and browser/tool checks.
+  Automated fixtures do not establish service-side availability or account limits.
+
+See [GPT Web setup and boundaries](docs/GPT_WEB.md).
+
 - **Real reset consumption remains untested**, by the owner's instruction. Tests
   validate request construction, confirmation, idempotency and uncertain outcomes
   using fixtures, not service-side credit consumption.

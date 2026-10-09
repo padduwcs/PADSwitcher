@@ -118,7 +118,7 @@ function render() {
   $('#login-bar').classList.toggle('hidden',!state.login);
   if (!state.login) $('#login-detail').textContent = 'Chọn đúng tài khoản trên trình duyệt. Phiên hiện tại vẫn được giữ.';
   if (page !== 'settings' || !$('#settings-form').dataset.dirty) fillSettings();
-  syncAppearance(); ui.apply();
+  window.padWebUI?.render(state);syncAppearance(); ui.apply();
 }
 function renderDetail(p) {
   if (!p) { $('#detail').innerHTML = ''; return; }
@@ -250,7 +250,7 @@ function navigate(next) {
   page = next;
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('hidden',el.id !== next+'-page'));
   document.querySelectorAll('.nav').forEach(el => {el.classList.toggle('active',el.dataset.page === next);if(el.dataset.page===next)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
-  $('#breadcrumb').textContent = ({accounts:'Tài khoản',connections:'Kết nối',settings:'Cài đặt',help:'Hướng dẫn'}[next]);
+  $('#breadcrumb').textContent = ({accounts:'Tài khoản',connections:'Kết nối',web:'GPT Web',settings:'Cài đặt',help:'Hướng dẫn'}[next]);
   if (next === 'settings') fillSettings();
   ui.apply();
   document.documentElement.scrollTop=0;
@@ -316,6 +316,7 @@ $('#restore-trash').onclick = async () => {
     if (restored) { selectedId = restored.result; navigate('accounts'); render(); }
   },'Khôi phục hồ sơ');
 };
+window.padWebUI?.setup({call,showModal,closeModal});
 api.onState(next => { state = next; render(); });
 api.onDevice(device => { $('#login-detail').textContent = ui.t(`Mã thiết bị: ${device.userCode} · Nhập mã trên trang OpenAI vừa mở.`); });
 api.onRefreshError?.(error => toast(ui.error(error),true));

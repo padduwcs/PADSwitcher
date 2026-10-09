@@ -2,6 +2,13 @@
 
 PADSwitcher source is licensed under [MIT](LICENSE).
 
+- **codex-chatgpt-web 6.1.6**, by codex-chatgpt-web contributors, is MIT licensed.
+  Source is pinned in `vendor/codex-chatgpt-web` at commit
+  `307763887a8ba61143ac12815856f4f0d92885d2`, with the original license and
+  local-change notes. The Windows companion preserves its license, generated
+  dependency notices, Bun 1.4.0 notices and Electron/Chromium notices in
+  `resources/gpt-web`. See [integration details](docs/GPT_WEB.md).
+
 - **Be Vietnam Pro**: distributed under the SIL Open Font License 1.1.
   The font license and attribution are included in [src/assets/fonts](src/assets/fonts).
 - **Electron**, **electron-builder**, **jsonc-parser**, **ws** and the development

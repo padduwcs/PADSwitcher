@@ -1,0 +1,2 @@
+# Keep vendored upstream text consistent across local Windows and CI checkouts.
+vendor/** text=auto eol=lf

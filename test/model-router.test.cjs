@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),http=require('node:http'),net=require('node:net'),zlib=require('node:zlib');
 const {ModelRouter}=require('../src/core/model-router.cjs');
+const {WebService}=require('../src/core/web-service.cjs');
 const quota={error:{type:'usage_limit_reached',message:'Fixture quota',resets_in_seconds:900}};
 const event=(type,value={})=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
 const completed=event('response.completed',{response:{id:'resp_ok',status:'completed',output:[]}});
@@ -9,7 +10,13 @@ async function fixture(t,handler,enabled=true,options={}){
   const upstream=http.createServer(async(req,res)=>{const chunks=[];for await(const chunk of req)chunks.push(chunk);const bytes=Buffer.concat(chunks);const entry={account:req.headers['chatgpt-account-id'],headers:req.headers,bytes,url:req.url};seen.push(entry);await handler(req,res,entry,seen);});
   await new Promise(r=>upstream.listen(0,'127.0.0.1',r));
   const g={profileId:'a',service:{state,running:new Map(),save:async()=>{}},recovery:{note:(type,message,from,to)=>events.push({type,message,from,to})},changed:()=>{},bundle:async(id,force)=>({accessToken:'token-'+id+(force?'-fresh':''),chatgptAccountId:id,chatgptPlanType:state.profiles.find(p=>p.id===id)?.plan})};
-  const r=new ModelRouter(g,{...options,upstream:'http://127.0.0.1:'+upstream.address().port+'/v1/',allowTestUpstream:true});await r.start();r.select('a');
+  let web;
+  if(['enabled','disabled'].includes(process.env.PAD_TEST_WEB_BRANCH)){
+    web=new WebService('artifacts/unused-native-router-fixture',{fetch:()=>assert.fail('Native tests must not call a Web runtime')});
+    web.state.enabled=process.env.PAD_TEST_WEB_BRANCH==='enabled';
+    web.launch=web.control=()=>assert.fail('Native tests must not start or control a Web runtime');
+  }
+  const r=new ModelRouter(g,{webTransport:web,...options,upstream:'http://127.0.0.1:'+upstream.address().port+'/v1/',allowTestUpstream:true});await r.start();r.select('a');
   t.after(async()=>{await r.stop();upstream.closeAllConnections();await new Promise(resolve=>upstream.close(resolve));});
   const call=(body,headers={},path='responses')=>fetch(r.baseUrl+'/'+path,{method:'POST',headers:{authorization:'Bearer native-fixture','content-type':'application/json',...headers},body:Buffer.isBuffer(body)?body:JSON.stringify(body)});
   return {r,g,seen,events,call};

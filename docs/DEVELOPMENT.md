@@ -59,6 +59,21 @@ Do not commit account data, generated connection files, logs or QA directories.
 
 ## Layout
 
+### Optional GPT Web companion
+
+Run `npm run web:build` before using GPT Web from source. It pins and installs Bun
+locally, builds the vendored bridge and packages its launcher into
+`artifacts/gpt-web/companion`. `npm run dist` builds this automatically and bundles
+the companion. The reference checkout outside PADSwitcher is never modified.
+
+`npm run smoke:web` checks two packaged companions without sign-in or inference;
+`npm run smoke:web:protocol` checks real Codex against synthetic Web replies.
+`npm run smoke:quota:with-web` repeats all existing native router/usage tests with
+the optional Web branch disabled and enabled. `npm run smoke:protocol:web-enabled`
+checks real native Codex cache affinity, quota fallback and tool execution while
+GPT Web is enabled. None of these commands uses real inference quota.
+Both use disposable data. See [GPT_WEB.md](GPT_WEB.md) for setup and limitations.
+
 | Folder | Purpose |
 |---|---|
 | `src/core` | Account vault, Codex App Server gateway and model router |

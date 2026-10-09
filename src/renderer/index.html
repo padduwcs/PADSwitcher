@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
-<title>PADSwitcher</title><link rel="icon" type="image/png" href="../assets/padswitcher-emblem.png"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="branding.css"><link rel="stylesheet" href="themes.css"><script src="i18n.js"></script><script src="app.js" defer></script>
+<title>PADSwitcher</title><link rel="icon" type="image/png" href="../assets/padswitcher-emblem.png"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="branding.css"><link rel="stylesheet" href="themes.css"><script src="i18n.js"></script><script src="web.js" defer></script><script src="app.js" defer></script>
 </head>
 <body>
 <aside class="sidebar">
@@ -11,6 +11,7 @@
   <nav aria-label="Điều hướng chính">
     <button class="nav active" data-page="accounts" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>Tài khoản <span id="nav-count" class="count">0</span></button>
     <button class="nav" data-page="connections"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v5m8-5v5M6 8h12v4a6 6 0 0 1-12 0V8Zm6 10v3"/></svg>Kết nối</button>
+    <button class="nav" data-page="web"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg>GPT Web</button>
     <button class="nav" data-page="settings"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg>Cài đặt</button>
     <button class="nav" data-page="help"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1-1.5 2m0 3h.01"/></svg>Hướng dẫn</button>
   </nav>
@@ -41,6 +42,15 @@
     <div class="connection-footer"><button class="button ghost danger-text" id="stop-gateway">Dừng kết nối</button></div>
     <details class="panel disclosure"><summary>Gỡ kết nối VS Code</summary><p>Trả lại đường dẫn Codex trước khi thiết lập. Sau đó Reload Window để áp dụng.</p><button class="button secondary" id="restore-vscode">Khôi phục cấu hình VS Code trước</button></details>
     <details class="panel disclosure"><summary>Gỡ kết nối JetBrains</summary><p>Chọn lại Codex bình thường trong AI Chat. Nút bên dưới chỉ gỡ agent Codex · PADSwitcher, giữ các agent và đăng nhập khác.</p><button class="button secondary" id="restore-jetbrains">Gỡ agent PADSwitcher</button></details>
+  </section>
+  <section id="web-page" class="page hidden">
+    <div class="page-heading"><div><h1>GPT Web</h1><p>Chọn tài khoản ChatGPT để dùng model Web trong Codex.</p></div><button class="button primary" id="web-add">Thêm tài khoản Web</button></div>
+    <div class="panel web-summary"><div><span class="eyebrow">GPT WEB</span><h2 id="web-state">Đang tắt</h2><p id="web-selected">Chưa chọn tài khoản Web</p><p class="field-help">Model thường tiếp tục dùng tài khoản và tự đổi Codex hiện tại.</p></div><div class="integration-actions"><button class="button primary" id="web-enable">Bật GPT Web</button><button class="button secondary" id="web-disable">Tắt GPT Web</button><button class="button ghost" id="web-refresh">Kiểm tra trạng thái</button></div></div>
+    <div id="web-runtime-hint" class="banner hidden">Chưa có bộ chạy GPT Web. Chạy npm run web:build rồi mở lại PADSwitcher.</div>
+    <div id="web-error" class="banner hidden" role="status"></div>
+    <div id="web-empty" class="panel web-empty"><h2>Thêm tài khoản ChatGPT đầu tiên</h2><p>Đăng nhập riêng cho từng tài khoản. Phiên Codex đã lưu được giữ nguyên.</p></div>
+    <div id="web-accounts" class="web-accounts" aria-label="Tài khoản GPT Web"></div>
+    <div class="panel web-guide"><h2>Cách sử dụng GPT Web</h2><ol><li>Thêm tài khoản rồi mở Đăng nhập &amp; thiết lập.</li><li>Đăng nhập ChatGPT và chạy kiểm tra trình duyệt trong cửa sổ GPT Web.</li><li>Hoàn tất thiết lập model. Muốn đọc file, chạy terminal và sửa code: vào MCP, kết nối tunnel và xác minh công cụ.</li><li>Bật kết nối Codex trong PADSwitcher như thường lệ. Bật GPT Web, mở lại CLI hoặc Reload Window một lần để cập nhật danh sách model.</li><li>Mở chat mới, chọn model có hậu tố (Web · tên tài khoản).</li></ol><p>Chọn tài khoản khác áp dụng cho chat mới. Chat cũ giữ tài khoản ban đầu. Mở chat mới khi chuyển từ Web về model thường.</p><p>Không tự đổi tài khoản Web khi hết giới hạn. Không tự chuyển giữa Codex và Web. Một lượt Web chạy tại một thời điểm.</p><p class="field-help">Chế độ Browser-only chỉ trao đổi nội dung. Chế độ Full dùng công cụ Codex qua MCP và giữ bước phê duyệt của Codex. Thiết lập tài khoản Web mở trong cửa sổ riêng.</p></div>
   </section>
   <section id="settings-page" class="page hidden">
     <div class="page-heading"><div><h1>Cài đặt</h1></div></div>

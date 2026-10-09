@@ -23,7 +23,7 @@ let timeout;
         await fs.mkdir(path.join(root,'assets/fonts'),{recursive:true});
         for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf','OFL.txt'])await fs.copyFile(path.join(__dirname,'../src/assets/fonts',file),path.join(root,'assets/fonts',file));
         for (const file of ['padswitcher-symbol.png','padswitcher-logo.png','padswitcher-emblem.png']) await fs.copyFile(path.join(__dirname,'../src/assets',file),path.join(root,'assets',file));
-        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','app.js']) {
+        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','web.js','app.js']) {
           let content = await fs.readFile(path.join(__dirname,'../src/renderer',file),'utf8');
           if (file === 'index.html') content = content.replace('<script src="app.js" defer></script>','<script src="preview.js" defer></script><script src="app.js" defer></script>');
           await fs.writeFile(path.join(fixtureRoot,file),content);
@@ -47,7 +47,7 @@ let timeout;
         await fs.writeFile(path.join(root,'automatic-switch-setup.png'),autoImage);
         await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
         await preview.webContents.executeJavaScript("document.querySelector('#toasts').replaceChildren()");
-        for(const page of ['connections','settings']) {
+        for(const page of ['connections','web','settings']) {
           await preview.webContents.executeJavaScript(`document.querySelector('.nav[data-page=${page}]').click()`);
           await new Promise(resolve=>setTimeout(resolve,250));
           const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
@@ -89,6 +89,14 @@ let timeout;
           assert.equal(connections.overflow,false);assert.equal(connections.count,3);assert(connections.live.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
           const connectionsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
           await fs.writeFile(path.join(root,'connections-'+variant+'.png'),connectionsFrame);
+          await preview.webContents.executeJavaScript("document.querySelector('[data-page=web]').click()");
+          preview.setSize(1000,680);
+          await new Promise(resolve=>setTimeout(resolve,200));
+          const webLayout=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,count:document.querySelectorAll('.web-account').length,enabled:!document.querySelector('#web-disable').disabled})");
+          assert.equal(webLayout.overflow,false);assert.equal(webLayout.count,2);assert.equal(webLayout.enabled,true);
+          const webFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+          await fs.writeFile(path.join(root,'web-compact-'+variant+'.png'),webFrame);
+          preview.setSize(1260,900);
           await preview.webContents.executeJavaScript("document.querySelector('[data-page=accounts]').click()");
           const client=await preview.webContents.executeJavaScript("({active:document.querySelector('#vscode-pill').classList.contains('connected'),text:document.querySelector('#vscode-status').textContent})");assert.equal(client.active,true);assert(client.text.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
         }

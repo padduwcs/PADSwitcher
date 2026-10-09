@@ -1,5 +1,9 @@
 # PADSwitcher
 
+**Mới ở 1.10.0:** trang **GPT Web**, quản lý nhiều phiên ChatGPT riêng và chọn
+model Web trong Codex qua PADSwitcher. Mặc định tắt; giữ tuyến Codex hiện có.
+Xem [thiết lập, cách dùng và phạm vi kiểm chứng](docs/GPT_WEB.md).
+
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
 
 Quản lý các tài khoản Codex cá nhân trên Windows: xem quota, đổi tài khoản và tiếp tục làm việc trong VS Code, CLI hoặc JetBrains AI Assistant. Giao diện sáng/tối, tiếng Việt/Anh.
