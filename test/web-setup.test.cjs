@@ -3,6 +3,15 @@ const test=require('node:test'),assert=require('node:assert/strict'),crypto=requ
 const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
 const {createPadSetup}=require('../vendor/codex-chatgpt-web/launcher/electron/padswitcher-setup.cjs');
 const {WebService}=require('../src/core/web-service.cjs');
+test('browser opening survives a managed sign-in request before the launcher React view subscribes',()=>{
+  const vm=require('node:vm'),events=new (require('node:events').EventEmitter)();let api;
+  const source=require('node:fs').readFileSync(path.join(__dirname,'../vendor/codex-chatgpt-web/launcher/electron/preload.cjs'),'utf8');
+  vm.runInNewContext(source,{require:()=>({ipcRenderer:events,contextBridge:{exposeInMainWorld:(_name,value)=>api=value}})});
+  events.emit('launcher:pad-browser',{},true);let shown=0;
+  const unsubscribe=api.onPadBrowser(active=>{assert.equal(active,true);shown++;});assert.equal(shown,1);
+  events.emit('launcher:pad-browser',{},true);assert.equal(shown,2);unsubscribe();
+  events.emit('launcher:pad-browser',{},true);assert.equal(shown,2);
+});
 const pause=()=>new Promise(r=>setImmediate(r));
 async function completed(setup){for(let i=0;i<100&&setup.active();i++)await pause();assert.equal(setup.active(),false);return setup.snapshot().job;}
 function fixture(options={}) {

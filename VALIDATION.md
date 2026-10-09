@@ -148,7 +148,7 @@ redirect rejection, disconnects and profile lifecycle protection.
 
 ### GPT Web setup wizard 1.11.0 — 2026-10-09
 
-- 189 PADSwitcher unit/integration tests pass; the native quota/router suite
+- 190 PADSwitcher unit/integration tests pass; the native quota/router suite
   passes all 50 comparisons with the Web branch disabled and enabled. The
   native router, gateway, recovery and quota refresher source is unchanged.
 - Managed setup invokes existing launcher safety checks, with asynchronous job
@@ -156,6 +156,8 @@ redirect rejection, disconnects and profile lifecycle protection.
   Web smoke turn, rejection while Web tasks are active, duplicate IDs, lost POST
   acknowledgements, stopped failures, saved-test continuation and runtime repair
   without another smoke turn. Native inference remains usable during Web setup.
+  Preload also buffers browser-opening requests before React subscribes, so a
+  fast first sign-in does not leave the browser behind the advanced Setup page.
 - Full setup cannot be enabled or used through the managed route until runtime
   and connector verification completes. Failed checks keep the account in setup;
   errors/status never expose tunnel API keys. Credentials disappear from wizard

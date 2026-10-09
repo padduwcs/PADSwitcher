@@ -1,4 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
+// Main may request the browser while React is still loading its first snapshot.
+// Buffer that view-only request in preload so sign-in never opens behind Setup.
+let padBrowserRequested = false;
+ipcRenderer.on("launcher:pad-browser", () => { padBrowserRequested = true; });
 
 function subscription(channel, listener) {
   const wrapped = (_event, value) => listener(value);
@@ -58,7 +62,11 @@ contextBridge.exposeInMainWorld("codexWebLauncher", {
   windowState: () => ipcRenderer.invoke("launcher:window-state"),
   windowControl: (action) => ipcRenderer.send("launcher:window-control", action),
   onWindowStateChanged: (listener) => subscription("launcher:window-state-changed", listener),
-  onPadBrowser: (listener) => subscription("launcher:pad-browser", listener),
+  onPadBrowser: (listener) => {
+    const unsubscribe = subscription("launcher:pad-browser", listener);
+    if (padBrowserRequested) listener(true);
+    return unsubscribe;
+  },
   onConnectorNamesChanged: (listener) => subscription("launcher:connector-names-changed", listener),
   onStateChanged: (listener) => subscription("launcher:state-changed", listener),
   onBrowserState: (listener) => subscription("launcher:browser-state", listener),
