@@ -1,6 +1,6 @@
 {
   "name": "padswitcher",
-  "version": "1.12.2",
+  "version": "1.13.0",
   "description": "Profile Account Directory Switcher — personal Codex profile manager for Windows",
   "private": true,
   "main": "src/main.cjs",
@@ -20,16 +20,10 @@
     "smoke:gateway": "node scripts/gateway-smoke.cjs --live --inference",
     "smoke:recovery": "node scripts/recovery-native-smoke.cjs --live",
     "smoke:protocol": "node scripts/router-protocol-smoke.cjs",
-    "web:build": "node scripts/build-gpt-web.cjs",
-    "smoke:web": "node scripts/web-companion-smoke.cjs",
-    "prebuild": "node scripts/prepare-build.cjs",
-    "predist": "node scripts/prepare-build.cjs",
+    "prebuild": "node scripts/build-helper.cjs",
+    "predist": "node scripts/build-helper.cjs",
     "build": "electron-builder --win dir",
-    "dist": "electron-builder --win portable",
-    "smoke:web:protocol": "node scripts/router-protocol-smoke.cjs --web",
-    "smoke:protocol:web-enabled": "node scripts/router-protocol-smoke.cjs --native-with-web",
-    "smoke:quota:with-web": "node scripts/quota-regression.cjs",
-    "smoke:portable": "node scripts/portable-smoke.cjs"
+    "dist": "electron-builder --win portable"
   },
   "devDependencies": {
     "electron": "44.5.1",
@@ -52,15 +46,6 @@
       "THIRD_PARTY_NOTICES.md"
     ],
     "asar": true,
-    "extraResources": [
-      {
-        "from": "artifacts/gpt-web/companion",
-        "to": "gpt-web",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
     "asarUnpack": [
       "src/assets/PADCodex.exe"
     ],
@@ -77,7 +62,6 @@
       "signExecutable": false
     },
     "portable": {
-      "unpackDirName": true,
       "artifactName": "PADSwitcher-${version}-Windows.exe"
     }
   },

@@ -22,7 +22,6 @@ npm test
 npm run smoke
 npm run smoke:ui
 npm run dist
-npm run smoke:portable
 node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
 ```
 
@@ -34,15 +33,6 @@ credits or require logging into a real account. The packaged smoke check runs af
 `dist/PADSwitcher-<version>-Windows.exe`. GitHub Actions checks and builds on Windows.
 For a release, publish the tested executable and its SHA-256 file through GitHub Releases.
 The portable build currently has no code-signing certificate or automatic updater.
-
-`smoke:portable` builds a disposable NSIS fixture with the production portable
-options, launches it twice and verifies that the second launch preserves the first
-instance's native-helper and Web resource files. It never loads real account data.
-With the pinned electron-builder 26.15.3, `portable.unpackDirName: true` leaves
-`UNPACK_DIR_NAME` undefined and uses a unique `$PLUGINSDIR/app` for each launch.
-This prevents a second launch from deleting resources still used by the first.
-The builder's schema describes `false` for this behavior, but its pinned executable
-code uses `true`; the wrapper regression check verifies the actual result.
 
 ## Optional real-account diagnostics
 
@@ -68,28 +58,6 @@ Never test reset consumption with a real account as part of routine checks.
 Do not commit account data, generated connection files, logs or QA directories.
 
 ## Layout
-
-### Optional GPT Web companion
-
-Run `npm run web:build` before using GPT Web from source. It pins and installs Bun
-locally, builds the vendored bridge and packages its launcher into
-`artifacts/gpt-web/companion`. `npm run dist` builds this automatically and bundles
-the companion. The reference checkout outside PADSwitcher is never modified.
-
-`npm run smoke:web` checks two packaged companions without sign-in or inference;
-`npm run smoke:web:protocol` checks real Codex against synthetic Web replies.
-`npm run smoke:quota:with-web` repeats all existing native router/usage tests with
-the optional Web branch disabled and enabled. `npm run smoke:protocol:web-enabled`
-checks real native Codex cache affinity, quota fallback and tool execution while
-GPT Web is enabled. None of these commands uses real inference quota.
-Both use disposable data. See [GPT_WEB.md](GPT_WEB.md) for setup and limitations.
-Managed setup lives in `src/renderer/web-setup.js` and the companion's
-`electron/padswitcher-setup.cjs`. It invokes the launcher's existing guarded
-handlers through an authenticated, bounded asynchronous job endpoint. Owner
-polling only reads job status. Unit fixtures cover explicit smoke consent,
-duplicate IDs, lost acknowledgements, partial setup recovery, secret redaction
-and refusal while Web turns are active. Companion smoke exercises signed-out
-failure before inference, invalid input/Origin, body limits and clean shutdown.
 
 | Folder | Purpose |
 |---|---|

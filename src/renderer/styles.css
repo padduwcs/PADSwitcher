@@ -1,10 +1,4 @@
 @font-face { font-family: 'Be Vietnam Pro'; src: url('../assets/fonts/BeVietnamPro-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
-.web-summary{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:20px}
-.web-summary h2{margin:8px 0}.web-summary p{margin:6px 0}.web-accounts{display:grid;gap:16px;margin:20px 0}
-.web-account-heading{display:flex;align-items:center;gap:14px;margin-bottom:20px}.web-account-identity{flex:1;min-width:0}
-.web-account-identity h2{overflow-wrap:anywhere;margin:0 0 6px}.web-account-identity p{margin:0;color:var(--muted)}
-.web-guide{margin-top:24px}.web-guide li{margin:12px 0;line-height:1.7}.web-guide p{line-height:1.8}.web-empty{margin:20px 0}
-@media(max-width:1100px){.web-summary{align-items:flex-start;flex-direction:column}.web-account .integration-actions{flex-wrap:wrap}}
 @font-face { font-family: 'Be Vietnam Pro'; src: url('../assets/fonts/BeVietnamPro-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
 @font-face { font-family: 'Be Vietnam Pro'; src: url('../assets/fonts/BeVietnamPro-SemiBold.ttf') format('truetype'); font-weight: 600; font-display: swap; }
 :root {

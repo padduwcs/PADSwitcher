@@ -7,8 +7,3 @@ auth.json
 *.dpapi
 .preview/
 src/assets/PADCodex.exe
-vendor/**/node_modules/
-vendor/**/dist/
-vendor/**/build/
-vendor/**/release/
-vendor/**/.launcher-runtime/

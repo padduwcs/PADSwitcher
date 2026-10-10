@@ -23,7 +23,7 @@ let timeout;
         await fs.mkdir(path.join(root,'assets/fonts'),{recursive:true});
         for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf','OFL.txt'])await fs.copyFile(path.join(__dirname,'../src/assets/fonts',file),path.join(root,'assets/fonts',file));
         for (const file of ['padswitcher-symbol.png','padswitcher-logo.png','padswitcher-emblem.png']) await fs.copyFile(path.join(__dirname,'../src/assets',file),path.join(root,'assets',file));
-        for (const file of ['index.html','styles.css','branding.css','themes.css','web-setup.css','i18n.js','web.js','web-setup.js','app.js']) {
+        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','app.js']) {
           let content = await fs.readFile(path.join(__dirname,'../src/renderer',file),'utf8');
           if (file === 'index.html') content = content.replace('<script src="app.js" defer></script>','<script src="preview.js" defer></script><script src="app.js" defer></script>');
           await fs.writeFile(path.join(fixtureRoot,file),content);
@@ -47,24 +47,13 @@ let timeout;
         await fs.writeFile(path.join(root,'automatic-switch-setup.png'),autoImage);
         await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
         await preview.webContents.executeJavaScript("document.querySelector('#toasts').replaceChildren()");
-        for(const page of ['connections','web','settings']) {
+        for(const page of ['connections','settings']) {
           await preview.webContents.executeJavaScript(`document.querySelector('.nav[data-page=${page}]').click()`);
           await new Promise(resolve=>setTimeout(resolve,250));
           const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
           await fs.writeFile(path.join(root,page+'-sample.png'),frame);
           const overflow=await preview.webContents.executeJavaScript('document.documentElement.scrollWidth>document.documentElement.clientWidth');assert.equal(overflow,false);
         }
-        await preview.webContents.executeJavaScript("(async()=>{window.padPreviewConnectMs=600000;document.querySelector('[data-page=web]').click();document.querySelector('#web-add').click();document.querySelector('#web-label').value='GPT Web · Setup preview';document.querySelector('#modal-form').dispatchEvent(new Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,100));})()");
-        const connecting=await preview.webContents.executeJavaScript("({count:document.querySelectorAll('.web-account.connecting').length,wizard:document.querySelector('#web-wizard').open,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth})");
-        assert.equal(connecting.count,1);assert.equal(connecting.wizard,false);assert.equal(connecting.overflow,false);
-        await new Promise(resolve=>setTimeout(resolve,200));
-        const loginFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,frame)=>resolve(frame.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'web-connecting.png'),loginFrame);
-        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('.web-account.connecting [data-web-cancel]').click();await new Promise(r=>setTimeout(r,100));document.querySelector('[data-web-tools]').click();await new Promise(r=>setTimeout(r,100));})()");
-        const wizardTools=await preview.webContents.executeJavaScript("({open:document.querySelector('#web-wizard').open,ready:!document.querySelector('#web-tools-ready').classList.contains('hidden')})");assert.equal(wizardTools.open,true);assert.equal(wizardTools.ready,true);
-        preview.setSize(1000,680);await new Promise(resolve=>setTimeout(resolve,200));
-        const toolsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,frame)=>resolve(frame.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'web-tools.png'),toolsFrame);
-        const compactWizard=await preview.webContents.executeJavaScript("({overflow:document.querySelector('#web-wizard').scrollWidth>document.querySelector('#web-wizard').clientWidth,viewport:document.querySelector('#web-wizard').getBoundingClientRect().bottom<=innerHeight})");assert.equal(compactWizard.overflow,false);assert.equal(compactWizard.viewport,true);
-        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#web-wizard-later').click();const rows=document.querySelectorAll('[data-web-remove]');await window.pad.action('webRemove',{id:rows[rows.length-1].dataset.webRemove});})()");preview.setSize(1260,840);
         const help = await preview.webContents.executeJavaScript("(async()=>{document.querySelector('[data-page=help]').click();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {visible:!document.querySelector('#help-page').classList.contains('hidden'),active:document.querySelector('.nav.active').dataset.page};})()");
         assert.equal(help.visible,true); assert.equal(help.active,'help');
         await new Promise(resolve => setTimeout(resolve,200));
@@ -100,14 +89,6 @@ let timeout;
           assert.equal(connections.overflow,false);assert.equal(connections.count,3);assert(connections.live.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
           const connectionsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
           await fs.writeFile(path.join(root,'connections-'+variant+'.png'),connectionsFrame);
-          await preview.webContents.executeJavaScript("document.querySelector('[data-page=web]').click()");
-          preview.setSize(1000,680);
-          await new Promise(resolve=>setTimeout(resolve,200));
-          const webLayout=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,count:document.querySelectorAll('.web-account').length,enabled:!document.querySelector('#web-disable').disabled})");
-          assert.equal(webLayout.overflow,false);assert.equal(webLayout.count,2);assert.equal(webLayout.enabled,true);
-          const webFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
-          await fs.writeFile(path.join(root,'web-compact-'+variant+'.png'),webFrame);
-          preview.setSize(1260,900);
           await preview.webContents.executeJavaScript("document.querySelector('[data-page=accounts]').click()");
           const client=await preview.webContents.executeJavaScript("({active:document.querySelector('#vscode-pill').classList.contains('connected'),text:document.querySelector('#vscode-status').textContent})");assert.equal(client.active,true);assert(client.text.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
         }

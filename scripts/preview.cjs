@@ -6,9 +6,6 @@ const mock = require('./preview-data.cjs');
 const root = path.resolve(__dirname,'../src/renderer');
 const allowed = new Map([['/index.html','text/html; charset=utf-8'],['/styles.css','text/css; charset=utf-8'],['/branding.css','text/css; charset=utf-8'],['/app.js','text/javascript; charset=utf-8'],['/i18n.js','text/javascript; charset=utf-8'],['/themes.css','text/css; charset=utf-8']]);
 const assets = new Map([['/assets/padswitcher-symbol.png','padswitcher-symbol.png'],['/assets/padswitcher-logo.png','padswitcher-logo.png'],['/assets/padswitcher-emblem.png','padswitcher-emblem.png']]);
-allowed.set('/web.js','text/javascript; charset=utf-8');
-allowed.set('/web-setup.js','text/javascript; charset=utf-8');
-allowed.set('/web-setup.css','text/css; charset=utf-8');
 for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf'])assets.set('/assets/fonts/'+file,'fonts/'+file);
 const server = http.createServer(async (req,res) => {
   try {

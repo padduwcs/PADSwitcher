@@ -6,10 +6,6 @@ const {spawn}=require('node:child_process');
 const {ModelRouter,decodeRequest}=require('../src/core/model-router.cjs');
 const {CodexRpc}=require('../src/core/rpc.cjs');
 const windows=require('../src/core/windows.cjs');
-const {WebService}=require('../src/core/web-service.cjs');
-const {qualify}=require('../src/core/web-models.cjs');
-const WEB=process.argv.includes('--web');
-const WITH_WEB=WEB||process.argv.includes('--native-with-web');
 const event=(type,value={})=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
 function respond(res,output,token){
   const id='resp_fixture';res.writeHead(200,{'Content-Type':'text/event-stream','x-codex-turn-state':token});
@@ -23,28 +19,22 @@ function respond(res,output,token){
 }
 (async()=>{
   const parent=path.resolve('artifacts/router-protocol');await fs.mkdir(parent,{recursive:true});
-  const home=await fs.mkdtemp(path.join(parent,'run-'));let rpc,router,web;const seen=[];let writes=0,completed=0,failed=0;
+  const home=await fs.mkdtemp(path.join(parent,'run-'));let rpc,router;const seen=[];let writes=0,completed=0,failed=0;
   const upstream=http.createServer(async(req,res)=>{
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
     if(req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"models":[]}');return;}
     const bytes=Buffer.concat(chunks),body=decodeRequest(bytes,req.headers['content-encoding']);seen.push({account:req.headers['chatgpt-account-id'],headers:req.headers,bytes,body});
     if(seen.length===1){respond(res,[{type:'function_call',id:'fc_one',call_id:'call_one',name:'write_marker',arguments:'{}'}],'state-a');return;}
-    if(!WEB&&seen.length===2){res.writeHead(429,{'Content-Type':'application/json'});res.end('{"error":{"type":"usage_limit_reached","resets_in_seconds":900}}');return;}
-    if(seen.length===(WEB?2:3)){respond(res,[{type:'function_call',id:'fc_two',call_id:'call_two',name:'write_marker',arguments:'{}'}],'state-b');return;}
+    if(seen.length===2){res.writeHead(429,{'Content-Type':'application/json'});res.end('{"error":{"type":"usage_limit_reached","resets_in_seconds":900}}');return;}
+    if(seen.length===3){respond(res,[{type:'function_call',id:'fc_two',call_id:'call_two',name:'write_marker',arguments:'{}'}],'state-b');return;}
     respond(res,[{type:'message',id:'msg_done',role:'assistant',status:'completed',content:[{type:'output_text',text:'FIXTURE_DONE',annotations:[]}]}],'state-b');
   });
   await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve));
   try{
     const state={profiles:[{id:'a',plan:'plus',status:'ready'},{id:'b',plan:'plus',status:'ready'}],autoSwitch:{enabled:true,order:['a','b']},quotaCooldowns:{}};
-    let model='gpt-5.4',bundles=0;
-    if(WITH_WEB){
-      web=new WebService(path.join(home,'web'),{platform:{protectDirectory:async()=>{}}});await web.init();const id=await web.add('Protocol fixture');web.state.enabled=true;
-      if(WEB){model=qualify(id,'chatgpt-web/gpt-6-sol');web.launch=async()=>{};web.refreshStatus=async()=>({ready:true,authenticated:true,interactionMode:'automatic',baseUrl:'http://127.0.0.1:'+upstream.address().port+'/v1/'});}
-      else {web.launch=web.control=web.refreshStatus=async()=>{throw Error('Native inference must not contact a Web runtime');};}
-    }
-    router=new ModelRouter({profileId:'a',service:{state,running:new Map(),save:async()=>{}},changed:()=>{},recovery:{note:()=>{}},bundle:async id=>{bundles++;return {accessToken:'fixture-'+id,chatgptAccountId:id,chatgptPlanType:'plus'};}},{webTransport:web,upstream:'http://127.0.0.1:'+upstream.address().port+'/v1/',allowTestUpstream:true});
+    router=new ModelRouter({profileId:'a',service:{state,running:new Map(),save:async()=>{}},changed:()=>{},recovery:{note:()=>{}},bundle:async id=>({accessToken:'fixture-'+id,chatgptAccountId:id,chatgptPlanType:'plus'})},{upstream:'http://127.0.0.1:'+upstream.address().port+'/v1/',allowTestUpstream:true});
     await router.start();router.select('a');
-    await fs.writeFile(path.join(home,'config.toml'),'model = '+JSON.stringify(model)+'\nmodel_provider = "fixture"\nmodel_reasoning_effort = "low"\n[analytics]\nenabled = false\n[model_providers.fixture]\nname = "Loopback protocol fixture"\nbase_url = '+JSON.stringify(router.baseUrl)+'\nwire_api = "responses"\nrequires_openai_auth = false\nhttp_headers = { Authorization = "Bearer native-fixture" }\n');
+    await fs.writeFile(path.join(home,'config.toml'),'model = "gpt-5.4"\nmodel_provider = "fixture"\nmodel_reasoning_effort = "low"\n[analytics]\nenabled = false\n[model_providers.fixture]\nname = "Loopback protocol fixture"\nbase_url = '+JSON.stringify(router.baseUrl)+'\nwire_api = "responses"\nrequires_openai_auth = false\nhttp_headers = { Authorization = "Bearer native-fixture" }\n');
     const executable=await windows.findGatewayCodex();
     rpc=new CodexRpc(executable,home,{spawn:(exe,args,options)=>{
       for(const key of ['OPENAI_BASE_URL','CODEX_INTERNAL_ORIGINATOR_OVERRIDE','NODE_OPTIONS'])delete options.env[key];
@@ -57,21 +47,22 @@ function respond(res,output,token){
       if(message.method==='item/tool/call'&&message.id!=null){writes++;rpc.send({id:message.id,result:{success:true,contentItems:[{type:'inputText',text:'Fixture marker '+writes+' written once.'}]}});return;}
       receive(line);
     };
-    const started=await rpc.request('thread/start',{cwd:home,model,approvalPolicy:'never',sandbox:'read-only',dynamicTools:[{type:'function',name:'write_marker',description:'A synthetic marker tool.',inputSchema:{type:'object',properties:{},additionalProperties:false}}]});
+    const started=await rpc.request('thread/start',{cwd:home,model:'gpt-5.4',approvalPolicy:'never',sandbox:'read-only',dynamicTools:[{type:'function',name:'write_marker',description:'A synthetic marker tool.',inputSchema:{type:'object',properties:{},additionalProperties:false}}]});
     await rpc.request('turn/start',{threadId:started.thread.id,input:[{type:'text',text:'Run the fixture marker tools then finish.'}]});
     for(let i=0;i<200&&!completed&&!failed;i++)await new Promise(resolve=>setTimeout(resolve,100));
-    assert.equal(failed,0);assert.equal(completed,1);assert.equal(writes,2);assert.equal(seen.length,WEB?3:4);
-    if(WEB){assert.equal(bundles,0);for(const request of seen){assert.equal(request.account,undefined);assert.equal(request.headers.authorization,'Bearer padswitcher-web');assert.equal(request.body.model,'chatgpt-web/gpt-6-sol');}}
-    else{assert.deepEqual(seen.map(x=>x.account),['a','a','b','b']);assert.deepEqual(seen.map(x=>x.headers['x-codex-turn-state']),[undefined,'state-a',undefined,'state-b']);assert(seen[1].bytes.equals(seen[2].bytes));}
+    assert.equal(failed,0);assert.equal(completed,1);assert.equal(writes,2);assert.equal(seen.length,4);
+    assert.deepEqual(seen.map(x=>x.account),['a','a','b','b']);
+    assert.deepEqual(seen.map(x=>x.headers['x-codex-turn-state']),[undefined,'state-a',undefined,'state-b']);
+    assert(seen[1].bytes.equals(seen[2].bytes));
     const sessionId=seen[0].headers['session-id'];assert(sessionId);
     for(const request of seen){assert.equal(request.headers['session-id'],sessionId);assert.equal(request.headers['thread-id'],started.thread.id);}
     const thread=await rpc.request('thread/read',{threadId:started.thread.id,includeTurns:true});assert.equal(thread.thread.turns.length,1);
-    if(WEB)assert.deepEqual([router.usage.requests,router.usage.attempts,router.usage.quotaRetries,router.usage.completed],[0,0,0,0]);
-    else{assert.deepEqual([router.usage.requests,router.usage.attempts,router.usage.quotaRetries,router.usage.completed],[3,4,1,3]);assert.deepEqual([router.usage.inputTokens,router.usage.cachedInputTokens,router.usage.outputTokens],[300,240,15]);assert.equal(router.usage.lastModel,'gpt-5.4');assert.equal(router.usage.lastEffort,'low');}
+    assert.deepEqual([router.usage.requests,router.usage.attempts,router.usage.quotaRetries,router.usage.completed],[3,4,1,3]);
+    assert.deepEqual([router.usage.inputTokens,router.usage.cachedInputTokens,router.usage.outputTokens],[300,240,15]);
+    assert.equal(router.usage.lastModel,'gpt-5.4');assert.equal(router.usage.lastEffort,'low');
     // Read-only account/thread inspection and an idle connection must not infer.
-    await rpc.request('account/read',{refreshToken:false});await new Promise(resolve=>setTimeout(resolve,1500));assert.equal(seen.length,WEB?3:4);
+    await rpc.request('account/read',{refreshToken:false});await new Promise(resolve=>setTimeout(resolve,1500));assert.equal(seen.length,4);
     assert.equal(await fs.stat(path.join(home,'auth.json')).then(()=>true,()=>false),false);
-    if(WITH_WEB&&!WEB){assert.deepEqual(web.bindings,{});assert.equal(web.active,0);assert.equal(web.children.size,0);console.log('Web branch enabled during native protocol fixture: no Web calls or bindings.');}
-    console.log(WEB?'Real Codex Web protocol fixture: two tools executed once; no native credentials, quota, inference or retries: passed.':'Native loopback cache headers, same-turn A/B routing, per-account sticky state, exact retry and two tools executed once: passed.');
-  }finally{await rpc?.close();await router?.stop();clearInterval(web?.timer);upstream.closeAllConnections();await new Promise(resolve=>upstream.close(resolve));}
+    console.log('Native loopback cache headers, same-turn A/B routing, per-account sticky state, exact retry and two tools executed once: passed.');
+  }finally{await rpc?.close();await router?.stop();upstream.closeAllConnections();await new Promise(resolve=>upstream.close(resolve));}
 })().catch(error=>{console.error('Native protocol fixture failed:',error.code||error.name,error.message);process.exitCode=1;});

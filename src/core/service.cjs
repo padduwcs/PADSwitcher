@@ -67,7 +67,6 @@ class ProfileService extends EventEmitter {
       gateway: this.gateway?.view() || {status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0},
       vscode: this.vscode || {configuration:'unknown',helperPresent:false},
       jetbrains: this.jetbrains || {configuration:'notConfigured',runtimePresent:false},
-      web: this.web?.view() || {enabled:false,selectedId:null,profiles:[],busy:false,active:0,runtimeAvailable:false},
     };
   }
   changed() { this.emit('change',this.view()); }
@@ -544,7 +543,6 @@ class ProfileService extends EventEmitter {
       const next = { ...this.state.settings };
       for (const field of ['codexPath','workspace','desktopHome']) if (input[field] !== undefined) { if (typeof input[field] !== 'string' || input[field].length > 2048) throw new UserError('Đường dẫn không hợp lệ.', 'INVALID_SETTINGS'); next[field] = input[field]; }
       const pathsChanged=['codexPath','workspace','desktopHome'].some(field=>next[field]!==this.state.settings[field]);
-      if(pathsChanged&&this.web?.children?.size)throw new UserError('Tắt GPT Web trước khi đổi đường dẫn.','WEB_RUNNING');
       if(pathsChanged&&this.gateway&&!['stopped','error'].includes(this.gateway.status))throw new UserError('Dừng gateway trước khi đổi đường dẫn.', 'GATEWAY_RUNNING');
       if (next.codexPath) await this.platform.findCodex(next.codexPath);
       await assertDirectory(next.workspace); await assertDirectory(next.desktopHome);

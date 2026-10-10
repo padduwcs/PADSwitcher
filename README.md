@@ -1,12 +1,5 @@
 # PADSwitcher
 
-**Mới ở 1.12.2:** **GPT Web** kết nối bằng một nút: bấm **Thêm tài khoản ChatGPT**,
-đăng nhập trong cửa sổ vừa mở, PADSwitcher tự kiểm tra, cài model và bật. Sửa lỗi
-cửa sổ đăng nhập trắng ("Loading") do mở phía sau ứng dụng khác. Lỗi hiển thị lý do
-cụ thể. Tự dọn phiên trình duyệt hỏng khi Cloudflare liên tục đòi xác minh, có nút
-**Đặt lại phiên**. Công cụ lập trình (MCP) tách thành bước tùy chọn. Tuyến Codex thường giữ nguyên.
-Xem [thiết lập, cách dùng và phạm vi kiểm chứng](docs/GPT_WEB.md).
-
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
 
 Quản lý các tài khoản Codex cá nhân trên Windows: xem quota, đổi tài khoản và tiếp tục làm việc trong VS Code, CLI hoặc JetBrains AI Assistant. Giao diện sáng/tối, tiếng Việt/Anh.
@@ -74,7 +67,7 @@ Mở PADSwitcher trước khi dùng Codex qua kết nối này. Có thể mở V
 - **Đổi tự động:** bật **Tự đổi**, chọn ít nhất hai tài khoản cá nhân và đặt ưu tiên. Khi lần gọi model bị từ chối vì quota trước khi có nội dung trả về, ứng dụng thử lại chính yêu cầu đó bằng tài khoản dự phòng, giữ nguyên ngữ cảnh. Cách này áp dụng cả lúc bắt đầu và sau các bước đã hoàn thành; không tự gửi tin nhắn “tiếp tục”.
 - **Quota:** hai thanh hiển thị phần **còn lại** của cửa sổ ngắn/dài. Làm mới khi cần; dữ liệu cũ được đánh dấu trên giao diện.
 
-Bản **1.9.2** sửa lỗi làm mất thông tin giữ cache và cắt lượt trả lời dài ở bản cũ. Cập nhật quota **mỗi phút** chỉ đọc thông tin tài khoản, không gọi model; có thể bỏ qua một lần nếu thao tác khác đang chạy. Nếu dùng bản cũ, thoát PADSwitcher bằng biểu tượng khay hệ thống rồi mở bản mới; kết nối lại client để nhận bản sửa. Tài khoản đã lưu được giữ lại.
+Bản **1.13.0** gỡ bỏ hoàn toàn tính năng thử nghiệm GPT Web (các bản 1.10–1.12); mã và hành vi Codex giống 1.9.2. Bản **1.9.2** sửa lỗi làm mất thông tin giữ cache và cắt lượt trả lời dài ở bản cũ. Cập nhật quota **mỗi phút** chỉ đọc thông tin tài khoản, không gọi model; có thể bỏ qua một lần nếu thao tác khác đang chạy. Nếu dùng bản cũ, thoát PADSwitcher bằng biểu tượng khay hệ thống rồi mở bản mới; kết nối lại client để nhận bản sửa. Tài khoản đã lưu được giữ lại.
 
 Nếu muốn kiểm tra mức sử dụng, mở **Cài đặt → Kiểm tra hệ thống → Hoạt động model**: xem số yêu cầu, lần gửi, lần thử tài khoản khác và tỷ lệ ngữ cảnh dùng lại được server báo. Số liệu bắt đầu lại khi khởi động lại kết nối, không phải lượng quota bị trừ. Quota còn phụ thuộc model, mức suy luận và toàn bộ ngữ cảnh; yêu cầu mới ngắn trong hội thoại dài vẫn có thể tốn nhiều, nhất là khi đổi sang tài khoản chưa có cache.
 - **Reset:** chỉ hiện số lượt/hạn dùng khi Codex cung cấp. `—` là chưa có dữ liệu, khác với 0. **Dùng reset** mở bước xác nhận; chỉ xác nhận mới tiêu thụ lượt. Nếu kết quả chưa rõ, dùng **Kiểm tra reset**, tránh gửi một yêu cầu mới. Reset không tự tiếp tục hội thoại đã dừng.

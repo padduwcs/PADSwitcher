@@ -1,54 +1,16 @@
-# PADSwitcher 1.9.2 — validation
+# PADSwitcher 1.13.0 — validation
 
-## GPT Web one-click connection — 1.12.2
+## GPT Web removal — 1.13.0
 
-- Repeated Cloudflare "Verify you are human" reproduced with a copy of the owner's
-  account profile in the packaged companion; a blank profile showed the normal sign-in
-  page, and clearing the profile's browser storage removed the challenge. Cause: stale
-  Cloudflare/ChatGPT cookies from earlier attempts that rendered while occluded.
-- Fix: an account that never signed in starts from a clean browser session; **Reset
-  session** wipes only that account's browser data (launcher preferences and logs kept).
-  Real `WebService` + companion on a copy of the owner's data now reaches the clean
-  sign-in page. Native Codex files are never touched.
-- Reset is refused for the account in use for chat. Real sign-in still needs the owner.
+- The experimental GPT Web feature (builds 1.10–1.12) and its vendored companion were removed. The source tree
+  equals the tagged 1.9.2 tree apart from the version number and release notes; no native fix was lost, because every
+  change after 1.9.2 was GPT Web code, hooks or build support.
+- Root suite: 150 passing tests (the 1.9.2 suite); syntax check, process/guardian smoke, Electron UI smoke and the
+  native protocol fixture pass. Packaged smoke on the portable build: ASAR, helper extraction, stdio bridge, tray close
+  and preserved fixture login pass. Portable size 103 MB (was 226 MB with the companion).
+- Local GPT Web data and build artifacts were deleted. Native account, gateway and login data were not touched.
 
-## GPT Web one-click connection — 1.12.1
-
-- Root cause of the blank sign-in page reproduced with the packaged companion: the
-  managed window opened behind the foreground app, Chromium's native occlusion
-  tracking treated it as hidden and ChatGPT stayed on its `Loading` shell. Bringing
-  the window forward rendered the page immediately.
-- Fix verified on the rebuilt companion with VS Code in front and a disposable
-  profile: the window is raised above other apps and `chatgpt.com/auth/login`
-  renders its Google/Apple/phone/email choices; `/hide` hides it again.
-- Real `WebService` + packaged companion, disposable root: Connect reaches the
-  sign-in step in about 7 s without taking the global Web lock; Cancel shuts the
-  unused companion down while sign-in is still pending. No credentials were entered.
-- Root suite: 199 passing tests; native quota/cache regression 50 cases with Web
-  disabled/enabled; native and Web protocol fixtures and the UI smoke pass.
-  Vendored launcher tests: 378 pass, 5 environment-specific skips.
-- **Not yet verified with a real ChatGPT account:** completing sign-in, the setup
-  check turn, model install, a Web reply and Full/MCP tools.
-
-## GPT Web sign-in recovery — 1.11.1
-
-- Reproduced the signed-out embedded page stopping at a blank `Just a moment...`
-  document. Fresh disposable profiles also loaded the normal ChatGPT guest page;
-  this does not establish that security checks will always clear.
-- Managed sign-in waits for measured browser bounds and opens `/auth/login`
-  directly. It can wait behind the existing saved-session refresh without
-  starting a competing refresh. An in-progress provider page is preserved.
-- Explicit reload is allowed only during ordinary ChatGPT login; active model
-  turns and other browser operations remain locked. No automatic login, reload,
-  inference retry or native fallback was added.
-- Local root suite: 192 passing tests; native quota/cache regression: 50 passing
-  cases across Web disabled/enabled. Launcher login tests cover direct entry,
-  provider-page preservation, surface readiness and navigation isolation.
-- No owner login, live model turn or Full/MCP tool operation was performed.
-- A disposable account in the rebuilt packaged companion reached the actual
-  `https://chatgpt.com/auth/login` page with Google/Apple/email sign-in choices.
-  No credentials were entered and no model turn was submitted. Complete owner
-  sign-in still needs to be verified; this is not a claim of Cloudflare bypass.
+## PADSwitcher 1.9.2 — validation
 
 ## Release checks
 
@@ -195,86 +157,6 @@ auth refresh, compressed requests, exhausted backups, local access checks,
 redirect rejection, disconnects and profile lifecycle protection.
 
 ## Limits
-
-### GPT Web setup wizard 1.11.0 — 2026-10-09
-
-- 190 PADSwitcher unit/integration tests pass; the native quota/router suite
-  passes all 50 comparisons with the Web branch disabled and enabled. The
-  native router, gateway, recovery and quota refresher source is unchanged.
-- Managed setup invokes existing launcher safety checks, with asynchronous job
-  status and bounded authenticated POSTs. Tests cover consent before the single
-  Web smoke turn, rejection while Web tasks are active, duplicate IDs, lost POST
-  acknowledgements, stopped failures, saved-test continuation and runtime repair
-  without another smoke turn. Native inference remains usable during Web setup.
-  Preload also buffers browser-opening requests before React subscribes, so a
-  fast first sign-in does not leave the browser behind the advanced Setup page.
-- Full setup cannot be enabled or used through the managed route until runtime
-  and connector verification completes. Failed checks keep the account in setup;
-  errors/status never expose tunnel API keys. Credentials disappear from wizard
-  inputs after submission/dismissal and are not stored in renderer preferences.
-- The actual packaged companion accepts the setup endpoint only with its owner
-  capability, rejects browser Origin, malformed actions, missing consent and
-  bodies over 8 KiB. A disposable signed-out profile fails at authentication
-  before smoke/model setup; a duplicate request does not replay it. Private
-  native auth/config hashes remain unchanged, and both companions stop cleanly.
-- Real Codex protocol fixtures preserve native payload/cache and execute each
-  of two tools once, both with Web enabled on the native path and with synthetic
-  Web replies. No owner inference quota is used.
-- Electron screenshots cover the integrated wizard at normal/compact sizes,
-  alongside existing light/dark and Vietnamese/English page checks. Chat-only
-  setup and coding setup are driven through UI fixtures; the finish button stays
-  unavailable until tools are verified. Packaged main/helper, resource discovery,
-  separate native routes and the NSIS double-launch check pass.
-- Vendored launcher tests: 375 pass, 5 environment-specific skips, 0 failures
-  locally. Bridge tests and GitHub CI are checked separately before delivery.
-- **Owner ChatGPT login, a real Web reply and real Full/MCP tool execution still
-  require the owner's first connection.** Fixtures do not establish account-side
-  service availability or permissions. PADSwitcher is not restarted during
-  deployment because the owner's current conversation uses its native gateway.
-
-### GPT Web 1.10.1 — 2026-10-09
-
-- All 171 PADSwitcher tests pass, including 20 Web isolation/regression tests.
-  Native compressed request bytes, cache/session headers and quota fallback are
-  checked with Web enabled and disabled.
-- The existing 25 native router/usage tests also run with the actual Web branch
-  both disabled and enabled (50 checks). This includes partial/stalled streams,
-  healthy long streams, auth rejection, same-byte fallback, sticky cache tokens,
-  native usage accounting and invalid JSON values. Web disconnects/redirects do
-  not replay, rotate or load native credentials. Native inference continues
-  independently while a Web response is active.
-- Concurrent companion launches are serialized and launch/stop/remove races are
-  guarded. Web catalog rows disable parallel-agent advertising; native metadata
-  and native parallel-agent settings are preserved.
-- Real native Codex uses the account-qualified Web route with synthetic loopback
-  replies: two dynamic tools execute once each, one completed turn, no native
-  credentials read, no native model requests or quota retries.
-- A separate real-native Codex fixture runs the original sticky-state/tool/fallback
-  sequence with GPT Web enabled and no Web runtime available. It produces exactly
-  the same four native requests and two tool executions as the baseline.
-- Two real packaged companion processes use disposable browser/core/Codex homes.
-  Their capabilities differ; unauthorized/origin requests are rejected; incomplete
-  setup cannot enable Web. Both stop cleanly; native auth/config hashes stay equal.
-- Electron UI startup, sandbox/CSP, existing pages and the new Web page pass at
-  normal/compact sizes, Vietnamese/English and light/dark themes.
-- The native NSIS portable-wrapper fixture reproduces missing helper/Web files
-  when the 1.10.0 build is opened twice while its first instance remains active.
-  The 1.10.1 per-launch extraction option preserves all first-instance resources
-  and cleans only the exiting launch's temporary folder. No native service or
-  account data is loaded by this fixture. Packaged main also explicitly verifies
-  discovery of the bundled Web runtime rather than a development build path.
-- Web setup presents the next action for the selected account and enables the
-  Web toggle only after a signed-in account reports ready. Missing-runtime
-  guidance no longer asks a portable user to run developer build commands.
-- The managed daemon catalog endpoint is tested with a real Bun listener. It
-  requires control authentication and generates Web rows without upstream/model
-  calls. The PAD catalog augmentation preserves native rows and returns the
-  original response if Web augmentation fails or exceeds its size limit.
-- **Live ChatGPT sign-in, Web chat and Full/MCP tools have not been tested with
-  the owner's account.** They require account-owner setup and browser/tool checks.
-  Automated fixtures do not establish service-side availability or account limits.
-
-See [GPT Web setup and boundaries](docs/GPT_WEB.md).
 
 - **Real reset consumption remains untested**, by the owner's instruction. Tests
   validate request construction, confirmation, idempotency and uncertain outcomes

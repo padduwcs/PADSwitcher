@@ -8,17 +8,10 @@ const {CodexRpc}=require('../src/core/rpc.cjs');
 const windows=require('../src/core/windows.cjs');
 const root=path.resolve('artifacts/packaged-qa');let timer,rpc;
 app.disableHardwareAcceleration();
-// Set isolated paths before the first await: Chromium initializes caches on ready.
-require('node:fs').mkdirSync(root,{recursive:true});
-const dir=require('node:fs').mkdtempSync(path.join(root,'run-'));
-app.setPath('appData',dir);app.setPath('userData',path.join(dir,'browser'));app.setName('PADSwitcher Packaged QA');
-// Execute main's packaged resource lookup, not the development companion path.
-Object.defineProperty(app,'isPackaged',{value:true});
-Object.defineProperty(process,'resourcesPath',{value:path.resolve(__dirname,'../dist/win-unpacked/resources')});
 (async()=>{
   await fs.mkdir(root,{recursive:true});await windows.protectDirectory(root);
-  const home=path.join(dir,'codex');await fs.mkdir(home);
-  process.env.CODEX_HOME=home;
+  const dir=await fs.mkdtemp(path.join(root,'run-')),home=path.join(dir,'codex');await fs.mkdir(home);
+  process.env.CODEX_HOME=home;app.setPath('appData',dir);app.setPath('userData',path.join(dir,'browser'));app.setName('PADSwitcher Packaged QA');
   const fixtureAuth=JSON.parse(auth('packaged').toString());
   const claims=JSON.parse(Buffer.from(fixtureAuth.tokens.id_token.split('.')[1],'base64url'));
   claims.exp=Math.floor(Date.now()/1000)+3600;claims.iat=Math.floor(Date.now()/1000);claims.iss='https://auth.openai.com';
@@ -43,16 +36,6 @@ Object.defineProperty(process,'resourcesPath',{value:path.resolve(__dirname,'../
         }
       };
       const imported=await action('import');assert(imported.ok);const started=await action('gateway',{id:imported.result});assert(started.ok);console.log('Packaged gateway startup passed.');
-      assert.equal(started.state.web.enabled,false);assert.deepEqual(started.state.web.profiles,[]);
-      assert.equal(started.state.web.runtimeAvailable,true,'Packaged main must find the bundled Web companion');
-      const webAdded=await action('webAdd',{label:'Packaged account fixture'});assert(webAdded.ok);
-      const webSelected=await action('webSelect',{id:webAdded.result});assert(webSelected.ok);
-      const invalidSetup=await action('webSetup',{id:webAdded.result,action:'inference',requestId:'invalid-setup-fixture'});
-      assert.equal(invalidSetup.ok,false);assert.equal(invalidSetup.error.code,'WEB_SETUP_INPUT');assert.equal(invalidSetup.state.gateway.status,'ready');
-      assert.equal(webSelected.state.web.selectedId,webAdded.result);assert.equal(webSelected.state.web.enabled,false);
-      const webRemoved=await action('webRemove',{id:webAdded.result});assert(webRemoved.ok);
-      assert.deepEqual(webRemoved.state.web.profiles,[]);assert.equal(webRemoved.state.gateway.status,'ready');
-      console.log('Packaged Web account IPC is separate; native gateway stays ready: passed.');
       assert.equal(started.state.version,require('../package.json').version);assert.equal(started.state.gateway.status,'ready');
       assert.equal(started.state.gateway.modelRouting,'request');
       assert.equal(started.state.gateway.recovery.enabled,false);

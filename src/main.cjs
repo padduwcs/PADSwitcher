@@ -4,12 +4,11 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { ProfileService } = require('./core/service.cjs');
 const { createQuotaRefresher } = require('./core/quota-refresh.cjs');
-const { WebService } = require('./core/web-service.cjs');
 const { GatewayHub } = require('./core/gateway-hub.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { JetBrainsIntegration } = require('./core/jetbrains.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
-let window, service, gateway, integration, jetbrains, web, tray, timer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
+let window, service, gateway, integration, jetbrains, tray, timer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
 let uiLocale='vi';
 const text=(vi,en)=>uiLocale==='en'?en:vi;
 function updateTray() {
@@ -32,16 +31,7 @@ async function openAuth(url) {
 async function start() {
   service = new ProfileService(path.join(app.getPath('appData'),'PADSwitcher','data'));
   await service.init();
-  const companionRoot=app.isPackaged?path.join(process.resourcesPath,'gpt-web'):path.join(__dirname,'../artifacts/gpt-web/companion');
-  const companionExe=path.join(companionRoot,'PADGPTWeb.exe');
-  web=new WebService(path.join(service.root,'gpt-web'),{platform:service.platform,
-    nativeHome:()=>service.state.settings.desktopHome,available:()=>require('node:fs').existsSync(companionExe),
-    invocation:show=>({executable:companionExe,args:show?[]:['--hidden'],cwd:companionRoot})});
-  service.web=web;web.on('change',()=>service.changed());
-  // Optional Web data failure must never prevent native Codex from starting.
-  let webInitError=null;
-  try{await web.init();}catch{webInitError=new UserError('Không đọc được dữ liệu GPT Web. Các kết nối Codex vẫn hoạt động. Giữ thư mục dữ liệu để kiểm tra.','WEB_STORE_INVALID');web.state.enabled=false;web.lastError=webInitError.message;}
-  gateway=new GatewayHub(service,{routerOptions:{webTransport:web}});integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);
+  gateway=new GatewayHub(service);integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);
   const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const [next,jb]=await Promise.all([integration.status(),jetbrains.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)){service.vscode=next;service.jetbrains=jb;service.changed();}})().finally(()=>{integrationFlight=null;}));
   await checkIntegration();
   window = new BrowserWindow({ width: 1260, height: 840, minWidth: 1000, minHeight: 680, title: 'PADSwitcher', icon:path.join(__dirname,'assets','padswitcher.ico'), backgroundColor:'#F6F8FB', autoHideMenuBar:true, show:false, webPreferences: { preload:path.join(__dirname,'preload.cjs'), nodeIntegration:false, contextIsolation:true, sandbox:true, webSecurity:true, devTools:!app.isPackaged } });
@@ -58,26 +48,8 @@ async function start() {
       if (!args || typeof args !== 'object' || Array.isArray(args)) throw new UserError('Yêu cầu không hợp lệ.', 'INVALID_REQUEST');
       if(['vi','en'].includes(args.locale)&&uiLocale!==args.locale){uiLocale=args.locale;updateTray();}
       let result;
-      if(command.startsWith('web')&&webInitError)throw webInitError;
       switch(command) {
         case 'state': result = service.view(); break;
-        case 'webAdd': result=await web.add(args.label);break;
-        case 'webSelect': await web.select(args.id);break;
-        case 'webOpen': await web.open(args.id);break;
-        case 'webConnect': await web.connect(args.id,{activate:args.activate===true});break;
-        case 'webCancelConnect': await web.cancelConnect(args.id);break;
-        case 'webResetSession': await web.resetSession(args.id);break;
-        case 'webLaunchSetup': await web.exclusive(()=>web.launch(args.id,false));break;
-        case 'webSetup': result=await web.setupCommand(args.id,{action:args.action,requestId:args.requestId,consent:args.consent,reuse:args.reuse,tunnelId:args.tunnelId,runtimeKey:args.runtimeKey,target:args.target});break;
-        case 'webCopyConnector': {
-          const s=await web.refreshStatus(args.id);const name=s.setup?.connectorName;
-          if(typeof name!=='string'||!name)throw new UserError('Mở thiết lập GPT Web trước.','WEB_SETUP_REQUIRED');
-          clipboard.writeText(name);break;
-        }
-        case 'webEnable': await web.enable();break;
-        case 'webDisable': await web.disable();break;
-        case 'webRemove': await web.remove(args.id);break;
-        case 'webRefresh': await web.poll();break;
         case 'import': result = await service.importCurrent(args.label); break;
         case 'add': result = await service.addAccount(args.label,openAuth,args.device === true,args.id || null,device => window.webContents.send('pad:device',device)); break;
         case 'cancelLogin': service.cancelLogin(); break;
@@ -145,7 +117,6 @@ async function start() {
   const showWindow=()=>{if(window.isMinimized())window.restore();window.show();window.focus();};
   tray.on('double-click',showWindow);
   updateTray();
-  if(web.enabled&&web.state.selectedId)void web.launch(web.state.selectedId,false).catch(()=>{web.lastError='Mở GPT Web để hoàn tất đăng nhập hoặc thiết lập.';web.changed();});
   if(service.state.gatewayEnabled&&service.state.profiles.some(p=>p.id===service.state.gatewayProfileId)){
     await gateway.start(service.state.gatewayProfileId).catch(error=>{if(!window.isDestroyed())window.webContents.send('pad:refresh-error',publicError(error));});
   }
@@ -160,7 +131,7 @@ async function start() {
   timer = setInterval(() => refresh('periodic'), 60 * 1000);
   window.on('close',event => {
     if (quitting) return;
-    if(['ready','starting'].includes(gateway.status)||web.enabled||web.children.size){event.preventDefault();window.hide();return;}
+    if(['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}
     if (service.busy && !service.login) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:'Thao tác đang hoàn tất',detail:'Hãy chờ lưu phiên xong trước khi đóng PADSwitcher.'}); return; }
     if (service.running.size) {
       const response = dialog.showMessageBoxSync(window,{type:'question',buttons:['Giữ PADSwitcher mở','Đóng trình quản lý'],defaultId:0,cancelId:0,message:'CLI vẫn đang chạy',detail:'Nếu đóng trình quản lý, các cửa sổ CLI tiếp tục chạy. Phiên riêng sẽ được mã hóa lại khi đóng CLI bình thường; mở PADSwitcher lại để kiểm tra trạng thái sau đó.'});
@@ -171,11 +142,11 @@ async function start() {
   app.on('window-all-closed',() => { clearInterval(timer); clearInterval(integrationTimer); app.quit(); });
   app.on('before-quit',event => {
     if(quitting)return;
-    if(service?.busy||web?.busy||web?.launchFlight){event.preventDefault();if(service.login)service.cancelLogin();return;}
-    if(gateway.turns.size||web?.active){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:text('Codex hoặc GPT Web còn lượt đang chạy','Codex or GPT Web has active turns'),detail:text('Chờ hoàn tất hoặc dừng tác vụ trước khi thoát.','Wait for completion or stop the task before quitting.')});return;}
-    if(gateway.status!=='stopped'||web?.children.size){
+    if(service?.busy){event.preventDefault();if(service.login)service.cancelLogin();return;}
+    if(gateway.turns.size){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:text('Codex còn lượt đang chạy','Codex has active turns'),detail:text('Chờ hoàn tất hoặc chọn Dừng gateway trong PADSwitcher trước khi thoát.','Wait for completion or disconnect Codex in PADSwitcher before quitting.')});return;}
+    if(gateway.status!=='stopped'){
       event.preventDefault();if(shutdown)return;shutdown=true;
-      (async()=>{await web.shutdown();await gateway.stop();})().then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});
+      gateway.stop().then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});
     }else{quitting=true;clearInterval(timer);tray?.destroy();}
   });
 }

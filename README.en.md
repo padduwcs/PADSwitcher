@@ -1,13 +1,5 @@
 # PADSwitcher
 
-**New in 1.12.2:** **GPT Web** connects with one button: click **Add ChatGPT
-account**, sign in in the window that opens, and PADSwitcher checks the account,
-installs models and enables Web. Fixes the blank ("Loading") sign-in window that
-opened behind other apps and clears a stale browser session when Cloudflare keeps
-asking to verify you are human (with a **Reset session** button). Failures show a specific reason. Coding tools (MCP) are a
-separate optional step. Native Codex routing is unchanged.
-See [setup, operation and validation scope (Vietnamese)](docs/GPT_WEB.md).
-
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
 
 Manage your personal Codex accounts on Windows: check remaining quota, switch accounts and keep working in VS Code, the CLI or JetBrains AI Assistant. Light/dark themes and Vietnamese/English UI.
@@ -75,7 +67,7 @@ Open PADSwitcher before using Codex through this connection. You can start VS Co
 - **Automatic switching:** enable **Auto switch**, choose at least two personal accounts and set their priority. A model request rejected for quota before response output is retried with a backup account using the exact same request and context. This applies both at the start and after completed steps; no extra “continue” message is sent.
 - **Quota:** the two bars show the **remaining** short/long-window allowance. Refresh when needed; stale data is marked.
 
-Version **1.9.2** fixes lost cache-affinity metadata and premature termination of long responses. Usage refresh runs **every minute**, only reads account metadata and does not call the model; a busy operation can delay a refresh. To update an older running version, quit PADSwitcher through its tray icon, open the new build and reconnect your client. Saved accounts are retained.
+Version **1.13.0** removes the experimental GPT Web feature (builds 1.10–1.12) entirely; Codex code and behavior are identical to 1.9.2. Version **1.9.2** fixes lost cache-affinity metadata and premature termination of long responses. Usage refresh runs **every minute**, only reads account metadata and does not call the model; a busy operation can delay a refresh. To update an older running version, quit PADSwitcher through its tray icon, open the new build and reconnect your client. Saved accounts are retained.
 
 To investigate usage, open **Settings → Check system → Model activity** for request, upstream-attempt, quota-retry and reported cached-input figures. Counts reset when the connection restarts; they are not quota charges. Consumption also depends on the model, reasoning effort and full context. A short follow-up in a long conversation can still be expensive, especially after switching to an account with a cold cache.
 - **Resets:** counts and expiry dates appear only when supplied by Codex. `—` means unavailable, not zero. **Use reset** opens a confirmation; only confirming consumes a credit. If the outcome is uncertain, use **Check reset** instead of starting another request. A reset does not resume a stopped conversation automatically.

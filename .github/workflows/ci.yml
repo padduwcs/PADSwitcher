@@ -23,25 +23,11 @@ jobs:
         run: npm install --global @openai/codex@0.160.0
       - run: npm run check
       - run: npm test
-      - run: npm run smoke:quota:with-web
       - run: npm run smoke
       - run: npm run smoke:protocol
-      - run: npm run smoke:web:protocol
-      - run: npm run smoke:protocol:web-enabled
       - run: npm run smoke:ui
       - run: npm run dist
-      - run: npm run smoke:portable
-      - name: Install launcher Electron for bridge and launcher tests
-        run: node vendor/codex-chatgpt-web/launcher/node_modules/electron/install.js
-      - name: Web bridge tests (Bun)
-        working-directory: vendor/codex-chatgpt-web
-        shell: pwsh
-        run: '& "${{ github.workspace }}/artifacts/build-tools/node_modules/@oven/bun-windows-x64/bin/bun.exe" test ./tests'
-      - name: Web launcher tests (Node)
-        working-directory: vendor/codex-chatgpt-web/launcher
-        run: node --test tests/*.test.cjs
       - run: node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
-      - run: node scripts/run-electron.cjs scripts/web-companion-smoke.cjs --packaged
       - name: SHA-256
         shell: pwsh
         run: |
