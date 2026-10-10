@@ -1,9 +1,10 @@
 # PADSwitcher
 
-**New in 1.12.1:** **GPT Web** connects with one button: click **Add ChatGPT
+**New in 1.12.2:** **GPT Web** connects with one button: click **Add ChatGPT
 account**, sign in in the window that opens, and PADSwitcher checks the account,
 installs models and enables Web. Fixes the blank ("Loading") sign-in window that
-opened behind other apps. Failures show a specific reason. Coding tools (MCP) are a
+opened behind other apps and clears a stale browser session when Cloudflare keeps
+asking to verify you are human (with a **Reset session** button). Failures show a specific reason. Coding tools (MCP) are a
 separate optional step. Native Codex routing is unchanged.
 See [setup, operation and validation scope (Vietnamese)](docs/GPT_WEB.md).
 

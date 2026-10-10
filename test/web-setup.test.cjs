@@ -236,3 +236,33 @@ test('a slow first start waits for the runtime and reports a retryable timeout o
   web.children.delete(id);ready=false;
   await assert.rejects(web.launch(id,false),{code:'WEB_START_FAILED'});
 });
+async function seedBrowserData(f){
+  const dir=path.join(f.web.home(f.id),'browser-data');await fs.mkdir(path.join(dir,'Network'),{recursive:true});await fs.mkdir(path.join(dir,'logs'),{recursive:true});
+  await fs.writeFile(path.join(dir,'Network','Cookies'),'stale-cf-clearance');await fs.writeFile(path.join(dir,'launcher-state.json'),'{"language":"en"}');await fs.writeFile(path.join(dir,'logs','launcher.jsonl'),'log');
+  return dir;
+}
+test('a never-signed-in account starts from a clean browser session, keeping launcher preferences and logs',async t=>{
+  const f=await flowFixture(t);const dir=await seedBrowserData(f);
+  await f.run({activate:true});
+  await assert.rejects(fs.stat(path.join(dir,'Network')),{code:'ENOENT'});
+  assert.equal(await fs.readFile(path.join(dir,'launcher-state.json'),'utf8'),'{"language":"en"}');await fs.stat(path.join(dir,'logs','launcher.jsonl'));
+  const saved=JSON.parse(await fs.readFile(path.join(f.root,'accounts.json'),'utf8'));assert.equal(saved.profiles[0].signedIn,true);
+});
+test('a signed-in account keeps its browser session when connecting again',async t=>{
+  const f=await flowFixture(t,{authenticated:true,prepared:true});const dir=await seedBrowserData(f);
+  f.web.get(f.id).signedIn=true;await f.run({activate:true});
+  assert.equal(await fs.readFile(path.join(dir,'Network','Cookies'),'utf8'),'stale-cf-clearance');
+});
+test('reset session stops the idle runtime, wipes the browser session and restarts sign-in; the account in use is protected',async t=>{
+  const f=await flowFixture(t,{loginPolls:1e9});const dir=await seedBrowserData(f);
+  f.web.get(f.id).signedIn=true;
+  await f.web.connect(f.id,{activate:true});const first=f.web.flows.get(f.id);
+  for(let i=0;i<300&&first.step!=='login';i++)await new Promise(r=>setTimeout(r,1));
+  await f.web.resetSession(f.id);
+  assert(f.sent.some(x=>x.route==='/shutdown'));await assert.rejects(fs.stat(path.join(dir,'Network')),{code:'ENOENT'});
+  const second=f.web.flows.get(f.id);assert.notEqual(second,first);assert.equal(second.running,true);assert.equal(second.activate,true);
+  const saved=JSON.parse(await fs.readFile(path.join(f.root,'accounts.json'),'utf8'));assert.equal(saved.profiles[0].signedIn,undefined);
+  await f.web.cancelConnect(f.id);await second.done;
+  f.web.state.selectedId=f.id;f.web.state.enabled=true;
+  await assert.rejects(f.web.resetSession(f.id),{code:'WEB_ACCOUNT_ACTIVE'});
+});

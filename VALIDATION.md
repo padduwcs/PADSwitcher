@@ -1,5 +1,17 @@
 # PADSwitcher 1.9.2 — validation
 
+## GPT Web one-click connection — 1.12.2
+
+- Repeated Cloudflare "Verify you are human" reproduced with a copy of the owner's
+  account profile in the packaged companion; a blank profile showed the normal sign-in
+  page, and clearing the profile's browser storage removed the challenge. Cause: stale
+  Cloudflare/ChatGPT cookies from earlier attempts that rendered while occluded.
+- Fix: an account that never signed in starts from a clean browser session; **Reset
+  session** wipes only that account's browser data (launcher preferences and logs kept).
+  Real `WebService` + companion on a copy of the owner's data now reaches the clean
+  sign-in page. Native Codex files are never touched.
+- Reset is refused for the account in use for chat. Real sign-in still needs the owner.
+
 ## GPT Web one-click connection — 1.12.1
 
 - Root cause of the blank sign-in page reproduced with the packaged companion: the

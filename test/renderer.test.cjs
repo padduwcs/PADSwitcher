@@ -326,3 +326,16 @@ test('connection indicators explain the next step, translate and offer a shortcu
   assert(d.querySelector('#vscode-next').textContent.includes('Reload Window'));d.querySelector('#vscode-pill').click();assert(!d.querySelector('#connections-page').classList.contains('hidden'));
   d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#vscode-status').textContent,'VS Code · Waiting for extension');assert.equal(d.querySelector('#vscode-config').textContent,'Configured');assert.equal(d.querySelector('#cli-status').textContent,'1 CLI connections');
 });
+test('a blocked or failed sign-in offers a confirmed session reset that never touches native settings',async t=>{
+  const w=dom(t);w.padPreviewConnectMs=60000;await settle();const d=w.document,commands=[];const action=w.pad.action;
+  w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
+  const card=()=>[...d.querySelectorAll('.web-account')].find(x=>x.textContent.includes('Tài khoản Web dự phòng'));
+  card().querySelector('[data-web-connect]').click();await settle();
+  const reset=card().querySelector('[data-web-reset]');assert(reset.textContent.includes('Trang bị chặn'));
+  reset.click();assert.equal(d.querySelector('#modal').open,true);assert(d.querySelector('#modal-body').textContent.includes('Verify you are human'));
+  assert(!commands.some(x=>x.command==='webResetSession'));
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  assert.equal(commands.filter(x=>x.command==='webResetSession').length,1);
+  assert(!commands.some(x=>['useGateway','autoSwitchSettings','refresh','configureVSCode'].includes(x.command)));
+  d.querySelector('#language-toggle').click();assert(card().textContent.includes('Page blocked? Reset session'));
+});

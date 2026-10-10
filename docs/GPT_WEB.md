@@ -1,4 +1,4 @@
-# GPT Web trong PADSwitcher 1.12.1
+# GPT Web trong PADSwitcher 1.12.2
 
 GPT Web là chức năng bổ sung, mặc định tắt. Trang **Tài khoản** tiếp tục quản lý
 đăng nhập Codex; trang **GPT Web** quản lý phiên đăng nhập ChatGPT riêng.
@@ -20,6 +20,14 @@ khóa này không dùng để gọi model API.
 5. Trong VS Code: **Reload Window** (hoặc mở lại CLI/chat JetBrains) một lần, mở
    **chat mới** và chọn model có hậu tố **(Web · tên tài khoản)**. Model thường
    tiếp tục dùng tuyến Codex hiện có.
+
+**Nếu ChatGPT liên tục đòi "Verify you are human" (Cloudflare):** cookie xác minh hỏng
+đã lưu trong hồ sơ trình duyệt của tài khoản làm trang lặp lại thử thách. Tài khoản
+chưa đăng nhập thành công được PADSwitcher tự dọn phiên trình duyệt trước khi mở. Nếu
+vẫn bị chặn, bấm **Trang bị chặn? Đặt lại phiên** (hoặc **Đặt lại phiên** sau khi lỗi):
+chỉ xóa cookie/dữ liệu trình duyệt của tài khoản Web đó rồi đăng nhập lại; tài khoản
+ChatGPT, Codex và các hồ sơ khác không bị ảnh hưởng. Không dùng được với tài khoản
+đang dùng cho chat; tắt GPT Web hoặc chọn tài khoản khác trước.
 
 Nếu một bước lỗi, thẻ tài khoản hiện lý do và **Chi tiết** (đã che khóa/token),
 rồi dừng lại. Bấm **Thử lại** khi sẵn sàng; ứng dụng không tự gửi lại. Bấm **Hủy**

@@ -66,6 +66,7 @@ async function start() {
         case 'webOpen': await web.open(args.id);break;
         case 'webConnect': await web.connect(args.id,{activate:args.activate===true});break;
         case 'webCancelConnect': await web.cancelConnect(args.id);break;
+        case 'webResetSession': await web.resetSession(args.id);break;
         case 'webLaunchSetup': await web.exclusive(()=>web.launch(args.id,false));break;
         case 'webSetup': result=await web.setupCommand(args.id,{action:args.action,requestId:args.requestId,consent:args.consent,reuse:args.reuse,tunnelId:args.tunnelId,runtimeKey:args.runtimeKey,target:args.target});break;
         case 'webCopyConnector': {

@@ -1,9 +1,10 @@
 # PADSwitcher
 
-**Mới ở 1.12.1:** **GPT Web** kết nối bằng một nút: bấm **Thêm tài khoản ChatGPT**,
+**Mới ở 1.12.2:** **GPT Web** kết nối bằng một nút: bấm **Thêm tài khoản ChatGPT**,
 đăng nhập trong cửa sổ vừa mở, PADSwitcher tự kiểm tra, cài model và bật. Sửa lỗi
 cửa sổ đăng nhập trắng ("Loading") do mở phía sau ứng dụng khác. Lỗi hiển thị lý do
-cụ thể. Công cụ lập trình (MCP) tách thành bước tùy chọn. Tuyến Codex thường giữ nguyên.
+cụ thể. Tự dọn phiên trình duyệt hỏng khi Cloudflare liên tục đòi xác minh, có nút
+**Đặt lại phiên**. Công cụ lập trình (MCP) tách thành bước tùy chọn. Tuyến Codex thường giữ nguyên.
 Xem [thiết lập, cách dùng và phạm vi kiểm chứng](docs/GPT_WEB.md).
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">

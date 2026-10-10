@@ -30,6 +30,7 @@ module.exports = `
             if(args.activate){state.web.selectedId=p.id;state.web.profiles.forEach(x=>x.selected=x.id===p.id);state.web.enabled=true;}publish();},Number(window.padPreviewConnectMs??20));
         }
       }
+      if(command==='webResetSession'){const p=state.web.profiles.find(p=>p.id===args.id);p.flow={running:true,step:'login',message:'Đăng nhập ChatGPT trong cửa sổ vừa mở. PADSwitcher tự tiếp tục khi bạn đăng nhập xong.',error:null};p.connected=false;publish();}
       if(command==='webCancelConnect'){const p=state.web.profiles.find(p=>p.id===args.id);p.flow=null;publish();}
       if(command==='webSelect'){state.web.selectedId=args.id;state.web.profiles.forEach(p=>p.selected=p.id===args.id);publish();}
       if(command==='webLaunchSetup'){

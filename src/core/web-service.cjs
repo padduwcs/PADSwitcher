@@ -10,6 +10,8 @@ const {UserError} = require('./errors.cjs');
 const models = require('./web-models.cjs');
 const wait = ms => new Promise(resolve => setTimeout(resolve,ms));
 class FlowCancelled extends Error {}
+// Browser storage that a stale Cloudflare/ChatGPT cookie can poison. Launcher preferences and logs stay.
+const KEEP_BROWSER_DATA=new Set(['launcher-state.json','window-state.json','logs','Preferences','Local State']);
 const MAX_CATALOG = 4*1024*1024;
 async function freePort() {
   const s = net.createServer(); await new Promise((r,j)=>{s.once('error',j);s.listen(0,'127.0.0.1',r);});
@@ -54,9 +56,9 @@ class WebService extends EventEmitter {
     if(await exists(this.file)){
       const x=JSON.parse((await readLimited(this.file,1024*1024)).toString('utf8'));
       if(x.version!==1||typeof x.enabled!=='boolean'||!Array.isArray(x.profiles)||x.profiles.length>50)throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');
-      const ids=new Set();for(const p of x.profiles){profilePath(path.join(this.root,'profiles'),p.id);if(ids.has(p.id)||typeof p.label!=='string'||!p.label.trim()||p.label.length>80||p.connected!==undefined&&typeof p.connected!=='boolean')throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');ids.add(p.id);}
+      const ids=new Set();for(const p of x.profiles){profilePath(path.join(this.root,'profiles'),p.id);if(ids.has(p.id)||typeof p.label!=='string'||!p.label.trim()||p.label.length>80||p.connected!==undefined&&typeof p.connected!=='boolean'||p.signedIn!==undefined&&typeof p.signedIn!=='boolean')throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');ids.add(p.id);}
       if(x.selectedId!==null&&!ids.has(x.selectedId))throw new UserError('Dữ liệu GPT Web không hợp lệ.','WEB_STORE_INVALID');
-      this.state={version:1,enabled:x.enabled,selectedId:x.selectedId,profiles:x.profiles.map(p=>({id:p.id,label:p.label,...(p.connected===true?{connected:true}:{})}))};
+      this.state={version:1,enabled:x.enabled,selectedId:x.selectedId,profiles:x.profiles.map(p=>({id:p.id,label:p.label,...(p.connected===true?{connected:true}:{}),...(p.signedIn===true?{signedIn:true}:{})}))};
     }else await this.save();
     if(await exists(this.bindingFile)){
       const x=JSON.parse((await readLimited(this.bindingFile,1024*1024)).toString('utf8'));
@@ -139,7 +141,7 @@ class WebService extends EventEmitter {
     if(current?.running){if(current.step==='login')await this.control(id,'/show',{}).catch(()=>{});return;}
     if(!this.options.available?.())throw new UserError('Không tìm thấy bộ chạy GPT Web. Hãy thoát PADSwitcher ở khay hệ thống rồi mở lại bản mới nhất.','WEB_RUNTIME_MISSING');
     if(this.closed||this.stopping)throw new UserError('GPT Web đã dừng hoặc đang dừng.','WEB_STOPPED');
-    const flow={running:true,cancelled:false,step:'start',message:'Đang mở bộ chạy GPT Web. Lần mở đầu sau khi cập nhật có thể mất 1–2 phút…',error:null};
+    const flow={running:true,cancelled:false,activate:activate===true,step:'start',message:'Đang mở bộ chạy GPT Web. Lần mở đầu sau khi cập nhật có thể mất 1–2 phút…',error:null};
     this.flows.set(id,flow);this.changed();
     flow.done=this.runFlow(id,flow,activate===true);
   }
@@ -152,16 +154,43 @@ class WebService extends EventEmitter {
     if(!this.inUse(id)&&!this.active)await this.stopChild(id).catch(()=>this.control(id,'/hide',{}).catch(()=>{}));
     else await this.control(id,'/hide',{}).catch(()=>{});
   }
+  // Wipe only this account's browser session (cookies, caches, site storage). Used for an account that has
+  // never signed in, or on request when Cloudflare keeps challenging a stale session.
+  async resetBrowserData(id){
+    if(this.children.has(id))throw new UserError('Đóng bộ chạy của tài khoản trước khi đặt lại phiên.','WEB_ACCOUNT_ACTIVE');
+    const dir=path.join(this.home(id),'browser-data');
+    let names;try{names=await fs.readdir(dir);}catch{return;}
+    for(const name of names)if(!KEEP_BROWSER_DATA.has(name))await fs.rm(path.join(dir,name),{recursive:true,force:true});
+  }
+  async resetSession(id){
+    this.get(id);const old=this.flows.get(id);
+    if(this.inUse(id)||this.active)throw new UserError('Tắt GPT Web hoặc chọn tài khoản khác trước khi đặt lại phiên của tài khoản đang dùng.','WEB_ACCOUNT_ACTIVE');
+    if(old?.running){old.cancelled=true;await old.done;}
+    await this.exclusive(async()=>{
+      if(this.children.has(id))await this.stopChild(id);
+      await this.resetBrowserData(id);
+      const profile=this.get(id);delete profile.connected;delete profile.signedIn;await this.save();
+      this.statuses.delete(id);this.rows.delete(id);this.flows.delete(id);
+    });
+    await this.connect(id,{activate:old?.activate===true});
+  }
   async whenIdle(action){for(let i=0;i<120&&this.busy;i++)await wait(250);return action();}
   async runFlow(id,flow,activate){
     const step=(name,message)=>{if(flow.cancelled)throw new FlowCancelled();flow.step=name;flow.message=message;this.changed();};
     try{
+      // A profile that never signed in has nothing worth keeping, and a stale Cloudflare cookie from an earlier
+      // attempt can make every new sign-in loop on "Verify you are human". Start it from a clean session.
+      const known=this.get(id);
+      if(!this.children.has(id)&&!known.connected&&!known.signedIn)await this.resetBrowserData(id).catch(()=>{});
       await this.whenIdle(()=>this.launch(id,false));
       let s=await this.refreshStatus(id);
+      const markSignedIn=async()=>{const p=this.get(id);if(!p.signedIn){p.signedIn=true;await this.save().catch(()=>{});}};
+      if(s.authenticated)await markSignedIn();
       if(!s.setup?.supported)throw new UserError('Bộ chạy GPT Web chưa hỗ trợ kết nối nhanh. Thoát PADSwitcher ở khay hệ thống rồi mở lại bản mới nhất.','WEB_SETUP_UNAVAILABLE');
       if(!s.authenticated){
         step('login','Đăng nhập ChatGPT trong cửa sổ vừa mở. PADSwitcher tự tiếp tục khi bạn đăng nhập xong.');
         s=await this.flowAction(id,flow,'login');
+        await markSignedIn();
       }
       if(!s.setup?.prepared||!s.ready){
         step('prepare','Đang kiểm tra ChatGPT và cài model Web (khoảng 1 phút, gửi một tin nhắn kiểm tra ngắn)…');

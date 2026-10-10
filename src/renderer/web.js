@@ -12,11 +12,12 @@ window.padWebUI = (() => {
   function actions(p,w){
     const off=w.busy||!w.runtimeAvailable;
     if(p.flow?.running)return (p.flow.step==='login'?`<button class="button primary" data-web-connect="${escape(p.id)}">Mở cửa sổ đăng nhập</button>`:'')
-      +`<button class="button ghost" data-web-cancel="${escape(p.id)}">Hủy</button>`;
+      +`<button class="button ghost" data-web-reset="${escape(p.id)}" ${w.busy?'disabled':''}>Trang bị chặn? Đặt lại phiên</button><button class="button ghost" data-web-cancel="${escape(p.id)}">Hủy</button>`;
     const connect=p.flow?.error?'Thử lại':p.status==='signedOut'?'Đăng nhập lại':'Kết nối';
     return (usable(p)&&!p.flow?.error?'':`<button class="button primary" data-web-connect="${escape(p.id)}" ${off?'disabled':''}>${connect}</button>`)
       +(p.selected?'':`<button class="button ${usable(p)?'primary':'secondary'}" data-web-select="${escape(p.id)}" ${w.busy?'disabled':''}>Dùng cho chat mới</button>`)
       +`<button class="button secondary" data-web-tools="${escape(p.id)}" ${off||!usable(p)?'disabled':''}>Công cụ lập trình</button>`
+      +(p.flow?.error||p.status==='signedOut'?`<button class="button ghost" data-web-reset="${escape(p.id)}" ${w.busy||w.enabled&&p.selected?'disabled':''}>Đặt lại phiên</button>`:'')
       +`<button class="button ghost" data-web-open="${escape(p.id)}" ${off?'disabled':''}>Nâng cao</button>`
       +`<button class="button ghost danger-text" data-web-remove="${escape(p.id)}" ${w.busy||w.enabled&&p.selected||w.active?'disabled':''}>Xóa</button>`;
   }
@@ -53,6 +54,10 @@ window.padWebUI = (() => {
     const on=(attr,fn)=>$('#web-accounts').querySelectorAll(`[${attr}]`).forEach(b=>b.onclick=()=>fn(b.getAttribute(attr)));
     on('data-web-connect',id=>hooks.call('webConnect',{id}));
     on('data-web-cancel',id=>hooks.call('webCancelConnect',{id}));
+    on('data-web-reset',id=>{
+      const p=w.profiles.find(p=>p.id===id);
+      hooks.showModal('Đặt lại phiên đăng nhập?',`<p data-literal>${escape(p.label)}</p><p>Xóa cookie và dữ liệu trình duyệt của riêng tài khoản này rồi đăng nhập lại từ đầu. Dùng khi trang ChatGPT liên tục đòi xác minh "Verify you are human" hoặc không đăng nhập được. Tài khoản ChatGPT và Codex không bị ảnh hưởng.</p>`,async()=>{hooks.closeModal();await hooks.call('webResetSession',{id});},'Đặt lại');
+    });
     on('data-web-select',id=>hooks.call('webSelect',{id},'Đã chọn tài khoản cho chat Web mới. Mở chat mới để dùng.'));
     on('data-web-tools',id=>window.padWebSetup.open(id));
     on('data-web-open',id=>hooks.call('webOpen',{id}));
