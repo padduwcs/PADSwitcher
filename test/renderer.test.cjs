@@ -8,6 +8,36 @@ const html = fs.readFileSync(path.join(__dirname,'../src/renderer/index.html'),'
 const script = fs.readFileSync(path.join(__dirname,'../src/renderer/app.js'),'utf8');
 const mock = require('../scripts/preview-data.cjs');
 const settle = async () => { await new Promise(resolve => setTimeout(resolve,10)); };
+test('Kaggle supports independent account terminals, search, quota and notebook monitoring in both languages',async t=>{
+  const w=dom(t);await settle();const d=w.document,commands=[],action=w.pad.action;
+  w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
+  d.querySelector('[data-page=kaggle]').click();assert.equal(d.querySelector('#kaggle-page').classList.contains('hidden'),false);
+  assert.equal(d.querySelectorAll('.kg-account').length,3);assert(d.querySelector('#kg-detail').textContent.includes('18,5 h'));
+  assert(d.querySelector('#kg-detail').textContent.includes('12 notebook'));assert(d.querySelector('#kg-detail').textContent.includes('Đang chạy'));
+  d.querySelector('#kg-launch').click();await settle();d.querySelectorAll('.kg-account')[1].click();d.querySelector('#kg-launch').click();await settle();
+  const launches=commands.filter(c=>c.command==='kaggleLaunch');assert.equal(launches.length,2);assert.notEqual(launches[0].args.id,launches[1].args.id);assert(!commands.some(c=>c.command==='gateway'||c.command==='switch'));
+  const search=d.querySelector('#kg-search');search.value='archive';search.dispatchEvent(new w.Event('input'));assert.equal(d.querySelectorAll('.kg-account').length,1);assert(d.querySelector('#kg-detail').textContent.includes('Dữ liệu cũ'));
+  d.querySelector('#language-toggle').click();assert(d.querySelector('#kg-detail').textContent.includes('Older data'));assert(d.querySelector('#kg-detail').textContent.includes('expired or was revoked'));
+  assert.equal(d.querySelector('#kg-launch').textContent,'Open account terminal');assert.equal(search.placeholder,'Search name or username');
+});
+test('Kaggle verifies a token once, clears password inputs and never inserts token into monitoring state',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();d.querySelector('#kg-add').click();await settle();
+  const token='KGAT_fixture-renderer-token';d.querySelector('#kg-token-input').value=token;d.querySelector('#kg-label').value='<img src=x onerror=alert(1)>';
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));assert.equal(d.querySelector('#kg-token-input').value,'');await settle();
+  assert.equal(d.querySelector('#modal').open,false);assert.equal(d.querySelectorAll('.kg-account').length,4);assert.equal(d.querySelector('#kg-detail img'),null);assert(!d.querySelector('#kg-detail').textContent.includes(token));
+  d.querySelector('#kg-token').click();await settle();d.querySelector('#kg-token-input').value=token;d.querySelector('#modal-cancel').click();assert.equal(d.querySelector('#kg-token-input').value,'');
+});
+test('Kaggle setup guides missing dependencies and notebook pins can be managed',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();
+  const action=w.pad.action;w.pad.action=async(command,args)=>{const r=await action(command,args);if(command==='kaggleTools'){r.result.supported=false;r.state.kaggle.tool.supported=false;}return r;};
+  d.querySelector('#kg-add').click();await settle();assert.equal(d.querySelector('#kg-token-input'),null);assert(d.querySelector('#modal-body').textContent.includes('Cần cài'));
+  d.querySelector('#modal-cancel').click();d.querySelector('#kg-pin').click();d.querySelector('#kg-ref').value='padresearch/new-job';d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  assert(d.querySelector('#kg-detail').textContent.includes('padresearch/new-job'));d.querySelector('[data-kg-unpin="padresearch/new-job"]').click();await settle();assert.equal(d.querySelector('[data-kg-unpin="padresearch/new-job"]'),null);
+});
+test('Kaggle empty state and removal explain terminal credential lifetime',async t=>{
+  const w=dom(t,false);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();assert(d.querySelector('#kg-empty').textContent.includes('đầu tiên'));assert(d.querySelector('#kg-toolbar').classList.contains('hidden'));
+  const other=dom(t);await settle();const od=other.document;od.querySelector('[data-page=kaggle]').click();od.querySelector('#kg-remove').click();assert(od.querySelector('#modal-body').textContent.includes('Terminal đã mở vẫn giữ token'));od.querySelector('#modal-form').dispatchEvent(new other.Event('submit',{cancelable:true}));await settle();assert.equal(od.querySelectorAll('.kg-account').length,2);
+});
 test('scoped UI changes only the selected account and auto-switch policy, and translates separate account setup',async t=>{
   const w=dom(t);await settle();const d=w.document;
   d.querySelector('#use-gateway').click();await settle();
@@ -40,6 +70,7 @@ function dom(t,demo = true, editState = null) {
     window.pad.action = async (...args) => { const response = await action(...args); if (args[0] === 'state') editState(response.result); return response; };
   }
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/i18n.js'),'utf8'));
+  window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/kaggle.js'),'utf8'));
   window.eval(script); t.after(() => window.close()); return window;
 }
 test('renderer shows a useful empty state and disables quota refresh with no accounts',async t => {

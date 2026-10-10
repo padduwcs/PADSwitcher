@@ -1,5 +1,25 @@
 # PADSwitcher 1.13.0 — validation
 
+## Kaggle feature branch — 1.14.0-kaggle.1
+
+Isolated development branch `feature/kaggle-accounts`; not merged or released.
+
+- Node suite: 166 tests covering the existing Codex flows plus Kaggle vaults,
+  identity-bound token updates, rollback, concurrent reads, terminal isolation,
+  partial errors, shutdown cancellation and renderer workflows.
+- Python: three offline contract tests with the actual `kaggle 2.2.4` /
+  `kagglesdk 0.1.37` request/response types. No credentials or network calls.
+- Windows: simultaneous native PowerShell processes decrypt separate synthetic
+  DPAPI vaults; no plaintext credential files or token-bearing command arguments.
+- Electron: actual startup/IPC/Python probe and sample Kaggle UI in light/dark,
+  VI/EN and 1000/1260px layouts. The Python reader is unpacked from ASAR and
+  checked in the packaged app when the disposable SDK environment is present.
+- Quota reads, notebook status and parallel job submissions using real Kaggle
+  accounts remain to be verified before release. No Kaggle compute was consumed.
+
+See [Kaggle guide and implementation boundaries](docs/KAGGLE.md). Temporary
+screenshots, SDK environments and portable builds are excluded from source control.
+
 ## GPT Web removal — 1.13.0
 
 - The experimental GPT Web feature (builds 1.10–1.12) and its vendored companion were removed. The source tree

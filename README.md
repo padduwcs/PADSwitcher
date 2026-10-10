@@ -48,6 +48,17 @@ Muốn trở về cách dùng cũ: chọn lại agent **Codex** trong AI Chat. C
 
 ## Dùng hằng ngày
 
+### Kaggle: nhiều tài khoản và terminal song song
+
+Nhánh thử nghiệm này có trang **Kaggle** độc lập: lưu API token một lần, mở terminal riêng cho từng tài khoản, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
+
+1. Mở **Kaggle → Thiết lập**, cài Python 3.11+ và các công cụ bằng lệnh được cung cấp; bấm **Lưu & kiểm tra**.
+2. Tạo **API token** tại [Kaggle Settings](https://www.kaggle.com/settings), chọn **Thêm tài khoản**, nhập token và chọn thư mục làm việc. Lặp lại cho các tài khoản bạn có quyền sử dụng, theo điều khoản Kaggle.
+3. Chọn tài khoản → **Mở terminal tài khoản này**. Mỗi PowerShell giữ một tài khoản; có thể mở nhiều terminal để gửi các công việc khác nhau song song trong giới hạn Kaggle.
+4. Dùng **Làm mới** hoặc cập nhật tự động mỗi hai phút để đọc quota và lượt chạy. **Ghim notebook** nếu muốn theo dõi notebook cụ thể.
+
+Terminal đã mở giữ tài khoản khi đổi thư mục bằng `cd`. Terminal VS Code đang mở không tự nhận token; `python train.py` vẫn chạy local. GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).
+
 ### Dùng chung hoặc tài khoản riêng
 
 Mặc định VS Code, JetBrains và CLI qua PADSwitcher dùng chung tài khoản. Muốn tách:

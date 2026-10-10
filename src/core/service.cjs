@@ -67,6 +67,7 @@ class ProfileService extends EventEmitter {
       gateway: this.gateway?.view() || {status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0},
       vscode: this.vscode || {configuration:'unknown',helperPresent:false},
       jetbrains: this.jetbrains || {configuration:'notConfigured',runtimePresent:false},
+      kaggle: this.kaggle?.view() || {accounts:[],settings:{pythonPath:'',autoRefresh:true},tool:null,editing:false},
     };
   }
   changed() { this.emit('change',this.view()); }

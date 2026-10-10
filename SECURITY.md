@@ -10,6 +10,15 @@ Windows user permissions protect local data; software running as the same user
 can still access it. Do not share the app data directory, gateway connection files,
 auth files, tokens, or diagnostic archives containing these files.
 
+The Kaggle feature stores each API token in a separate Windows DPAPI vault.
+The read-only bridge uses explicit credentials; account terminals receive their
+token through process-local environment variables after decryption, without
+changing the machine’s default Kaggle credentials. Tokens are not included in
+renderer snapshots, command arguments, setup commands or app logs. A terminal
+retains its token until closed, even after removing an account or updating its
+token in PADSwitcher. Revoke the token on Kaggle to invalidate it everywhere.
+See [Kaggle boundaries](docs/KAGGLE.md) for monitoring coverage and storage details.
+
 Automatic switching is opt-in, limited to supported personal accounts and confirmed
 quota failures before response output. Reset credits always require explicit confirmation.
 See [routing boundaries](ROUTING.md) and [validation limits](VALIDATION.md).

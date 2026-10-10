@@ -35,6 +35,13 @@ app.disableHardwareAcceleration();
           await new Promise(resolve=>setTimeout(resolve,100));
         }
       };
+      const kgState=await action('state');assert.deepEqual(kgState.result.kaggle.accounts,[]);
+      const kagglePython=path.resolve('artifacts/kaggle-sdk-probe/Scripts/python.exe');
+      if(await fs.stat(kagglePython).then(()=>true,()=>false)){
+        assert((await action('kaggleSettings',{pythonPath:kagglePython,autoRefresh:false})).ok);
+        const tools=await action('kaggleTools');assert(tools.ok);assert(tools.result.supported,'Packaged Kaggle Python bridge must be unpacked and executable.');
+        console.log('Packaged Kaggle ASAR-unpacked bridge and official dependency probe: passed.');
+      }
       const imported=await action('import');assert(imported.ok);const started=await action('gateway',{id:imported.result});assert(started.ok);console.log('Packaged gateway startup passed.');
       assert.equal(started.state.version,require('../package.json').version);assert.equal(started.state.gateway.status,'ready');
       assert.equal(started.state.gateway.modelRouting,'request');
@@ -62,5 +69,6 @@ app.disableHardwareAcceleration();
       clearTimeout(timer);app.exit(0);
     }catch(e){clearTimeout(timer);await rpc?.close();const location=String(e.stack||'').split('\n').find(line=>line.includes('electron-packaged-smoke.cjs:'));console.error('Packaged verification failed:',e.code||e.name,e.code==='ERR_ASSERTION'?e.message:'',location?.trim()||'');app.exit(1);}
   }));
-  require('../dist/win-unpacked/resources/app.asar/src/main.cjs');
+  const packagedRoot=path.resolve(process.env.PADSWITCHER_PACKAGED_ROOT||'dist/win-unpacked');
+  require(path.join(packagedRoot,'resources/app.asar/src/main.cjs'));
 })().catch(e=>{clearTimeout(timer);console.error('Packaged QA could not initialize:',e.code||e.name,e.message);app.exit(1);});

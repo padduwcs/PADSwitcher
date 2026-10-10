@@ -21,3 +21,8 @@ PADSwitcher source is licensed under [MIT](LICENSE).
 
 The model router was informed by the request-fallback approach in 9router;
 PADSwitcher implements its own relay without copying its provider translation layer.
+
+The Kaggle feature uses user-installed Python, **kaggle** and **kagglesdk**;
+these packages are not bundled into the Windows executable. They retain their
+upstream licenses and notices. Kaggle is a separate service; PADSwitcher is an
+independent project. See the [official CLI](https://github.com/Kaggle/kaggle-cli).

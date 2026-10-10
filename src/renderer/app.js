@@ -118,6 +118,7 @@ function render() {
   $('#login-bar').classList.toggle('hidden',!state.login);
   if (!state.login) $('#login-detail').textContent = 'Chọn đúng tài khoản trên trình duyệt. Phiên hiện tại vẫn được giữ.';
   if (page !== 'settings' || !$('#settings-form').dataset.dirty) fillSettings();
+  window.padKaggleUI.render(state.kaggle, state.settings.workspace);
   syncAppearance(); ui.apply();
 }
 function renderDetail(p) {
@@ -233,7 +234,11 @@ function showModal(title,body,submit,button = 'Tiếp tục') {
   $('#modal-title').textContent = title; $('#modal-body').innerHTML = body; $('#modal-submit').textContent = button; $('#modal-submit').disabled = false; modalSubmit = submit;
   ui.apply($('#modal')); $('#modal').showModal(); $('#modal-body input')?.focus();
 }
-function closeModal() { $('#modal').close(); modalSubmit = null; }
+function clearModalSecrets() { document.querySelectorAll('#modal-body input[type=password]').forEach(input => { input.value = ''; }); }
+function closeModal() { clearModalSecrets(); $('#modal').close(); modalSubmit = null; }
+$('#modal').addEventListener('cancel',clearModalSecrets);
+$('#modal').addEventListener('cancel',event=>{if(modalSubmit&&$('#modal-submit').disabled)event.preventDefault();});
+$('#modal').addEventListener('close',clearModalSecrets);
 function accountModal(p = null) {
   showModal(p ? 'Đăng nhập lại' : 'Thêm tài khoản',`<p>Trình duyệt sẽ mở trang đăng nhập chính thức của OpenAI. Chọn ${p ? `<span class="confirm-name">${e(email(p))}</span>` : 'tài khoản bạn muốn thêm'}.</p>${p ? '' : '<label for="profile-label">Tên dễ nhớ (tùy chọn)</label><input id="profile-label" type="text" maxlength="80" placeholder="Ví dụ: Cá nhân · Plus">'}<label class="check-label"><input type="checkbox" id="device-login"> Dùng mã thiết bị nếu đăng nhập trình duyệt lỗi</label><p class="field-help">PADSwitcher không nhận mật khẩu. Mã thiết bị cần được bật trong cài đặt bảo mật ChatGPT.</p>`,async () => {
     const args = { label:p?.label || $('#profile-label').value, device:$('#device-login').checked, id:p?.id || null };
@@ -250,7 +255,7 @@ function navigate(next) {
   page = next;
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('hidden',el.id !== next+'-page'));
   document.querySelectorAll('.nav').forEach(el => {el.classList.toggle('active',el.dataset.page === next);if(el.dataset.page===next)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
-  $('#breadcrumb').textContent = ({accounts:'Tài khoản',connections:'Kết nối',settings:'Cài đặt',help:'Hướng dẫn'}[next]);
+  $('#breadcrumb').textContent = ({accounts:'Tài khoản',connections:'Kết nối',kaggle:'Kaggle',settings:'Cài đặt',help:'Hướng dẫn'}[next]);
   if (next === 'settings') fillSettings();
   ui.apply();
   document.documentElement.scrollTop=0;
@@ -265,7 +270,7 @@ document.addEventListener('click',event=>{const menu=$('.account-menu');if(menu.
 document.addEventListener('keydown',event=>{const menu=$('.account-menu');if(event.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary').focus();}});
 $('#refresh-all').onclick = async () => { const response = await call('refreshAll'); if (response) toast(state.profiles.some(p => p.lastError) ? 'Đã cập nhật các hồ sơ có thể kết nối. Xem chi tiết hồ sơ bị lỗi.' : 'Đã cập nhật quota các tài khoản.'); };
 $('#modal-close').onclick = closeModal; $('#modal-cancel').onclick = closeModal;
-$('#modal-form').onsubmit = async event => { event.preventDefault(); if (modalSubmit) { const submit = modalSubmit; $('#modal-submit').disabled = true; try { await submit(); } finally { $('#modal-submit').disabled = false; } } };
+$('#modal-form').onsubmit = async event => { event.preventDefault(); if (modalSubmit&&!$('#modal-submit').disabled) { const submit = modalSubmit; $('#modal-submit').disabled = true; $('#modal-close').disabled=true; $('#modal-cancel').disabled=true; try { await submit(); } finally { $('#modal-submit').disabled = false; $('#modal-close').disabled=false; $('#modal-cancel').disabled=false; } } };
 $('#cancel-login').onclick = () => call('cancelLogin');
 document.querySelectorAll('[data-pick]').forEach(button => button.onclick = async () => { const response = await call('pick',{kind:button.dataset.pick}); if (response?.result) { $('#'+button.dataset.pick).value = response.result; $('#settings-form').dataset.dirty = '1'; } });
 $('#autoRefresh').onchange = () => { $('#settings-form').dataset.dirty = '1'; };
@@ -316,8 +321,9 @@ $('#restore-trash').onclick = async () => {
     if (restored) { selectedId = restored.result; navigate('accounts'); render(); }
   },'Khôi phục hồ sơ');
 };
+window.padKaggleUI.init({call,showModal,closeModal,toast});
 api.onState(next => { state = next; render(); });
 api.onDevice(device => { $('#login-detail').textContent = ui.t(`Mã thiết bị: ${device.userCode} · Nhập mã trên trang OpenAI vừa mở.`); });
 api.onRefreshError?.(error => toast(ui.error(error),true));
 call('state').then(response => { if (response) { state = response.result; render(); } });
-setInterval(() => { if (state && page === 'accounts' && !state.busy && !$('#modal').open) render(); },30000);
+setInterval(() => { if (state && ['accounts','kaggle'].includes(page) && !state.busy && !$('#modal').open) render(); },30000);

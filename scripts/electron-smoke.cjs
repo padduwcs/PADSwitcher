@@ -18,12 +18,18 @@ let timeout;
         await win.webContents.executeJavaScript('document.fonts.ready.then(()=>true)');
         const image = await win.webContents.capturePage(); await fs.writeFile(path.join(root,'startup.png'),image.toPNG());
         console.log('Actual Electron startup, preload bridge, sandbox and CSP: passed.');
+        assert.deepEqual(data.bridgeResponse.result.kaggle.accounts,[]);
+        const kagglePython=path.resolve('artifacts/kaggle-sdk-probe/Scripts/python.exe');
+        if(await fs.stat(kagglePython).then(()=>true,()=>false)){
+          const configured=await win.webContents.executeJavaScript('window.pad.action("kaggleSettings",'+JSON.stringify({pythonPath:kagglePython,autoRefresh:false})+')');assert(configured.ok);
+          const tools=await win.webContents.executeJavaScript('window.pad.action("kaggleTools")');assert(tools.ok);assert(tools.result.supported);console.log('Actual Kaggle Python bridge and official CLI dependency probe: passed.');
+        }
         const fixtureRoot = path.join(root,'renderer-fixture'); await fs.mkdir(fixtureRoot,{recursive:true});
         await fs.mkdir(path.join(root,'assets'),{recursive:true});
         await fs.mkdir(path.join(root,'assets/fonts'),{recursive:true});
         for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf','OFL.txt'])await fs.copyFile(path.join(__dirname,'../src/assets/fonts',file),path.join(root,'assets/fonts',file));
         for (const file of ['padswitcher-symbol.png','padswitcher-logo.png','padswitcher-emblem.png']) await fs.copyFile(path.join(__dirname,'../src/assets',file),path.join(root,'assets',file));
-        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','app.js']) {
+        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','kaggle.css','kaggle.js','app.js']) {
           let content = await fs.readFile(path.join(__dirname,'../src/renderer',file),'utf8');
           if (file === 'index.html') content = content.replace('<script src="app.js" defer></script>','<script src="preview.js" defer></script><script src="app.js" defer></script>');
           await fs.writeFile(path.join(fixtureRoot,file),content);
@@ -128,7 +134,22 @@ let timeout;
           const account=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'separate-accounts-'+variant+'.png'),account);
           preview.setSize(1260,900);
         }
-        preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, quotas, reset cancellation and separate account controls: passed.');
+        for(const variant of ['light-vi','dark-en']){
+          await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();document.querySelector('[data-page=kaggle]').click();document.querySelector('#toasts').replaceChildren();");
+          for(const width of [1260,1000]){
+            preview.setSize(width,width===1000?680:900);
+            const metrics=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,accounts:document.querySelectorAll('.kg-account').length,launchVisible:document.querySelector('#kg-launch').getBoundingClientRect().bottom<=innerHeight,quota:document.querySelector('.kg-quota>b').textContent,runs:document.querySelectorAll('.kg-notebook').length};})()");
+            assert.equal(metrics.overflow,false);assert.equal(metrics.accounts,3);assert.equal(metrics.launchVisible,true);assert.equal(metrics.runs,3);assert(metrics.quota.includes(variant.endsWith('en')?'18.5':'18,5'));
+            await new Promise(resolve=>setTimeout(resolve,100));
+            const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-'+variant+'-'+width+'.png'),frame);
+          }
+          preview.setSize(1260,900);
+          await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#kg-add').click();await new Promise(r=>setTimeout(r,100));return true;})()");
+          const modal=await preview.webContents.executeJavaScript("({hasToken:document.querySelector('#kg-token-input')?.type==='password',overflow:document.querySelector('#modal').getBoundingClientRect().bottom>innerHeight})");assert(modal.hasToken);assert.equal(modal.overflow,false);
+          const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-add-'+variant+'.png'),frame);
+          await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
+        }
+        preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, quotas, reset cancellation, separate account controls and Kaggle at 1260/1000px: passed.');
         clearTimeout(timeout); app.exit(0);
       } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.message); app.exit(1); }
     });

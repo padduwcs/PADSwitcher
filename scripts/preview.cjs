@@ -4,7 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const mock = require('./preview-data.cjs');
 const root = path.resolve(__dirname,'../src/renderer');
-const allowed = new Map([['/index.html','text/html; charset=utf-8'],['/styles.css','text/css; charset=utf-8'],['/branding.css','text/css; charset=utf-8'],['/app.js','text/javascript; charset=utf-8'],['/i18n.js','text/javascript; charset=utf-8'],['/themes.css','text/css; charset=utf-8']]);
+const allowed = new Map([['/index.html','text/html; charset=utf-8'],['/styles.css','text/css; charset=utf-8'],['/branding.css','text/css; charset=utf-8'],['/app.js','text/javascript; charset=utf-8'],['/i18n.js','text/javascript; charset=utf-8'],['/themes.css','text/css; charset=utf-8'],['/kaggle.css','text/css; charset=utf-8'],['/kaggle.js','text/javascript; charset=utf-8']]);
 const assets = new Map([['/assets/padswitcher-symbol.png','padswitcher-symbol.png'],['/assets/padswitcher-logo.png','padswitcher-logo.png'],['/assets/padswitcher-emblem.png','padswitcher-emblem.png']]);
 for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf'])assets.set('/assets/fonts/'+file,'fonts/'+file);
 const server = http.createServer(async (req,res) => {

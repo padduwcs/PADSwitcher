@@ -3,12 +3,13 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, clipboard } = re
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { ProfileService } = require('./core/service.cjs');
+const { KaggleService, notebookRef } = require('./core/kaggle.cjs');
 const { createQuotaRefresher } = require('./core/quota-refresh.cjs');
 const { GatewayHub } = require('./core/gateway-hub.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { JetBrainsIntegration } = require('./core/jetbrains.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
-let window, service, gateway, integration, jetbrains, tray, timer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
+let window, service, kaggle, gateway, integration, jetbrains, tray, timer, kaggleTimer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
 let uiLocale='vi';
 const text=(vi,en)=>uiLocale==='en'?en:vi;
 function updateTray() {
@@ -31,6 +32,10 @@ async function openAuth(url) {
 async function start() {
   service = new ProfileService(path.join(app.getPath('appData'),'PADSwitcher','data'));
   await service.init();
+  kaggle = new KaggleService(service.root);
+  try{await kaggle.init();}catch(error){kaggle.initError=publicError(error);}
+  service.kaggle = kaggle;
+  kaggle.on('change',()=>service.changed());
   gateway=new GatewayHub(service);integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);
   const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const [next,jb]=await Promise.all([integration.status(),jetbrains.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)){service.vscode=next;service.jetbrains=jb;service.changed();}})().finally(()=>{integrationFlight=null;}));
   await checkIntegration();
@@ -49,6 +54,26 @@ async function start() {
       if(['vi','en'].includes(args.locale)&&uiLocale!==args.locale){uiLocale=args.locale;updateTray();}
       let result;
       switch(command) {
+        case 'kaggleAdd': result=await kaggle.add(args);break;
+        case 'kaggleEdit': await kaggle.edit(args);break;
+        case 'kaggleRemove': await kaggle.remove(args.id);break;
+        case 'kaggleRefresh': await kaggle.refresh(args.id);break;
+        case 'kaggleRefreshAll': await kaggle.refreshAll();break;
+        case 'kaggleLaunch': await kaggle.launch(args.id,uiLocale);break;
+        case 'kaggleSettings': await kaggle.settings(args);break;
+        case 'kaggleTools': result=await kaggle.checkTools(true);break;
+        case 'kaggleWatch': await kaggle.watch(args.id,args.ref,args.remove===true);break;
+        case 'kaggleSetupCopy': {
+          const tool=await kaggle.checkTools();
+          const python=tool.executable||kaggle.state.settings.pythonPath;
+          clipboard.writeText((python?"& '"+python.replaceAll("'","''")+"'":"py -3")+" -m pip install 'kaggle>=2.2.4,<3' 'kagglesdk>=0.1.37,<1'");break;
+        }
+        case 'kaggleOpen': {
+          const urls={settings:'https://www.kaggle.com/settings',docs:'https://github.com/Kaggle/kaggle-cli',python:'https://www.python.org/downloads/windows/'};
+          const url=args.ref?'https://www.kaggle.com/code/'+notebookRef(args.ref):urls[args.kind];
+          if(!url)throw new UserError('Đường dẫn Kaggle không hợp lệ.','KAGGLE_REF');
+          await shell.openExternal(url);break;
+        }
         case 'state': result = service.view(); break;
         case 'import': result = await service.importCurrent(args.label); break;
         case 'add': result = await service.addAccount(args.label,openAuth,args.device === true,args.id || null,device => window.webContents.send('pad:device',device)); break;
@@ -95,8 +120,9 @@ async function start() {
         case 'settings': result = await service.settings(args); break;
         case 'diagnostics': result = await service.diagnostics(); break;
         case 'pick': {
-          if (!['codexPath','workspace','desktopHome'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
-          const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'codexPath' ? text('Chọn codex.exe chính thức','Choose official codex.exe') : text('Chọn thư mục','Choose folder'), properties: args.kind === 'codexPath' ? ['openFile'] : ['openDirectory'], ...(args.kind === 'codexPath' ? { filters:[{name:'Codex',extensions:['exe']}] } : {}) });
+          if (!['codexPath','workspace','desktopHome','kaggleWorkspace','kagglePython'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
+          const executable=['codexPath','kagglePython'].includes(args.kind);
+          const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'kagglePython' ? text('Chọn Python 3.11+ (python.exe)','Choose Python 3.11+ (python.exe)') : executable ? text('Chọn codex.exe chính thức','Choose official codex.exe') : text('Chọn thư mục','Choose folder'), properties: executable ? ['openFile'] : ['openDirectory'], ...(executable ? { filters:[{name:'Executable',extensions:['exe']}] } : {}) });
           result = selected.canceled ? null : selected.filePaths[0]; break;
         }
         case 'openData': await shell.openPath(service.root); break;
@@ -129,24 +155,27 @@ async function start() {
   window.on('focus',()=>checkIntegration());
   integrationTimer=setInterval(()=>checkIntegration(),3000);
   timer = setInterval(() => refresh('periodic'), 60 * 1000);
+  const refreshKaggle=()=>{if(kaggle.state.settings.autoRefresh)kaggle.refreshAll(true).catch(error=>{if(!window?.isDestroyed())window.webContents.send('pad:refresh-error',publicError(error));});};
+  refreshKaggle(); kaggleTimer=setInterval(refreshKaggle,120000);
   window.on('close',event => {
     if (quitting) return;
     if(['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}
-    if (service.busy && !service.login) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:'Thao tác đang hoàn tất',detail:'Hãy chờ lưu phiên xong trước khi đóng PADSwitcher.'}); return; }
+    if ((service.busy && !service.login)||kaggle.editing) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:text('Thao tác đang hoàn tất','Operation in progress'),detail:text('Hãy chờ lưu tài khoản xong trước khi đóng PADSwitcher.','Wait for the account operation to finish before closing PADSwitcher.')}); return; }
     if (service.running.size) {
       const response = dialog.showMessageBoxSync(window,{type:'question',buttons:['Giữ PADSwitcher mở','Đóng trình quản lý'],defaultId:0,cancelId:0,message:'CLI vẫn đang chạy',detail:'Nếu đóng trình quản lý, các cửa sổ CLI tiếp tục chạy. Phiên riêng sẽ được mã hóa lại khi đóng CLI bình thường; mở PADSwitcher lại để kiểm tra trạng thái sau đó.'});
       if (response === 0) { event.preventDefault(); return; }
     }
     if (service.login) { event.preventDefault(); service.cancelLogin(); const wait = setInterval(() => { if (!service.busy) { clearInterval(wait); quitting = true; window.close(); } },100); }
   });
-  app.on('window-all-closed',() => { clearInterval(timer); clearInterval(integrationTimer); app.quit(); });
+  app.on('window-all-closed',() => { clearInterval(timer); clearInterval(integrationTimer); clearInterval(kaggleTimer); app.quit(); });
   app.on('before-quit',event => {
     if(quitting)return;
-    if(service?.busy){event.preventDefault();if(service.login)service.cancelLogin();return;}
+    if(service?.busy||kaggle?.editing){event.preventDefault();if(service.login)service.cancelLogin();return;}
     if(gateway.turns.size){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:text('Codex còn lượt đang chạy','Codex has active turns'),detail:text('Chờ hoàn tất hoặc chọn Dừng gateway trong PADSwitcher trước khi thoát.','Wait for completion or disconnect Codex in PADSwitcher before quitting.')});return;}
-    if(gateway.status!=='stopped'){
+    if(gateway.status!=='stopped'||kaggle.flights.size||kaggle.toolFlight||kaggle.saveFlight){
       event.preventDefault();if(shutdown)return;shutdown=true;
-      gateway.stop().then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});
+      clearInterval(kaggleTimer);
+      Promise.all([gateway.stop(),kaggle.shutdown()]).then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});
     }else{quitting=true;clearInterval(timer);tray?.destroy();}
   });
 }

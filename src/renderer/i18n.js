@@ -142,6 +142,30 @@ window.padUI = (() => {
     'Đã khôi phục hồ sơ.':'Account restored.',
     'BẢN XEM TRƯỚC · DỮ LIỆU MẪU':'PREVIEW · SAMPLE DATA'
   });
+  Object.assign(dictionary, {
+    'API token không hợp lệ. Dùng token được tạo trong cài đặt Kaggle.':'Invalid API token. Use a token created in Kaggle settings.',
+    'Token Kaggle đã hết hạn hoặc bị thu hồi. Cập nhật token của tài khoản này.':'Your Kaggle token expired or was revoked. Update this account’s token.',
+    'Token thuộc tài khoản Kaggle khác. Chưa thay thông tin đã lưu.':'This token belongs to another Kaggle account. Saved credentials were not replaced.',
+    'Kaggle từ chối quyền truy cập thông tin này.':'Kaggle denied access to this information.',
+    'Không tìm thấy notebook Kaggle hoặc bạn chưa có quyền xem.':'Notebook not found or this account cannot access it.',
+    'Kaggle đang giới hạn yêu cầu. Chờ trước khi làm mới lại.':'Kaggle is rate limiting requests. Wait before refreshing again.',
+    'Không đọc được Kaggle. Kiểm tra mạng rồi thử lại.':'Could not read Kaggle. Check your connection and try again.',
+    'Kaggle trả về dữ liệu chưa hỗ trợ. Kiểm tra phiên bản công cụ.':'Unsupported Kaggle response. Check your tool versions.',
+    'Cần Python 3.11+, kaggle 2.2.4+ và kagglesdk 0.1.37+. Mở Thiết lập Kaggle.':'Requires Python 3.11+, kaggle 2.2.4+ and kagglesdk 0.1.37+. Open Kaggle setup.',
+    'Không chạy được Python. Chọn python.exe trong Thiết lập Kaggle.':'Could not run Python. Choose python.exe in Kaggle setup.',
+    'Đọc Kaggle quá lâu. Thông tin cũ được giữ; hãy thử lại sau.':'Kaggle refresh timed out. Previous data was retained. Try again later.',
+    'Dùng đường dẫn notebook trên kaggle.com.':'Use a notebook URL on kaggle.com.',
+    'Nhập notebook dạng username/notebook-slug hoặc URL Kaggle.':'Enter username/notebook-slug or a Kaggle notebook URL.',
+    'Không tìm thấy tài khoản Kaggle.':'Kaggle account not found.',
+    'Một thao tác Kaggle khác đang chạy.':'Another Kaggle operation is running.',
+    'Chờ cập nhật Kaggle hoàn tất.':'Wait for the Kaggle refresh to finish.',
+    'Chọn thư mục làm việc tuyệt đối.':'Choose an absolute workspace folder.',
+    'Tài khoản Kaggle này đã được thêm. Dùng Cập nhật token.':'This account is already saved. Use Update token.',
+    'Đã đạt giới hạn 100 tài khoản đã lưu.':'The limit of 100 saved accounts has been reached.',
+    'Cấu hình Kaggle không hợp lệ.':'Invalid Kaggle settings.',
+    'Theo dõi tối đa 20 notebook ghim cho mỗi tài khoản.':'Monitor up to 20 pinned notebooks per account.',
+    'Dữ liệu Kaggle bị lỗi. Giữ thư mục dữ liệu để kiểm tra.':'Kaggle storage is invalid. Keep the data folder for inspection.'
+  });
   const patterns = [
     [/^Cập nhật (\d+) phút trước · Dữ liệu cũ$/, 'Updated $1 minutes ago · Outdated data'],
     [/^Cập nhật (\d+) giờ trước · Dữ liệu cũ$/, 'Updated $1 hours ago · Outdated data'],

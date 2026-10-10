@@ -34,6 +34,12 @@ credits or require logging into a real account. The packaged smoke check runs af
 For a release, publish the tested executable and its SHA-256 file through GitHub Releases.
 The portable build currently has no code-signing certificate or automatic updater.
 
+For an isolated Kaggle preview build, use
+`npx electron-builder --win portable --config.directories.output=dist/kaggle-preview`.
+Set `PADSWITCHER_PACKAGED_ROOT` to the absolute path of
+`dist/kaggle-preview/win-unpacked` when running the packaged smoke script.
+This keeps the ordinary release output separate.
+
 ## Optional real-account diagnostics
 
 Run these only when deliberately authorizing access to your own accounts:
@@ -56,6 +62,12 @@ Run these only when deliberately authorizing access to your own accounts:
 
 Never test reset consumption with a real account as part of routine checks.
 Do not commit account data, generated connection files, logs or QA directories.
+
+The Kaggle feature has no real-account checks in the routine suite. Its optional
+offline Python contract tests require Python 3.11+, `kaggle>=2.2.4,<3` and
+`kagglesdk>=0.1.37,<1`. Run `python -I test/kaggle-reader-test.py` using an
+interpreter with those packages. See [Kaggle](KAGGLE.md) for the independent
+terminal design, API coverage and the manual checks required before release.
 
 ## Layout
 

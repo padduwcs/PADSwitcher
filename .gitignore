@@ -7,3 +7,5 @@ auth.json
 *.dpapi
 .preview/
 src/assets/PADCodex.exe
+__pycache__/
+*.pyc
