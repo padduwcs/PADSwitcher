@@ -79,6 +79,14 @@ class Contract(unittest.TestCase):
     def read(self, client, **fields):
         return reader.read_account({"action": "refresh", "token": TOKEN, **fields}, lambda: client)
 
+    def test_supported_package_version_bounds(self):
+        for version in ("2.2.4", "2.2.4.post1", "2.3.0"):
+            self.assertTrue(reader.version_ok(version, (2, 2, 4), (3, 0, 0)))
+        for version in (None, "2.2.3", "3.0.0", "2.2.4rc1"):
+            self.assertFalse(reader.version_ok(version, (2, 2, 4), (3, 0, 0)))
+        self.assertTrue(reader.version_ok("0.1.37", (0, 1, 37), (1, 0, 0)))
+        self.assertFalse(reader.version_ok("1.0.0", (0, 1, 37), (1, 0, 0)))
+
     def test_versions_and_quota_units(self):
         self.assertTrue(reader.versions()["supported"])
         client = Client()

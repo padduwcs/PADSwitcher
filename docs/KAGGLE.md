@@ -1,6 +1,6 @@
 # Kaggle account management
 
-Feature branch: `feature/kaggle-accounts`. This feature is separate from the Codex gateway and can be used without configuring a Codex connection.
+Available in PADSwitcher 1.14.0. This feature is separate from the Codex gateway and can be used without configuring a Codex connection.
 
 ## Luồng sử dụng
 
@@ -54,6 +54,6 @@ For the real SDK request/response contract, install the stated packages in a dis
 
 This offline suite uses real SDK model types and fixture clients; it makes no Kaggle requests. Electron smoke checks include the Kaggle page in light/dark, VI/EN and 1000/1260px layouts. If `artifacts/kaggle-sdk-probe/Scripts/python.exe` exists, startup and packaged smoke also verify the actual Python bridge and tool detection without authentication.
 
-Before integrating into the release branch, use two authorized real Kaggle accounts to verify token creation/revocation, account-specific CLI submissions, parallel jobs, quota and private notebook status. These live workflows have not been executed by the automated checks; they require real tokens and consume Kaggle compute when jobs run.
+Live acceptance checks use two authorized real Kaggle accounts to verify token creation/revocation, account-specific CLI submissions, parallel jobs, quota and private notebook status. These workflows have not been executed by the automated checks; they require real tokens and consume Kaggle compute when jobs run.
 
 Primary references: [official Kaggle CLI](https://github.com/Kaggle/kaggle-cli), [Kaggle API documentation](https://www.kaggle.com/docs/api), [Kaggle Settings](https://www.kaggle.com/settings). The implementation was checked against locally installed `kaggle 2.2.4` and `kagglesdk 0.1.37`.

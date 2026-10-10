@@ -1,21 +1,27 @@
-# PADSwitcher 1.13.0 — validation
+# PADSwitcher 1.14.0 — validation
 
-## Kaggle feature branch — 1.14.0-kaggle.1
+## Kaggle account management — 1.14.0
 
-Isolated development branch `feature/kaggle-accounts`; not merged or released.
+Validated on Windows x64 on 2026-10-11 using isolated data. Codex routing remains
+covered by the existing regression suite and native loopback protocol checks.
 
-- Node suite: 166 tests covering the existing Codex flows plus Kaggle vaults,
+- Node suite: 167 passing tests covering the existing Codex flows plus Kaggle vaults,
   identity-bound token updates, rollback, concurrent reads, terminal isolation,
-  partial errors, shutdown cancellation and renderer workflows.
-- Python: three offline contract tests with the actual `kaggle 2.2.4` /
+  partial errors, shutdown cancellation, interpreter selection and renderer workflows.
+- Python: four passing offline contract tests with the actual `kaggle 2.2.4` /
   `kagglesdk 0.1.37` request/response types. No credentials or network calls.
 - Windows: simultaneous native PowerShell processes decrypt separate synthetic
   DPAPI vaults; no plaintext credential files or token-bearing command arguments.
 - Electron: actual startup/IPC/Python probe and sample Kaggle UI in light/dark,
   VI/EN and 1000/1260px layouts. The Python reader is unpacked from ASAR and
-  checked in the packaged app when the disposable SDK environment is present.
+  checked in the packaged app using the disposable SDK environment. CI installs
+  these exact SDK versions and runs the offline contracts and bridge probes.
+- Syntax, isolated DPAPI/guardian smoke, native Codex protocol fixtures, Electron
+  UI smoke and the Windows portable build pass. The packaged check verifies
+  ASAR/helper extraction, the stdio bridge, separate routes, tray close and an
+  unchanged fixture login.
 - Quota reads, notebook status and parallel job submissions using real Kaggle
-  accounts remain to be verified before release. No Kaggle compute was consumed.
+  accounts remain unverified. No Kaggle compute was consumed.
 
 See [Kaggle guide and implementation boundaries](docs/KAGGLE.md). Temporary
 screenshots, SDK environments and portable builds are excluded from source control.

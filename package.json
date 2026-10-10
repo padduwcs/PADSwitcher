@@ -1,6 +1,6 @@
 {
   "name": "padswitcher",
-  "version": "1.14.0-kaggle.1",
+  "version": "1.14.0",
   "description": "Profile Account Directory Switcher — Codex and Kaggle account manager for Windows",
   "private": true,
   "main": "src/main.cjs",

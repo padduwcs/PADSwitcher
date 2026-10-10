@@ -19,10 +19,19 @@ newer versions need compatibility verification when their protocol changes.
 ```powershell
 npm run check
 npm test
+& ./artifacts/kaggle-sdk-probe/Scripts/python.exe -I test/kaggle-reader-test.py
 npm run smoke
+npm run smoke:protocol
 npm run smoke:ui
 npm run dist
 node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
+```
+
+The Python contract check requires an isolated environment. CI creates it with:
+
+```powershell
+py -3.12 -m venv artifacts/kaggle-sdk-probe
+& ./artifacts/kaggle-sdk-probe/Scripts/python.exe -m pip install 'kaggle==2.2.4' 'kagglesdk==0.1.37'
 ```
 
 These checks use fixtures and disposable app data. They do not consume real reset
@@ -34,10 +43,10 @@ credits or require logging into a real account. The packaged smoke check runs af
 For a release, publish the tested executable and its SHA-256 file through GitHub Releases.
 The portable build currently has no code-signing certificate or automatic updater.
 
-For an isolated Kaggle preview build, use
-`npx electron-builder --win portable --config.directories.output=dist/kaggle-preview`.
+For an isolated development build, use
+`npx electron-builder --win portable --config.directories.output=dist/preview`.
 Set `PADSWITCHER_PACKAGED_ROOT` to the absolute path of
-`dist/kaggle-preview/win-unpacked` when running the packaged smoke script.
+`dist/preview/win-unpacked` when running the packaged smoke script.
 This keeps the ordinary release output separate.
 
 ## Optional real-account diagnostics
@@ -67,7 +76,7 @@ The Kaggle feature has no real-account checks in the routine suite. Its optional
 offline Python contract tests require Python 3.11+, `kaggle>=2.2.4,<3` and
 `kagglesdk>=0.1.37,<1`. Run `python -I test/kaggle-reader-test.py` using an
 interpreter with those packages. See [Kaggle](KAGGLE.md) for the independent
-terminal design, API coverage and the manual checks required before release.
+terminal design, API coverage and the remaining live acceptance checks.
 
 ## Layout
 

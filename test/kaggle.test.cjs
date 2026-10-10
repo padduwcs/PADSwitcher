@@ -73,6 +73,18 @@ test('failed metadata save rolls back token replacement and account removal',asy
   await assert.rejects(f.k.remove(a));assert.equal(await f.k.loadToken(a),tokenA);assert.equal(f.k.view().accounts.length,1);
   f.k.save=save;await f.k.shutdown();
 });
+
+test('automatic Python detection prefers a supported interpreter and retains an install target when neither is ready',async t=>{
+  const f=await setup(t),probes=[];
+  const info=python=>({ok:true,executable:path.join(f.directory,python,'python.exe'),scriptsPath:f.directory,python:'3.12.10',supported:python==='python3.exe'});
+  f.k.bridge=async(python)=>{probes.push(python);return info(python);};
+  assert.equal((await f.k.checkTools()).executable,info('python3.exe').executable);assert.deepEqual(probes,['python.exe','python3.exe']);
+  f.k.bridge=async(python)=>({...info(python),supported:false});
+  const missing=await f.k.checkTools(true);assert.equal(missing.supported,false);assert.equal(missing.executable,info('python.exe').executable);
+  await f.k.settings({pythonPath:info('custom').executable,autoRefresh:false});
+  probes.length=0;f.k.bridge=async(python)=>{probes.push(python);return {...info('custom'),supported:true};};
+  assert.equal((await f.k.checkTools()).supported,true);assert.deepEqual(probes,[info('custom').executable]);
+});
 test('subprocess environment excludes inherited Kaggle credentials and Python hooks',()=>{
   const old={};for(const key of ['KAGGLE_API_TOKEN','KAGGLE_KEY','PADSWITCHER_KAGGLE_VAULT','PYTHONPATH']){old[key]=process.env[key];process.env[key]='fixture-secret';}
   try{const env=safeEnvironment();for(const key of Object.keys(old))assert.equal(env[key],undefined);assert.equal(env.SystemRoot,process.env.SystemRoot);}

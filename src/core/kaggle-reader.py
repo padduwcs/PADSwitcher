@@ -25,16 +25,16 @@ def versions():
         except importlib.metadata.PackageNotFoundError:
             result[package] = None
     result["supported"] = (sys.version_info >= (3, 11)
-                           and version_ok(result["kaggle"], (2, 2, 4))
-                           and version_ok(result["kagglesdk"], (0, 1, 37)))
+                           and version_ok(result["kaggle"], (2, 2, 4), (3, 0, 0))
+                           and version_ok(result["kagglesdk"], (0, 1, 37), (1, 0, 0)))
     if os.name == "nt":
         result["supported"] = result["supported"] and os.path.isfile(os.path.join(scripts, "kaggle.exe"))
     return result
 
 
-def version_ok(value, minimum):
+def version_ok(value, minimum, maximum):
     match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:\.post\d+)?", value or "")
-    return bool(match and tuple(map(int, match.groups())) >= minimum)
+    return bool(match and minimum <= tuple(map(int, match.groups())) < maximum)
 
 
 def error_code(error):

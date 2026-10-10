@@ -19,6 +19,15 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install official Kaggle tools in an isolated environment
+        run: |
+          python -m venv artifacts/kaggle-sdk-probe
+          & ./artifacts/kaggle-sdk-probe/Scripts/python.exe -m pip install 'kaggle==2.2.4' 'kagglesdk==0.1.37'
+      - name: Offline Kaggle SDK contract checks
+        run: '& ./artifacts/kaggle-sdk-probe/Scripts/python.exe -I test/kaggle-reader-test.py'
       - name: Install Codex for isolated protocol checks
         run: npm install --global @openai/codex@0.160.0
       - run: npm run check

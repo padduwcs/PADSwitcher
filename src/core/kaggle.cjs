@@ -143,7 +143,7 @@ class KaggleService extends EventEmitter {
     this.toolFlight=(async()=>{
       const candidates=this.state.settings.pythonPath?[this.state.settings.pythonPath]:['python.exe','python3.exe'];
       let found;
-      for(const candidate of candidates){if(this.stopping)throw fail('KAGGLE_CANCELLED');try{const info=await this.executeBridge(candidate,{action:'probe'},15000);if(info.ok&&typeof info.executable==='string'&&path.isAbsolute(info.executable)){found=info;break;}}catch{}}
+      for(const candidate of candidates){if(this.stopping)throw fail('KAGGLE_CANCELLED');try{const info=await this.executeBridge(candidate,{action:'probe'},15000);if(info.ok&&typeof info.executable==='string'&&path.isAbsolute(info.executable)){found||=info;if(info.supported===true&&typeof info.scriptsPath==='string'&&path.isAbsolute(info.scriptsPath)){found=info;break;}}}catch{}}
       if(this.stopping)throw fail('KAGGLE_CANCELLED');
       this.tool=found?{python:clean(found.python,40),kaggle:clean(found.kaggle,40)||null,kagglesdk:clean(found.kagglesdk,40)||null,executable:found.executable,scriptsPath:found.scriptsPath,supported:found.supported===true&&typeof found.scriptsPath==='string'&&path.isAbsolute(found.scriptsPath)}:{supported:false,code:'KAGGLE_PYTHON'};
       this.changed();return this.tool;

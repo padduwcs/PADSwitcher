@@ -50,7 +50,7 @@ Muốn trở về cách dùng cũ: chọn lại agent **Codex** trong AI Chat. C
 
 ### Kaggle: nhiều tài khoản và terminal song song
 
-Nhánh thử nghiệm này có trang **Kaggle** độc lập: lưu API token một lần, mở terminal riêng cho từng tài khoản, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
+Bản **1.14.0** có trang **Kaggle** độc lập: lưu API token một lần, mở terminal riêng cho từng tài khoản, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
 
 1. Mở **Kaggle → Thiết lập**, cài Python 3.11+ và các công cụ bằng lệnh được cung cấp; bấm **Lưu & kiểm tra**.
 2. Tạo **API token** tại [Kaggle Settings](https://www.kaggle.com/settings), chọn **Thêm tài khoản**, nhập token và chọn thư mục làm việc. Lặp lại cho các tài khoản bạn có quyền sử dụng, theo điều khoản Kaggle.

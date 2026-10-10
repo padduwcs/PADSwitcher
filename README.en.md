@@ -50,7 +50,7 @@ To return to normal operation, select the regular **Codex** agent. Optionally re
 
 ### Kaggle: multiple accounts and parallel terminals
 
-This feature branch adds an independent **Kaggle** page: save API tokens once, open an account-specific terminal, and monitor GPU/TPU quota and notebook runs. Keep writing code in VS Code and submit it using the official Kaggle CLI. PADSwitcher manages accounts and reads status; it does not split jobs or rotate accounts.
+Version **1.14.0** adds an independent **Kaggle** page: save API tokens once, open an account-specific terminal, and monitor GPU/TPU quota and notebook runs. Keep writing code in VS Code and submit it using the official Kaggle CLI. PADSwitcher manages accounts and reads status; it does not split jobs or rotate accounts.
 
 1. Open **Kaggle → Setup**, install Python 3.11+ and the tools using the provided command, then **Save & check**.
 2. Create an **API token** in [Kaggle Settings](https://www.kaggle.com/settings), choose **Add account**, paste the token and choose a workspace. Repeat for accounts you are authorized to use, under Kaggle’s terms.
