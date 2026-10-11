@@ -50,14 +50,14 @@ Muốn trở về cách dùng cũ: chọn lại agent **Codex** trong AI Chat. C
 
 ### Kaggle: nhiều tài khoản và terminal song song
 
-Bản **1.14.0** có trang **Kaggle** độc lập: lưu API token một lần, mở terminal riêng cho từng tài khoản, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
+Bản **1.14.1** có trang **Kaggle** độc lập: lưu API token một lần, chọn tài khoản trong terminal đang mở hoặc mở terminal mới, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
 
 1. Mở **Kaggle → Thiết lập**, cài Python 3.11+ và các công cụ bằng lệnh được cung cấp; bấm **Lưu & kiểm tra**.
 2. Tạo **API token** tại [Kaggle Settings](https://www.kaggle.com/settings), chọn **Thêm tài khoản**, nhập token và chọn thư mục làm việc. Lặp lại cho các tài khoản bạn có quyền sử dụng, theo điều khoản Kaggle.
-3. Chọn tài khoản → **Mở terminal tài khoản này**. Mỗi PowerShell giữ một tài khoản; có thể mở nhiều terminal để gửi các công việc khác nhau song song trong giới hạn Kaggle.
+3. Chọn tài khoản → **Dùng ở terminal đang mở**, dán lệnh vào PowerShell trong VS Code hoặc cửa sổ PowerShell của bạn. Muốn gọi lệnh ngắn, bật **Thiết lập lệnh padkaggle** một lần; terminal mới dùng `padkaggle list`, `padkaggle use username`, `padkaggle status` và `padkaggle off`. Bạn vẫn có thể **Mở terminal tài khoản này** từ ứng dụng.
 4. Dùng **Làm mới** hoặc cập nhật tự động mỗi hai phút để đọc quota và lượt chạy. **Ghim notebook** nếu muốn theo dõi notebook cụ thể.
 
-Terminal đã mở giữ tài khoản khi đổi thư mục bằng `cd`. Terminal VS Code đang mở không tự nhận token; `python train.py` vẫn chạy local. GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).
+Mỗi PowerShell giữ lựa chọn riêng và giữ tài khoản khi đổi thư mục bằng `cd`. Terminal thứ nhất có thể dùng A, terminal thứ hai dùng B để gửi công việc song song trong giới hạn Kaggle. `python train.py` vẫn chạy local; GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).
 
 ### Dùng chung hoặc tài khoản riêng
 

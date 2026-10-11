@@ -6,6 +6,7 @@ const { EventEmitter } = require('node:events');
 const { spawn } = require('node:child_process');
 const windows = require('./windows.cjs');
 const { UserError } = require('./errors.cjs');
+const { KaggleShell } = require('./kaggle-shell.cjs');
 const { exists, atomicWrite, readLimited, assertDirectory, profilePath } = require('./files.cjs');
 
 const MESSAGES = {
@@ -71,16 +72,8 @@ function runBridge(python, payload, timeout=90000, signal) {
 // No token in command arguments, launcher files, renderer state, or plaintext files.
 const TERMINAL_SCRIPT = String.raw`$ErrorActionPreference='Stop'
 try {
-  Add-Type -AssemblyName System.Security
-  $padKaggleEncrypted=[IO.File]::ReadAllBytes($env:PADSWITCHER_KAGGLE_VAULT)
-  $padKaggleBytes=[Security.Cryptography.ProtectedData]::Unprotect($padKaggleEncrypted,[Text.Encoding]::UTF8.GetBytes('PADSwitcher/v1'),[Security.Cryptography.DataProtectionScope]::CurrentUser)
-  $padKaggleToken=[Text.Encoding]::UTF8.GetString($padKaggleBytes)
-  Get-ChildItem Env: | Where-Object { $_.Name -like 'KAGGLE_*' } | ForEach-Object { Remove-Item -LiteralPath ('Env:'+$_.Name) }
-  $env:KAGGLE_API_TOKEN=$padKaggleToken
-  $env:KAGGLE_USERNAME=$env:PADSWITCHER_KAGGLE_USERNAME
-  $env:KAGGLE_KEY='PADSwitcher-token-only-no-legacy-key'
-  $env:KAGGLE_CONFIG_DIR=$env:PADSWITCHER_KAGGLE_CONFIG
-  $env:PATH=$env:PADSWITCHER_KAGGLE_SCRIPTS+[IO.Path]::PathSeparator+$env:PADSWITCHER_KAGGLE_PYTHON+[IO.Path]::PathSeparator+$env:PATH
+  . $env:PADSWITCHER_KAGGLE_HELPER
+  padkaggle use $env:PADSWITCHER_KAGGLE_USERNAME -ErrorAction Stop
   $Host.UI.RawUI.WindowTitle='Kaggle - '+$env:PADSWITCHER_KAGGLE_USERNAME
   Set-Location -LiteralPath $env:PADSWITCHER_KAGGLE_WORKSPACE
   Write-Host ('Kaggle: '+$env:PADSWITCHER_KAGGLE_USERNAME) -ForegroundColor Cyan
@@ -88,15 +81,11 @@ try {
   Write-Host 'kaggle --help'
 } catch { Write-Host 'PADSwitcher: unable to prepare Kaggle terminal.' -ForegroundColor Red }
 finally {
-  if($padKaggleBytes){[Array]::Clear($padKaggleBytes,0,$padKaggleBytes.Length)}
-  Remove-Variable padKaggleToken,padKaggleBytes,padKaggleEncrypted -ErrorAction SilentlyContinue
   Get-ChildItem Env: | Where-Object { $_.Name -like 'PADSWITCHER_KAGGLE_*' } | ForEach-Object { Remove-Item -LiteralPath ('Env:'+$_.Name) }
 }`;
 async function launchTerminal(options) {
-  const env={...safeEnvironment(),PADSWITCHER_KAGGLE_VAULT:options.vault,PADSWITCHER_KAGGLE_USERNAME:options.username,
-    PADSWITCHER_KAGGLE_WORKSPACE:options.workspace,PADSWITCHER_KAGGLE_SCRIPTS:options.scriptsPath,
-    PADSWITCHER_KAGGLE_CONFIG:options.configPath,PADSWITCHER_KAGGLE_HINT:options.locale==='en'?'Use Kaggle CLI here. Python commands run locally.':'Dùng Kaggle CLI tại đây. Lệnh Python thông thường chạy trên máy local.'};
-  env.PADSWITCHER_KAGGLE_PYTHON=path.dirname(options.python);
+  const env={...safeEnvironment(),PADSWITCHER_KAGGLE_HELPER:options.helperPath,PADSWITCHER_KAGGLE_USERNAME:options.username,
+    PADSWITCHER_KAGGLE_WORKSPACE:options.workspace,PADSWITCHER_KAGGLE_HINT:options.locale==='en'?'Use Kaggle CLI here. Python commands run locally.':'Dùng Kaggle CLI tại đây. Lệnh Python thông thường chạy trên máy local.'};
   env.PADSWITCHER_KAGGLE_COMMAND=Buffer.from(TERMINAL_SCRIPT,'utf16le').toString('base64');
   env.PADSWITCHER_KAGGLE_SHELL=windows.powershell;
   const outer="$ErrorActionPreference='Stop'; Start-Process -WindowStyle Normal -FilePath $env:PADSWITCHER_KAGGLE_SHELL -ArgumentList @('-NoLogo','-NoProfile','-NoExit','-EncodedCommand',$env:PADSWITCHER_KAGGLE_COMMAND)";
@@ -106,6 +95,7 @@ async function launchTerminal(options) {
 class KaggleService extends EventEmitter {
   constructor(root, adapters={}) {
     super();this.root=path.join(path.resolve(root),'kaggle');this.file=path.join(this.root,'accounts.json');
+    this.shell=new KaggleShell(this.root,adapters);this.terminal={scriptPath:this.shell.script,configured:null};
     this.platform={...windows,...adapters};this.bridge=adapters.bridge||runBridge;this.launcher=adapters.launchTerminal||launchTerminal;
     this.state={version:1,accounts:[],settings:{pythonPath:'',autoRefresh:true}};
     this.tool=null;this.flights=new Map();this.editing=false;this.controllers=new Set();this.stopping=false;
@@ -120,10 +110,11 @@ class KaggleService extends EventEmitter {
         this.state=parsed;
       } catch {throw new UserError('Dữ liệu Kaggle bị lỗi. Giữ thư mục dữ liệu để kiểm tra.', 'KAGGLE_STORE');}
     }
+    try{await this.shell.ensure();}catch{this.terminal.error='Chưa tạo được lệnh terminal Kaggle. Kiểm tra quyền thư mục dữ liệu.';}
     return this.view();
   }
   view() {
-    return {settings:{pythonPath:this.state.settings.pythonPath,autoRefresh:this.state.settings.autoRefresh},tool:this.tool,editing:this.editing,storeError:this.initError||null,
+    return {settings:{pythonPath:this.state.settings.pythonPath,autoRefresh:this.state.settings.autoRefresh},tool:this.tool,terminal:this.terminal,editing:this.editing,storeError:this.initError||null,
       accounts:this.state.accounts.map(p=>({id:p.id,username:p.username,label:p.label,workspace:p.workspace,watch:[...p.watch],
         status:p.status,quota:p.quota||[],quotaAt:p.quotaAt||null,notebooks:p.notebooks||[],notebooksAt:p.notebooksAt||null,
         verifiedAt:p.verifiedAt||null,lastAttemptAt:p.lastAttemptAt||null,lastTerminalAt:p.lastTerminalAt||null,
@@ -152,6 +143,9 @@ class KaggleService extends EventEmitter {
   async executeBridge(python,payload,timeout){if(this.stopping)throw fail('KAGGLE_CANCELLED');const controller=new AbortController();this.controllers.add(controller);try{return await this.bridge(python,payload,timeout,controller.signal);}finally{this.controllers.delete(controller);}}
   async request(payload) {const tool=await this.checkTools();if(!tool.supported)throw fail(tool.code||'KAGGLE_DEPENDENCIES');const r=await this.executeBridge(tool.executable,payload);if(!r.ok)throw fail(Object.hasOwn(MESSAGES,r.code)?r.code:'KAGGLE_RESPONSE');return r;}
   async loadToken(id){const bytes=await this.platform.dpapi(await readLimited(this.vault(id),32768),true);try{return credentials(bytes.toString('utf8'));}finally{bytes.fill(0);}}
+  async terminalStatus(){this.requireStore();this.terminal=await this.shell.status();this.changed();return this.terminal;}
+  async terminalConfigure(enabled){return this.exclusive(async()=>{this.terminal=await this.shell.configure(enabled);this.changed();return this.terminal;});}
+  async terminalCommand(id){this.requireStore();const p=this.get(id);await this.shell.ensure();return this.shell.command(p.username);}
   async add({id=null,token,label='',workspace}) {return this.exclusive(async()=>{
     token=credentials(token);await assertDirectory(workspace);if(!path.isAbsolute(workspace))throw new UserError('Chọn thư mục làm việc tuyệt đối.', 'KAGGLE_WORKSPACE');
     const previous=id?this.get(id):null;if(previous&&this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');
@@ -198,7 +192,8 @@ class KaggleService extends EventEmitter {
     return this.exclusive(async()=>{const p=this.get(id);await assertDirectory(p.workspace);try{const token=await this.loadToken(id);const identity=await this.request({action:'verify',token,username:p.username});if(identity.username?.toLowerCase()!==p.username.toLowerCase())throw fail('KAGGLE_IDENTITY');}catch(error){if(['KAGGLE_AUTH','KAGGLE_IDENTITY','KAGGLE_TOKEN'].includes(error.code)){p.status='reauth';p.lastError=MESSAGES[error.code];await this.save();}throw error;}
       const tool=this.tool;const cli=path.join(tool.scriptsPath,'kaggle.exe');if(!await exists(cli))throw fail('KAGGLE_DEPENDENCIES');
       const configPath=path.join(profilePath(this.root,id),'cli');await assertDirectory(configPath);
-      await this.launcher({vault:this.vault(id),username:p.username,workspace:p.workspace,python:tool.executable,scriptsPath:tool.scriptsPath,configPath,locale});
+      await this.shell.ensure();
+      await this.launcher({vault:this.vault(id),username:p.username,workspace:p.workspace,python:tool.executable,scriptsPath:tool.scriptsPath,configPath,helperPath:this.shell.script,locale});
       p.lastTerminalAt=new Date().toISOString();await this.save();return true;});
   }
   async shutdown(){this.stopping=true;for(const controller of this.controllers)controller.abort();await Promise.allSettled([...this.flights.values(),this.refreshFlight,this.toolFlight,this.saveFlight].filter(Boolean));}

@@ -89,7 +89,7 @@ test('subprocess environment excludes inherited Kaggle credentials and Python ho
   const old={};for(const key of ['KAGGLE_API_TOKEN','KAGGLE_KEY','PADSWITCHER_KAGGLE_VAULT','PYTHONPATH']){old[key]=process.env[key];process.env[key]='fixture-secret';}
   try{const env=safeEnvironment();for(const key of Object.keys(old))assert.equal(env[key],undefined);assert.equal(env.SystemRoot,process.env.SystemRoot);}
   finally{for(const [key,value] of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
-  assert(TERMINAL_SCRIPT.includes('ProtectedData]::Unprotect'));assert(TERMINAL_SCRIPT.includes("$env:KAGGLE_API_TOKEN=$padKaggleToken"));assert(!TERMINAL_SCRIPT.includes(tokenA));
+  assert(TERMINAL_SCRIPT.includes('. $env:PADSWITCHER_KAGGLE_HELPER'));assert(TERMINAL_SCRIPT.includes('padkaggle use'));assert(!TERMINAL_SCRIPT.includes(tokenA));
 });
 test('shutdown cancels read-only bridge work and preserves the last successful snapshot',async t=>{
   const f=await setup(t),a=await f.k.add({token:tokenA,workspace:f.directory});await f.k.refresh(a);const before=f.k.view().accounts[0];
@@ -97,17 +97,6 @@ test('shutdown cancels read-only bridge work and preserves the last successful s
   f.k.bridge=async(python,payload,timeout,signal)=>payload.action!=='refresh'?original(python,payload):new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new UserError('Cancelled','KAGGLE_CANCELLED')),{once:true}));
   const read=f.k.refresh(a);await new Promise(r=>setTimeout(r,10));assert.equal(f.k.controllers.size,1);await f.k.shutdown();await read;
   const after=f.k.view().accounts[0];assert.deepEqual(after.quota,before.quota);assert.deepEqual(after.notebooks,before.notebooks);assert.equal(after.lastError,null);assert.equal(f.k.controllers.size,0);assert.equal(f.k.flights.size,0);
-});
-test('Windows DPAPI terminal bootstrap isolates two simultaneous native PowerShell processes',{skip:process.platform!=='win32',timeout:30000},async t=>{
-  const f=await fixture(t),windows=require('../src/core/windows.cjs'),options=[['account-a',tokenA],['account-b',tokenB]];
-  const outputs=await Promise.all(options.map(async([username,token])=>{
-    const vault=path.join(f.directory,username+'.dpapi');await fs.writeFile(vault,await windows.dpapi(Buffer.from(token)));
-    const env={...safeEnvironment(),PADSWITCHER_KAGGLE_VAULT:vault,PADSWITCHER_KAGGLE_USERNAME:username,PADSWITCHER_KAGGLE_WORKSPACE:f.directory,PADSWITCHER_KAGGLE_CONFIG:path.join(f.directory,username),PADSWITCHER_KAGGLE_SCRIPTS:f.directory,PADSWITCHER_KAGGLE_PYTHON:f.directory,PADSWITCHER_KAGGLE_HINT:'Fixture only',KAGGLE_API_TOKEN:'fixture-inherited-wrong-token'};
-    const inspect="$padIdentity=[ordered]@{username=$env:KAGGLE_USERNAME;tokenCorrect=($env:KAGGLE_API_TOKEN -eq ('KGAT_fixture-only-'+$env:KAGGLE_USERNAME));noHelper=(@(Get-ChildItem Env: | Where-Object {$_.Name -like 'PADSWITCHER_KAGGLE_*'}).Count -eq 0);fallbackBlocked=($env:KAGGLE_KEY -eq 'PADSwitcher-token-only-no-legacy-key');folder=(Get-Location).Path;config=$env:KAGGLE_CONFIG_DIR}; Write-Output ('PAD_RESULT:'+($padIdentity|ConvertTo-Json -Compress))";
-    const output=await windows.ps(TERMINAL_SCRIPT+'\n'+inspect,{env,timeout:15000});assert(!output.includes(token));return JSON.parse(output.split(/\r?\n/).find(line=>line.startsWith('PAD_RESULT:')).slice(11));
-  }));
-  assert.deepEqual(outputs.map(o=>o.username),['account-a','account-b']);assert.notEqual(outputs[0].config,outputs[1].config);
-  for(const o of outputs){assert.equal(o.tokenCorrect,true);assert.equal(o.noHelper,true);assert.equal(o.fallbackBlocked,true);assert.equal(o.folder,f.directory);}
 });
 test('corrupt Kaggle metadata disables its mutations without blocking Codex or overwriting the file',async t=>{
   const f=await fixture(t),k=new KaggleService(f.data,f.adapter);await fs.mkdir(k.root);const corrupted='{"version":1,"accounts":"broken"}';await fs.writeFile(k.file,corrupted);

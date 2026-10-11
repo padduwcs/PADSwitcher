@@ -1,6 +1,6 @@
 # Kaggle account management
 
-Available in PADSwitcher 1.14.0. This feature is separate from the Codex gateway and can be used without configuring a Codex connection.
+Available in PADSwitcher 1.14.0, with commands for existing PowerShell terminals in 1.14.1. This feature is separate from the Codex gateway and can be used without configuring a Codex connection.
 
 ## Luồng sử dụng
 
@@ -8,7 +8,24 @@ Available in PADSwitcher 1.14.0. This feature is separate from the Codex gateway
 
 **Thêm tài khoản:** tạo API token mới tại Kaggle Settings → API. Nhập token, tên dễ nhớ và thư mục làm việc trong PADSwitcher. Token được kiểm tra qua Kaggle trước khi lưu, nhận diện username tự động. Token trùng tài khoản bị từ chối; cập nhật token phải khớp username đã lưu. Bản đầu hỗ trợ API token hiện đại, không nhập `kaggle.json` dạng username/key cũ.
 
-**Làm việc:** chọn tài khoản rồi mở terminal. PowerShell được cấu hình riêng cho tài khoản đó, với Kaggle CLI từ môi trường Python đã chọn. Có thể mở các terminal của A, B, C cùng lúc. `cd` đến thư mục nào cũng giữ tài khoản của terminal; terminal có sẵn trong IDE không tự nhận tài khoản. Bạn có thể tiếp tục sửa code trong VS Code.
+**Dùng terminal đang mở:** chọn tài khoản → **Dùng ở terminal đang mở**, dán lệnh được sao chép vào PowerShell, gồm PowerShell trong VS Code. Terminal đó nhận tài khoản đã chọn và giữ nguyên thư mục hiện tại. Không cần nhập lại token hoặc mở cửa sổ mới.
+
+**Bật lệnh ngắn một lần:** chọn **Thiết lập lệnh padkaggle → Bật lệnh padkaggle**. PADSwitcher thêm một đoạn được đánh dấu riêng vào profile người dùng của Windows PowerShell và PowerShell 7, giữ các cấu hình khác. Terminal mới có thể gọi:
+
+```powershell
+padkaggle list
+padkaggle use username_a
+kaggle kernels list --mine
+padkaggle use username_b
+padkaggle status
+padkaggle off
+```
+
+`use` chọn tài khoản cho chính tiến trình PowerShell đang chạy. Có thể dùng tên dễ nhớ trong dấu nháy, ví dụ `padkaggle use 'Nhóm nghiên cứu'`, nếu tên không trùng; username luôn được ưu tiên. Không tự chọn tài khoản khi mở terminal. Terminal đang mở trước khi bật profile dùng nút sao chép ở trên để nạp lệnh ngay. Các phiên khởi động với `-NoProfile` cũng cần nạp bằng lệnh sao chép. Nếu chính sách PowerShell chặn script, cần giải quyết theo chính sách máy; PADSwitcher không bỏ qua execution policy. CMD, Git Bash và WSL chưa hỗ trợ lệnh chọn tài khoản tại chỗ này.
+
+Mỗi terminal giữ lựa chọn riêng: terminal thứ nhất dùng A, terminal thứ hai dùng B; đổi lựa chọn chỉ ảnh hưởng các lệnh bắt đầu sau đó trong terminal đó. `status` cho biết lựa chọn cục bộ, không xác minh token trực tuyến. `off` khôi phục các biến Kaggle trước lần chọn đầu tiên và gỡ các đường dẫn công cụ do lệnh thêm, giữ những thay đổi PATH khác. Nó không dừng tiến trình đã chạy, job trên Kaggle hay thu hồi token. Có thể gỡ đoạn profile tại **Thiết lập lệnh padkaggle**; terminal đã mở vẫn giữ lựa chọn cho tới `off` hoặc khi đóng.
+
+**Mở terminal mới từ ứng dụng:** chọn tài khoản rồi **Mở terminal tài khoản này**. PowerShell mới dùng cùng lệnh `padkaggle`, với Kaggle CLI từ môi trường Python đã chọn, và mở tại thư mục đã lưu. Có thể mở terminal của A, B, C cùng lúc. `cd` đến thư mục nào cũng giữ tài khoản của terminal. Bạn tiếp tục sửa code trong VS Code bình thường.
 
 Ví dụ gửi code local lên Kaggle:
 
@@ -40,11 +57,13 @@ Tự cập nhật mỗi hai phút khi PADSwitcher mở; các lượt làm mới 
 - The Python bridge is ASAR-unpacked for portable builds. Packages remain user-installed. SDK stdout/stderr and raw HTTP errors are not forwarded; only the reader’s JSON contract is returned. Request timeout is 12 seconds; the overall reader is bounded to 90 seconds.
 - Quitting cancels pending read-only bridge processes and retains the last successful snapshot. Invalid Kaggle storage disables Kaggle mutations while leaving Codex available; the invalid file is preserved for repair.
 - Terminal startup decrypts the vault inside PowerShell and sets process-only `KAGGLE_API_TOKEN`. Per-account `KAGGLE_CONFIG_DIR` keeps CLI preferences separate. A deliberately invalid legacy key prevents a rejected modern token from silently falling back to the machine’s default saved account in Kaggle CLI 2.2.4. It does not grant access. No user-level environment variable or default `.kaggle` credential file is changed.
+- `terminal/padkaggle.ps1` and its read-only Python dependency reader are exported from the packaged app to a stable path. The shell command reads saved metadata and DPAPI vaults directly, without rewriting account storage or requiring the app to remain open. It resolves and validates the account, tools and vault before changing the caller's environment; failures retain the prior selection. Credentials are never part of copied commands or profile blocks.
+- Optional profile setup modifies only the marked PADSwitcher block in the user's all-hosts `profile.ps1` files for Windows PowerShell and PowerShell 7. Existing UTF-8/UTF-16LE encodings are preserved; malformed blocks, unsupported encodings, signed profiles and linked files are left alone. Concurrent profile edits cause setup to stop and roll back files it has already changed when they remain unchanged.
 - The token is necessarily present in memory and in that terminal’s environment. Software running as the same Windows user can read it; DPAPI is protection at rest, not isolation from the current user.
 
 ## Verification and boundaries
 
-The normal Node suite covers encrypted storage, reload, duplicate/identity checks, rollback on disk errors, per-account refresh deduplication, simultaneous account reads, partial snapshots, pinning limits, dependency failures, safe error messages, independent launches and UI workflows. A Windows-only test decrypts two synthetic tokens in simultaneous hidden PowerShell processes and verifies process environments without printing tokens.
+The normal Node suite covers encrypted storage, reload, duplicate/identity checks, rollback on disk errors, per-account refresh deduplication, simultaneous account reads, partial snapshots, pinning limits, dependency failures, safe error messages, independent launches and UI workflows. Windows tests decrypt synthetic tokens in simultaneous hidden PowerShell processes and verify in-place switching, safe failures, PATH restoration, profile preservation and environments without printing tokens. PowerShell 7 is checked when installed, including in Windows CI.
 
 For the real SDK request/response contract, install the stated packages in a disposable venv and run:
 

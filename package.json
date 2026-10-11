@@ -1,6 +1,6 @@
 {
   "name": "padswitcher",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "description": "Profile Account Directory Switcher — Codex and Kaggle account manager for Windows",
   "private": true,
   "main": "src/main.cjs",
@@ -48,7 +48,8 @@
     "asar": true,
     "asarUnpack": [
       "src/assets/PADCodex.exe",
-      "src/core/kaggle-reader.py"
+      "src/core/kaggle-reader.py",
+      "src/core/padkaggle.ps1"
     ],
     "electronFuses": {
       "runAsNode": false,

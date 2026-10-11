@@ -50,14 +50,14 @@ To return to normal operation, select the regular **Codex** agent. Optionally re
 
 ### Kaggle: multiple accounts and parallel terminals
 
-Version **1.14.0** adds an independent **Kaggle** page: save API tokens once, open an account-specific terminal, and monitor GPU/TPU quota and notebook runs. Keep writing code in VS Code and submit it using the official Kaggle CLI. PADSwitcher manages accounts and reads status; it does not split jobs or rotate accounts.
+Version **1.14.1** adds an independent **Kaggle** page: save API tokens once, select an account in an existing terminal or open a new one, and monitor GPU/TPU quota and notebook runs. Keep writing code in VS Code and submit it using the official Kaggle CLI. PADSwitcher manages accounts and reads status; it does not split jobs or rotate accounts.
 
 1. Open **Kaggle → Setup**, install Python 3.11+ and the tools using the provided command, then **Save & check**.
 2. Create an **API token** in [Kaggle Settings](https://www.kaggle.com/settings), choose **Add account**, paste the token and choose a workspace. Repeat for accounts you are authorized to use, under Kaggle’s terms.
-3. Select an account → **Open account terminal**. Each PowerShell keeps its own account; open multiple terminals to submit separate jobs in parallel within Kaggle’s limits.
+3. Select an account → **Use in existing terminal**, then paste the command into your PowerShell terminal, including VS Code. For shorter commands, enable **Set up padkaggle command** once; new terminals support `padkaggle list`, `padkaggle use username`, `padkaggle status` and `padkaggle off`. You can also **Open account terminal** from the app.
 4. **Refresh** manually or enable two-minute refresh to read quota and latest runs. **Pin notebook** to monitor a particular notebook.
 
-Changing directories with `cd` preserves that terminal’s account. Existing VS Code terminals do not receive tokens automatically; `python train.py` still runs locally. Kaggle GPUs run the notebooks submitted with `kaggle kernels push`. See [Kaggle usage and limits](docs/KAGGLE.md).
+Each PowerShell keeps its own selection when changing directories with `cd`. Use A in one terminal and B in another to submit jobs in parallel within Kaggle's limits. `python train.py` still runs locally; Kaggle GPUs run the notebooks submitted with `kaggle kernels push`. See [Kaggle usage and limits](docs/KAGGLE.md).
 
 ### Shared or separate accounts
 

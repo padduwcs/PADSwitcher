@@ -148,6 +148,10 @@ let timeout;
           const modal=await preview.webContents.executeJavaScript("({hasToken:document.querySelector('#kg-token-input')?.type==='password',overflow:document.querySelector('#modal').getBoundingClientRect().bottom>innerHeight})");assert(modal.hasToken);assert.equal(modal.overflow,false);
           const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-add-'+variant+'.png'),frame);
           await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
+          await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#kg-terminal-setup').click();await new Promise(r=>setTimeout(r,100));return true;})()");
+          const shellModal=await preview.webContents.executeJavaScript("({commands:document.querySelector('#modal-body').textContent.includes('padkaggle off'),overflow:document.querySelector('#modal').getBoundingClientRect().bottom>innerHeight})");assert(shellModal.commands);assert.equal(shellModal.overflow,false);
+          const shellFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-shell-'+variant+'.png'),shellFrame);
+          await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
         }
         preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, quotas, reset cancellation, separate account controls and Kaggle at 1260/1000px: passed.');
         clearTimeout(timeout); app.exit(0);

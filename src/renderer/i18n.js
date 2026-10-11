@@ -164,7 +164,10 @@ window.padUI = (() => {
     'Đã đạt giới hạn 100 tài khoản đã lưu.':'The limit of 100 saved accounts has been reached.',
     'Cấu hình Kaggle không hợp lệ.':'Invalid Kaggle settings.',
     'Theo dõi tối đa 20 notebook ghim cho mỗi tài khoản.':'Monitor up to 20 pinned notebooks per account.',
-    'Dữ liệu Kaggle bị lỗi. Giữ thư mục dữ liệu để kiểm tra.':'Kaggle storage is invalid. Keep the data folder for inspection.'
+    'Dữ liệu Kaggle bị lỗi. Giữ thư mục dữ liệu để kiểm tra.':'Kaggle storage is invalid. Keep the data folder for inspection.',
+    'Chưa cập nhật được profile PowerShell. Giữ nguyên profile và kiểm tra quyền / nội dung tệp.':'Could not update the PowerShell profile. Check file permissions and contents; existing settings were preserved.',
+    'Profile PowerShell có chữ ký. Giữ nguyên tệp; dùng lệnh sao chép trong terminal hiện tại.':'This PowerShell profile is signed. It was preserved; use the copied command in your current terminal.',
+    'Chưa tạo được lệnh terminal Kaggle. Kiểm tra quyền thư mục dữ liệu.':'Could not export the Kaggle terminal command. Check data folder permissions.'
   });
   const patterns = [
     [/^Cập nhật (\d+) phút trước · Dữ liệu cũ$/, 'Updated $1 minutes ago · Outdated data'],

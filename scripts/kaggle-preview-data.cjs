@@ -10,6 +10,9 @@ module.exports=String.raw`
   state.kaggle={accounts:new URLSearchParams(location.search).has('demo')?clone(kgAccounts):[],settings:{pythonPath:'',autoRefresh:true},tool:{python:'3.12.10',kaggle:'2.2.4',kagglesdk:'0.1.37',executable:'C:\Python312\python.exe',supported:true},editing:false};
   async function kaggleAction(command,args){
     let result;const k=state.kaggle,p=k.accounts.find(p=>p.id===args.id);
+    k.terminal||={scriptPath:'C:\\Users\\Sample\\AppData\\Roaming\\PADSwitcher\\data\\kaggle\\terminal\\padkaggle.ps1',configured:false,profiles:[{path:'C:\\Users\\Sample\\Documents\\WindowsPowerShell\\profile.ps1',configured:false},{path:'C:\\Users\\Sample\\Documents\\PowerShell\\profile.ps1',configured:false}]};
+    if(command==='kaggleTerminalStatus')result=clone(k.terminal);
+    if(command==='kaggleTerminalConfigure'){k.terminal.configured=args.enabled;k.terminal.profiles.forEach(p=>p.configured=args.enabled);result=clone(k.terminal);}
     if(command==='kaggleTools')result=clone(k.tool);
     if(command==='kaggleAdd'){
       const account=p||{id:'44444444-4444-4444-8444-444444444444',username:'padnew',watch:[],quota:[],notebooks:[]};

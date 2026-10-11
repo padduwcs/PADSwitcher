@@ -19,6 +19,14 @@ retains its token until closed, even after removing an account or updating its
 token in PADSwitcher. Revoke the token on Kaggle to invalidate it everywhere.
 See [Kaggle boundaries](docs/KAGGLE.md) for monitoring coverage and storage details.
 
+The optional `padkaggle` PowerShell command decrypts the same DPAPI vault in the
+calling terminal. Copied commands and profile blocks contain a script path and
+account selector, never a token. Selecting an account changes process-local
+Kaggle variables and PATH only. `off` restores the prior Kaggle environment;
+children already started retain their inherited credentials. Profile setup is
+explicit and modifies a marked block without replacing other settings or
+bypassing PowerShell execution policy.
+
 Automatic switching is opt-in, limited to supported personal accounts and confirmed
 quota failures before response output. Reset credits always require explicit confirmation.
 See [routing boundaries](ROUTING.md) and [validation limits](VALIDATION.md).

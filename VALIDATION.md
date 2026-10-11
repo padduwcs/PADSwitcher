@@ -1,4 +1,21 @@
-# PADSwitcher 1.14.0 — validation
+# PADSwitcher 1.14.1 — validation
+
+## PowerShell account commands — 1.14.1
+
+Validated on Windows x64 on 2026-10-11 using synthetic credentials and isolated
+profiles. No real Kaggle token was decrypted or Kaggle request submitted by QA.
+
+- Node suite: 173 tests; 172 pass locally and the PowerShell 7 check is skipped
+  when that shell is absent. Windows CI includes PowerShell 7.
+- Native PowerShell checks cover in-place A/B selection, simultaneous terminals,
+  tool precedence on PATH, Unicode folder preservation, strict-mode profiles,
+  failed-selection rollback and restoration of prior Kaggle variables/PATH.
+- Profile tests preserve UTF-8/UTF-16LE content, stop on malformed/signed/linked
+  profiles, handle concurrent edits and remove only the PADSwitcher block.
+- UI checks exercise copy/select and explicit profile enable/removal. Packaged
+  smoke verifies helper export and function loading without account selection.
+- Existing Codex regression and native protocol fixtures remain covered. The
+  running user's app and Codex helper are kept untouched during installation.
 
 ## Kaggle account management — 1.14.0
 

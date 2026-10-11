@@ -36,6 +36,9 @@ app.disableHardwareAcceleration();
         }
       };
       const kgState=await action('state');assert.deepEqual(kgState.result.kaggle.accounts,[]);
+      const shellHelper=kgState.result.kaggle.terminal.scriptPath;assert((await fs.stat(shellHelper)).isFile());
+      const shellStatus=await windows.ps('. $env:PADSWITCHER_PACKAGED_SHELL; padkaggle status',{env:{...process.env,PADSWITCHER_PACKAGED_SHELL:shellHelper}});
+      assert(shellStatus.includes('No account selected'));console.log('Packaged PowerShell command export and loading without account selection: passed.');
       const kagglePython=path.resolve('artifacts/kaggle-sdk-probe/Scripts/python.exe');
       if(await fs.stat(kagglePython).then(()=>true,()=>false)){
         assert((await action('kaggleSettings',{pythonPath:kagglePython,autoRefresh:false})).ok);

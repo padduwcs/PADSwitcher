@@ -27,6 +27,15 @@ test('Kaggle verifies a token once, clears password inputs and never inserts tok
   assert.equal(d.querySelector('#modal').open,false);assert.equal(d.querySelectorAll('.kg-account').length,4);assert.equal(d.querySelector('#kg-detail img'),null);assert(!d.querySelector('#kg-detail').textContent.includes(token));
   d.querySelector('#kg-token').click();await settle();d.querySelector('#kg-token-input').value=token;d.querySelector('#modal-cancel').click();assert.equal(d.querySelector('#kg-token-input').value,'');
 });
+
+test('Kaggle copies selection for the existing terminal and enables/removes PowerShell commands explicitly',async t=>{
+  const w=dom(t);await settle();const d=w.document,calls=[],action=w.pad.action;w.pad.action=async(command,args)=>{calls.push({command,args});return action(command,args);};
+  d.querySelector('[data-page=kaggle]').click();d.querySelector('#kg-terminal-copy').click();await settle();
+  assert.equal(calls.find(c=>c.command==='kaggleTerminalCopy').args.id,'11111111-1111-4111-8111-111111111111');assert(!calls.some(c=>c.command==='kaggleLaunch'));
+  d.querySelector('#kg-terminal-setup').click();await settle();assert(d.querySelector('#modal-body').textContent.includes('padkaggle off'));assert(!calls.some(c=>c.command==='kaggleTerminalConfigure'));
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();assert.equal(calls.find(c=>c.command==='kaggleTerminalConfigure').args.enabled,true);
+  d.querySelector('#kg-terminal-setup').click();await settle();d.querySelector('#kg-terminal-disable').click();await settle();assert.equal(calls.filter(c=>c.command==='kaggleTerminalConfigure').at(-1).args.enabled,false);
+});
 test('Kaggle setup guides missing dependencies and notebook pins can be managed',async t=>{
   const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();
   const action=w.pad.action;w.pad.action=async(command,args)=>{const r=await action(command,args);if(command==='kaggleTools'){r.result.supported=false;r.state.kaggle.tool.supported=false;}return r;};

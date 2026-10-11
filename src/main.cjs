@@ -60,6 +60,9 @@ async function start() {
         case 'kaggleRefresh': await kaggle.refresh(args.id);break;
         case 'kaggleRefreshAll': await kaggle.refreshAll();break;
         case 'kaggleLaunch': await kaggle.launch(args.id,uiLocale);break;
+        case 'kaggleTerminalStatus': result=await kaggle.terminalStatus();break;
+        case 'kaggleTerminalConfigure': result=await kaggle.terminalConfigure(args.enabled);break;
+        case 'kaggleTerminalCopy': clipboard.writeText(await kaggle.terminalCommand(args.id));break;
         case 'kaggleSettings': await kaggle.settings(args);break;
         case 'kaggleTools': result=await kaggle.checkTools(true);break;
         case 'kaggleWatch': await kaggle.watch(args.id,args.ref,args.remove===true);break;
