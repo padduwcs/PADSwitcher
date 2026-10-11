@@ -6,6 +6,24 @@
   "main": "src/main.cjs",
   "author": "Anh-Duc Phan",
   "license": "MIT",
+  "homepage": "https://github.com/padduwcs/PADSwitcher#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/padduwcs/PADSwitcher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/padduwcs/PADSwitcher/issues"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "keywords": [
+    "codex",
+    "kaggle",
+    "account-manager",
+    "electron",
+    "windows"
+  ],
   "scripts": {
     "prestart": "node scripts/build-helper.cjs",
     "start": "node scripts/run-electron.cjs .",
