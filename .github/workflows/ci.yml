@@ -19,7 +19,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install official Kaggle tools in an isolated environment
