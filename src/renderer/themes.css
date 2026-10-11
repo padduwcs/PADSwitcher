@@ -178,6 +178,16 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
 .toolbar-right .refresh-button .icon { display:block; width:18px; height:18px; }
 .refresh-button > span { display:block; line-height:20px; }
 .toolbar-right .refresh-button:hover { border-color:var(--detail-line); background:var(--surface-soft); box-shadow:0 2px 8px var(--action-shadow); }
+/* Codex toolbar actions share geometry with search and connection selection. */
+#accounts-page .toolbar-right .toolbar-action { min-height:44px; padding:10px 14px; gap:8px; line-height:20px; border:1px solid var(--card-edge); background:var(--card-fill); color:var(--ink); border-radius:9px; }
+#accounts-page .toolbar-action > .icon { display:block; width:18px; height:18px; }
+#accounts-page .toolbar-action > span { display:block; line-height:20px; }
+#accounts-page .toolbar-right .toolbar-action:hover { border-color:var(--detail-line); background:var(--surface-soft); box-shadow:0 2px 8px var(--action-shadow); }
+#accounts-page .account-target { flex-shrink:0; }
+#accounts-page .account-target select { height:44px; border-radius:9px; }
+#accounts-page .detail-actions > .button { border-radius:10px; line-height:20px; }
+#accounts-page #say-hi-one > .icon { width:17px; height:17px; }
+#accounts-page #say-hi-one:disabled { background:var(--surface); color:var(--muted); opacity:.45; }
 .connection-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
 .integration-card { min-width:0; display:flex; flex-direction:column; }
 .integration-card > .button, .integration-card > .integration-actions { align-self:flex-start; margin-bottom:20px; }
@@ -231,6 +241,8 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
   .session-grid { margin-bottom:8px; }
   .toolbar { margin-bottom:12px; }
   .search input { height:36px; }
+  #accounts-page .toolbar-right .toolbar-action { min-height:38px; padding:8px 12px; }
+  #accounts-page .account-target select { height:38px; }
   .detail { padding:20px; top:92px; }
   .detail-top { margin:-20px -20px 12px; padding:14px 60px 14px 20px; min-height:74px; }
   .detail-meta { top:20px; right:17px; }

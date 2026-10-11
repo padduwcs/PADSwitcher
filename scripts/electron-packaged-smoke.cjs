@@ -39,6 +39,13 @@ app.disableHardwareAcceleration();
         }
       };
       const kgState=await action('state');assert.deepEqual(kgState.result.kaggle.accounts,[]);
+      assert.deepEqual(kgState.result.sayHi,{active:false,rows:[]});
+      const sayHiControls=await win.webContents.executeJavaScript("({allPresent:!!document.querySelector('#say-hi-all'),allDisabled:document.querySelector('#say-hi-all').disabled,panelHidden:document.querySelector('#say-hi-panel').classList.contains('hidden')})");
+      assert.deepEqual(sayHiControls,{allPresent:true,allDisabled:true,panelHidden:true});
+      assert.equal((await action('sayHi')).error.code,'PROFILE_MISSING');
+      assert.equal((await action('sayHiAll')).error.code,'SAY_HI_EMPTY');
+      assert((await action('sayHiStop')).ok);assert((await action('sayHiDismiss')).ok);
+      console.log('Packaged Say hi controls, isolated job state and empty-account IPC guards: passed.');
       const pagination=await action('kaggleNotebooksMore',{id:'11111111-1111-4111-8111-111111111111'});assert.equal(pagination.ok,false);assert.equal(pagination.error.code,'KAGGLE_ACCOUNT');
       const shellHelper=kgState.result.kaggle.terminal.scriptPath;assert((await fs.stat(shellHelper)).isFile());
       const shellStatus=await windows.ps('. $env:PADSWITCHER_PACKAGED_SHELL; padkaggle status',{env:{...process.env,PADSWITCHER_PACKAGED_SHELL:shellHelper}});
@@ -50,6 +57,7 @@ app.disableHardwareAcceleration();
         console.log('Packaged Kaggle ASAR-unpacked bridge and official dependency probe: passed.');
       }
       const imported=await action('import');assert(imported.ok);const started=await action('gateway',{id:imported.result});assert(started.ok);console.log('Packaged gateway startup passed.');
+      assert.equal(await win.webContents.executeJavaScript("!!document.querySelector('#say-hi-one')"),true);
       assert.equal(started.state.version,require('../package.json').version);assert.equal(started.state.gateway.status,'ready');
       assert.equal(started.state.gateway.modelRouting,'request');
       assert.equal(started.state.gateway.recovery.enabled,false);

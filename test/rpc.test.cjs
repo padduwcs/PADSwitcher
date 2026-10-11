@@ -15,6 +15,20 @@ function fakeSpawn(handler) {
   };
   return { spawn,get child(){return child;},get options(){return options;} };
 }
+test('isolated greetings cannot inherit host app tools, thread identity or provider environment overrides',async () => {
+  const keys=['CODEX_APP_TOOLS_PIPE_PATH','CODEX_THREAD_ID','OPENAI_BASE_URL'];
+  const previous=keys.map(k=>process.env[k]);
+  try {
+    for(const k of keys)process.env[k]='fixture-only';
+    const fake=fakeSpawn((m,reply)=>reply({id:m.id,result:{}}));
+    const rpc=new CodexRpc('fixture.exe','C:/isolated-greeting',{spawn:fake.spawn,ephemeralStore:true,isolated:true});
+    await rpc.initialize();await rpc.close();
+    for(const k of keys)assert.equal(fake.options.env[k],undefined);
+    assert.equal(fake.options.env.CODEX_HOME,'C:/isolated-greeting');
+    const ordinary=fakeSpawn();const reader=new CodexRpc('fixture.exe','C:/ordinary',{spawn:ordinary.spawn});
+    assert.equal(ordinary.options.env.CODEX_APP_TOOLS_PIPE_PATH,'fixture-only');await reader.close();
+  } finally {keys.forEach((k,i)=>{if(previous[i]===undefined)delete process.env[k];else process.env[k]=previous[i];});}
+});
 test('RPC matches response ids, handles notifications and initializes supported protocol',async () => {
   const fake = fakeSpawn((m,reply) => {if(m.id) reply({id:m.id,result:m.method==='initialize'?{userAgent:'fixture'}:{account:null}});});
   const rpc = new CodexRpc('fixture.exe','C:/fixture',{spawn:fake.spawn,fileStore:true});

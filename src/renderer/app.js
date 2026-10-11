@@ -114,6 +114,8 @@ function render() {
   $('#cancel-recovery').classList.toggle('hidden',!(recovery.queued||recovery.active));
   for (const id of ['add-account','import-current','empty-import','refresh-all','check-system','recover-login']) $( '#'+id ).disabled = state.busy;
   $('#refresh-all').disabled = state.busy || !state.profiles.length;
+  $('#say-hi-all').disabled = state.busy || !!state.sayHi?.active || !state.profiles.length;
+  renderSayHi();
   $('#restore').disabled = state.busy || !state.canRestore;
   $('#login-bar').classList.toggle('hidden',!state.login);
   if (!state.login) $('#login-detail').textContent = 'Chọn đúng tài khoản trên trình duyệt. Phiên hiện tại vẫn được giữ.';
@@ -134,7 +136,8 @@ function renderDetail(p) {
       <div class="detail-label quota-title"><span>Quota còn lại</span><span class="timestamp${stale(p) ? ' stale' : ' fresh'}">${e(quotaAge(p))}${p.quotaAt&&stale(p)?' · Dữ liệu cũ':''}</span></div>
       ${p.lastError ? `<div class="inline-error">${e(ui.error({message:p.lastError,code:p.status==='reauth'?'AUTH_INVALID':'QUOTA_REFRESH'}))}</div>` : ''}
       <div class="detail-quotas">${windows(p).length ? windows(p).map(w => progress(w)).join('') : '<p class="field-help">Chưa có dữ liệu quota.</p>'}</div>
-      <div class="detail-actions"><button class="button primary" id="use-gateway" ${disabled || (current||['starting','stopping'].includes(gatewayForScope()?.status)?'disabled':'')}>${current?'Đang sử dụng':'Dùng tài khoản này'}</button></div>
+      <div class="detail-actions"><button class="button primary" id="use-gateway" ${disabled || (current||['starting','stopping'].includes(gatewayForScope()?.status)?'disabled':'')}>${current?'Đang sử dụng':'Dùng tài khoản này'}</button><button class="button secondary" id="say-hi-one" ${disabled || (state.sayHi?.active?'disabled':'')} title="Gửi một lời chào ngắn để bắt đầu chu kỳ quota sớm."><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8H4l-1 2v-10a8 8 0 0 1 8-8h1a8 8 0 0 1 8 8Z"/><path d="M7 11.5h.01M11.5 11.5h.01M16 11.5h.01"/></svg><span>Say hi</span></button></div>
+      <p class="field-help say-hi-hint">Say hi tiêu hao một ít quota.</p>
       ${resetPanel(p,disabled)}
       <details class="detail-management" id="profile-management" ${previous.has('profile-management')?'open':''}><summary>Tùy chọn tài khoản</summary><div class="detail-bottom"><button class="button ghost" id="edit-profile" ${disabled}>Sửa tên</button><button class="button ghost" id="reauth-profile" ${disabled}>Đăng nhập lại</button><button class="button ghost danger-text" id="remove-profile" ${disabled}>Xóa</button></div><button class="button ghost refresh-detail" id="refresh-one" ${disabled}>Làm mới quota tài khoản này</button>${p.notes ? `<p class="detail-note" data-literal>${e(p.notes)}</p>` : ''}
       <details class="legacy-actions" id="profile-legacy" ${previous.has('profile-legacy')?'open':''}><summary>Nâng cao</summary><p class="field-help">${ui.language==='en'?'Source: Codex service':'Nguồn: dịch vụ Codex'}${p.quotaAt?' · '+e(time(p.quotaAt)):''}. ${windows(p).map(w=>e(ui.t(windowName(w)))+': '+Math.round(w.usedPercent)+(ui.language==='en'?'% used':'% đã dùng')).join(' · ')}. ${ui.language==='en'?'The options below do not support auto-switching.':'Các cách dùng bên dưới không hỗ trợ tự đổi.'}</p><button class="button secondary" id="use-desktop" ${disabled || (p.desktopActive ? 'disabled' : '')}>${p.desktopActive ? 'Phiên dùng chung hiện tại' : 'Đổi phiên chung · cần đóng Codex'}</button><div class="cli-actions"><button class="button secondary" id="launch-cli" ${disabled || (p.running ? 'disabled' : '')}>${p.running ? 'CLI riêng đang mở' : 'Mở CLI riêng'}</button><button class="button secondary" id="resume-cli" ${disabled || (p.running ? 'disabled' : '')}>Tiếp tục CLI riêng</button></div></details></details>
@@ -145,9 +148,32 @@ function renderDetail(p) {
   $('#launch-cli').onclick = () => call('launch',{id:p.id},'Đã mở CLI. Đóng cửa sổ CLI khi xong để khóa lại phiên.');
   $('#resume-cli').onclick = () => call('launch',{id:p.id,resume:true},'Đã mở bộ chọn hội thoại CLI.');
   $('#refresh-one').onclick = () => call('refresh',{id:p.id},'Đã cập nhật quota.');
+  $('#say-hi-one').onclick = () => call('sayHi',{id:p.id});
+  if (state.sayHi?.active && (state.sayHi.activeProfileId===p.id || state.sayHi.rows.some(r=>r.id===p.id&&r.status==='queued'))) {
+    for (const id of ['reauth-profile','remove-profile']) { $('#'+id).disabled=true; $('#'+id).title=ui.t('Chờ Say hi hoàn tất trước khi thay phiên tài khoản này.'); }
+  }
   $('#edit-profile').onclick = () => showModal('Sửa hồ sơ',`<label for="profile-label">Tên dễ nhớ</label><input id="profile-label" type="text" maxlength="80" required value="${e(p.label)}"><label for="profile-notes">Ghi chú</label><textarea id="profile-notes" maxlength="500">${e(p.notes)}</textarea>`,async () => { const label = $('#profile-label').value, notes = $('#profile-notes').value; closeModal(); await call('edit',{id:p.id,label,notes},'Đã lưu hồ sơ.'); },'Lưu thay đổi');
   $('#reauth-profile').onclick = () => accountModal(p);
   $('#remove-profile').onclick = () => showModal('Xóa khỏi danh sách?',`<p>Hồ sơ <span class="confirm-name">${e(p.label)}</span> sẽ được chuyển vào thư mục trash trên máy. Tài khoản OpenAI vẫn giữ nguyên.</p><p class="field-help">Không thể xóa hồ sơ đang dùng cho desktop hoặc đang mở CLI.</p>`,async () => { closeModal(); await call('remove',{id:p.id},'Đã chuyển hồ sơ vào trash.'); },'Xóa hồ sơ');
+}
+function renderSayHi() {
+  const job=state.sayHi||{rows:[]},rows=job.rows||[];
+  $('#say-hi-panel').classList.toggle('hidden',!rows.length);
+  if (!rows.length) return;
+  const done=rows.filter(r=>!['queued','sending'].includes(r.status)).length;
+  const sent=rows.filter(r=>r.status==='sent').length;
+  $('#say-hi-summary').textContent=job.active
+    ? (ui.language==='en'?`Say hi · ${done}/${rows.length} processed${job.stopping?' · Stopping after this turn':''}`:`Say hi · Đã xử lý ${done}/${rows.length}${job.stopping?' · Sẽ dừng sau lượt này':''}`)
+    : (ui.language==='en'?`Say hi · ${sent}/${rows.length} sent`:`Say hi · Đã gửi ${sent}/${rows.length}`);
+  $('#say-hi-progress').max=rows.length;$('#say-hi-progress').value=done;
+  $('#say-hi-stop').classList.toggle('hidden',!job.active);$('#say-hi-stop').disabled=!!job.stopping;
+  $('#say-hi-dismiss').classList.toggle('hidden',!!job.active);
+  const names={queued:'Đang chờ',sending:'Đang say hi…',sent:'Đã say hi',skipped:'Đã bỏ qua',failed:'Chưa gửi được',uncertain:'Chưa rõ kết quả',cancelled:'Đã dừng'};
+  $('#say-hi-rows').innerHTML=rows.map(r=>{
+    const p=state.profiles.find(p=>p.id===r.id);
+    const reset=p&&r.status==='sent'&&r.quotaRefreshed?windows(p).find(w=>w.bucketId==='codex'&&w.kind==='primary')?.resetsAt:null;
+    return `<div class="say-hi-row ${r.status}"><strong data-literal>${e(r.label)}</strong><div><span>${e(ui.t(names[r.status]||r.status))}</span>${r.sentAt?`<small data-literal>${e(time(r.sentAt))}</small>`:''}${r.error?`<p data-literal>${e(ui.error(r.error))}</p>`:r.status==='sent'?`<p>${e(reset?ui.t('Đặt lại '+time(reset*1000)):ui.t('Chưa có thời gian đặt lại'))}</p>`:''}</div></div>`;
+  }).join('');
 }
 function renderConnectionStatus(g) {
   const live=g.status==='ready'&&(g.connected?.vscode||0)>0,configured=state.vscode?.configuration==='configured',unknown=!state.vscode||state.vscode.configuration==='unknown';
@@ -278,6 +304,9 @@ $('#import-current').onclick = () => { $('.account-menu').open=false; return imp
 document.addEventListener('click',event=>{const menu=$('.account-menu');if(menu.open&&!menu.contains(event.target))menu.open=false;});
 document.addEventListener('keydown',event=>{const menu=$('.account-menu');if(event.key==='Escape'&&menu.open){menu.open=false;menu.querySelector('summary').focus();}});
 $('#refresh-all').onclick = async () => { const response = await call('refreshAll'); if (response) toast(state.profiles.some(p => p.lastError) ? 'Đã cập nhật các hồ sơ có thể kết nối. Xem chi tiết hồ sơ bị lỗi.' : 'Đã cập nhật quota các tài khoản.'); };
+$('#say-hi-all').onclick = () => call('sayHiAll');
+$('#say-hi-stop').onclick = () => call('sayHiStop');
+$('#say-hi-dismiss').onclick = () => call('sayHiDismiss');
 $('#modal-close').onclick = closeModal; $('#modal-cancel').onclick = closeModal;
 $('#modal-form').onsubmit = async event => { event.preventDefault(); if (modalSubmit&&!$('#modal-submit').disabled) { const submit = modalSubmit; $('#modal-submit').disabled = true; $('#modal-close').disabled=true; $('#modal-cancel').disabled=true; try { await submit(); } finally { $('#modal-submit').disabled = false; $('#modal-close').disabled=false; $('#modal-cancel').disabled=false; } } };
 $('#cancel-login').onclick = () => call('cancelLogin');

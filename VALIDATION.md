@@ -1,4 +1,70 @@
-# PADSwitcher 1.18.0 — validation
+# PADSwitcher 1.19.1 — validation
+
+## Aligned Codex toolbar and Say hi presentation — 1.19.1
+
+Validated on Windows x64 on 2026-10-11 with disposable app data and synthetic
+accounts. This patch changes presentation; the greeting and routing behavior
+remain covered by the 1.19.0 checks below.
+
+- Search, connection selection, Say hi to all and Refresh share their top/bottom
+  edges, with consistent 44px control heights (38px in short windows). Both
+  toolbar actions use the same padding, line height, border, surface and radius;
+  icons and labels are centered. Single-account actions align with an 8px gap.
+- Say hi uses the existing chat icon style, theme surfaces and mint progress
+  color. Its result panel matches the account cards and keeps account errors
+  readable. Disabled greeting controls retain their geometry.
+- Chromium geometry checks and screenshots cover idle, running/stopping and
+  completed greeting states in VI/EN, light/dark and 1920/1260/1000px layouts.
+  They check aligned edges, centered icons/text, overlap and clipped labels.
+  Existing compact reset controls and Kaggle layout checks continue to pass.
+- Node suite: 200 tests, 199 pass and one PowerShell 7 check is skipped locally.
+  Syntax, six offline Python checks, Windows account isolation, existing native
+  gateway protocol and native Say hi fixtures pass. CI now includes the native
+  Say hi loopback check alongside the existing checks and portable packaging.
+- The 1.19.1 portable build and packaged ASAR smoke pass, including greeting
+  controls/IPC, connected gateway routes, PowerShell commands, the Kaggle Python
+  bridge and unchanged fixture authentication.
+
+## Say hi for one or all saved Codex accounts — 1.19.0
+
+Validated on Windows x64 on 2026-10-11 with synthetic credentials, disposable
+app data and local model responses. No real greeting was sent or inference quota
+consumed on the user's accounts. Actual quota activation and the amount charged
+remain live acceptance checks; reset times are read from the server.
+
+- Each account gets one fresh, ephemeral native Codex thread in its own temporary
+  workspace and backend. The native default text model uses its lowest supported
+  reasoning effort and standard service tier. Project context, execution
+  environments, external apps and MCP servers are disabled. Existing desktop
+  authentication, gateway selection and reset credits are preserved.
+- All-account jobs run sequentially with per-account outcomes. Expired sessions
+  and depleted quotas are skipped; one failure does not reroute the greeting.
+  Stop finishes the current account and cancels queued accounts. App shutdown
+  interrupts only the private greeting backend. Ambiguous completion is shown
+  without resending; a failed quota refresh retains the successful greeting.
+- The shared credential lock is held only for account access and quota saving,
+  not while waiting for the model. Queued/current sessions cannot be replaced
+  or deleted until released. Other account operations and existing connections
+  retain their normal behavior.
+- Full Node suite: 200 tests, 199 pass and one PowerShell 7 check is skipped
+  because that shell is absent locally. Syntax checks and six offline Python
+  contract checks pass. Existing Windows DPAPI/ACL, account-isolation and gateway
+  protocol smoke checks pass.
+- The native Say hi protocol smoke verifies two independent synthetic accounts,
+  one request each, no tools executed, lowest supported effort, server quota
+  refresh and private-backend/workspace cleanup. It also preserves the existing
+  selected gateway account and desktop authentication bytes.
+- Real Chromium checks pass for single/all greeting controls, progress, stopping
+  and results in VI/EN, light/dark and 1260/1000px layouts. Existing account reset
+  visibility, service navigation, Kaggle scrolling/pagination, native resizing
+  and persisted layout checks continue to pass. New toolbar styles are scoped
+  to the Codex account page.
+- Portable packaging and packaged ASAR smoke pass, including Say hi controls
+  and empty-account IPC guards, connected gateway routes, PowerShell commands
+  and the unpacked Kaggle Python bridge. The executable is isolated under
+  `dist/say-hi-preview`; existing release outputs, shortcuts and the user's
+  running app are untouched.
+
 
 ## Simplified Kaggle interface and account sidebar — 1.18.0
 

@@ -88,6 +88,33 @@ p { font-size: 13px; line-height: 1.8; color: var(--muted); margin: 0; }
 .search input::placeholder { color: #98a8b8; }
 .toolbar-right .button { min-height: 40px; padding: 8px 0 8px 12px; font-size: 12px; }
 .toolbar-right .icon { width: 17px; height: 17px; }
+#accounts-page .toolbar-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+#accounts-page .toolbar .search { flex:1; min-width:150px; }
+.detail-actions { display:flex; gap:8px; }
+.detail-actions > #use-gateway { width:auto; min-width:0; flex:1; padding-inline:12px; }
+.detail-actions > #say-hi-one { width:auto; flex-shrink:0; padding-inline:14px; }
+.detail-body .say-hi-hint { margin:6px 0 0; line-height:1.5; }
+.say-hi-panel { border:1px solid var(--card-edge); border-radius:14px; padding:16px 20px; margin-bottom:20px; background:var(--card-fill); color:var(--ink); box-shadow:0 12px 30px -20px var(--shadow),inset 0 1px var(--surface-border); }
+.say-hi-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.say-hi-title { display:flex; align-items:center; gap:10px; min-width:0; }
+.say-hi-title > .icon { width:18px; height:18px; color:var(--mint); }
+.say-hi-heading strong { font-size:13px; font-weight:500; }
+.say-hi-controls { display:flex; gap:8px; }
+.say-hi-heading .button { min-height:34px; padding:6px 10px; font-size:12px; }
+.say-hi-panel > progress { display:block; width:100%; height:4px; margin:14px 0 10px; border:0; border-radius:4px; appearance:none; overflow:hidden; background:var(--bar); }
+.say-hi-panel > progress::-webkit-progress-bar { background:var(--bar); }
+.say-hi-panel > progress::-webkit-progress-value { background:var(--mint); border-radius:4px; }
+.say-hi-panel > progress::-moz-progress-bar { background:var(--mint); border-radius:4px; }
+.say-hi-panel > .field-help { margin-top:0; }
+.say-hi-panel summary { font-size:12px; color:var(--muted); cursor:pointer; margin-top:12px; }
+.say-hi-panel summary:hover { color:var(--ink); }
+.say-hi-rows { max-height:240px; overflow:auto; margin-top:10px; }
+.say-hi-row { display:grid; grid-template-columns:minmax(120px,1fr) minmax(0,2fr); gap:16px; padding:10px 0; border-top:1px solid var(--line,#dfe6ef); font-size:12px; overflow-wrap:anywhere; }
+.say-hi-row strong { font-weight:500; }
+.say-hi-row small { margin-left:10px; color:var(--muted,#72859a); }
+.say-hi-row p { margin-top:4px; color:var(--muted,#72859a); line-height:1.6; }
+.say-hi-row.sent span { color:var(--mint,#44856b); }
+.say-hi-row.failed span,.say-hi-row.uncertain span { color:var(--amber,#b76b45); }
 .account-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(335px, 1fr); gap: 28px; align-items: start; }
 .account-list { display: flex; flex-direction: column; gap: 16px; }
 .account-card { width: 100%; text-align: left; color: var(--ink); padding: 23px 24px; border: 1px solid transparent; border-radius: 19px; background: white; box-shadow: 0 4px 18px #17385904; }

@@ -31,6 +31,7 @@ npm test
 & ./artifacts/kaggle-sdk-probe/Scripts/python.exe -I test/kaggle-reader-test.py
 npm run smoke
 npm run smoke:protocol
+npm run smoke:say-hi
 npm run smoke:ui
 npm run dist
 node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
@@ -51,6 +52,22 @@ credits or require logging into a real account. The packaged smoke check runs af
 `dist/PADSwitcher-<version>-Windows.exe`. GitHub Actions checks and builds on Windows.
 For a release, publish the tested executable and its SHA-256 file through GitHub Releases.
 The portable build currently has no code-signing certificate or automatic updater.
+
+## Say hi
+
+`src/core/say-hi.cjs` owns a sequential, user-triggered greeting job with session
+progress and per-account results. Credential lookup uses the existing account
+lock; inference runs outside it in a dedicated ephemeral Codex home, with no
+execution environment, user project instructions or gateway account fallback.
+The job never changes the shared or private client selections. Pending accounts
+are protected from session replacement/removal; normal quota reads and gateway
+work remain available. Stop finishes the current greeting; shutdown interrupts
+only the dedicated backend. Ambiguous outcomes are never resubmitted by the job.
+
+`npm run smoke:say-hi` exercises the real installed Codex binary against loopback
+model responses and synthetic tokens. Account quota reads are fixtures; it does
+not access saved accounts or send real inference requests. Real service-side
+quota activation and the amount charged still require live user acceptance.
 
 For an isolated development build, use
 `npx electron-builder --win portable --config.directories.output=dist/preview`.

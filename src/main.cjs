@@ -85,6 +85,10 @@ async function start() {
         case 'recoverLogin': result = await service.recoverLogin(); break;
         case 'refresh': result = await service.refresh(args.id); break;
         case 'refreshAll': result = await service.refreshAll(); break;
+        case 'sayHi': if (typeof args.id !== 'string') throw new UserError('Không tìm thấy hồ sơ.', 'PROFILE_MISSING'); result = service.sayHi.start(args.id); break;
+        case 'sayHiAll': result = service.sayHi.start(); break;
+        case 'sayHiStop': service.sayHi.stop(); break;
+        case 'sayHiDismiss': service.sayHi.dismiss(); break;
         case 'prepareReset': result = await service.prepareReset(args.id,args.creditId ?? null); break;
         case 'consumeReset': result = await service.consumeReset(args.id,args.key,args.confirmed); break;
         case 'switch': result = await service.switchDesktop(args.id); break;
@@ -176,10 +180,10 @@ async function start() {
     if(quitting)return;
     if(service?.busy||kaggle?.editing){event.preventDefault();if(service.login)service.cancelLogin();return;}
     if(gateway.turns.size){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:text('Codex còn lượt đang chạy','Codex has active turns'),detail:text('Chờ hoàn tất hoặc chọn Dừng gateway trong PADSwitcher trước khi thoát.','Wait for completion or disconnect Codex in PADSwitcher before quitting.')});return;}
-    if(gateway.status!=='stopped'||kaggle.flights.size||kaggle.toolFlight||kaggle.saveFlight){
+    if(service.sayHi.flight||gateway.status!=='stopped'||kaggle.flights.size||kaggle.toolFlight||kaggle.saveFlight){
       event.preventDefault();if(shutdown)return;shutdown=true;
       clearInterval(kaggleTimer);
-      Promise.all([gateway.stop(),kaggle.shutdown()]).then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});
+      Promise.all([service.close(),gateway.stop(),kaggle.shutdown()]).then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});
     }else{quitting=true;clearInterval(timer);tray?.destroy();}
   });
 }

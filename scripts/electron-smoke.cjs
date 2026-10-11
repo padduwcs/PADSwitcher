@@ -7,6 +7,31 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname,'../artifacts/electron-qa');
 app.disableHardwareAcceleration();
 let timeout;
+async function captureFixture(preview,filename) {
+  // Offscreen resize/layout acknowledgement precedes the compositor's full paint.
+  await new Promise(resolve=>setTimeout(resolve,160));
+  const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
+  await fs.writeFile(path.join(root,filename),frame);
+}
+async function checkCodexActions(preview) {
+  const layout=await preview.webContents.executeJavaScript(`(async()=>{
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const box=el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:r.height,width:r.width,clipped:el.scrollWidth>el.clientWidth+1};};
+    const style=el=>{const s=getComputedStyle(el);return [s.borderRadius,s.padding,s.lineHeight,s.fontSize,s.borderWidth,s.backgroundImage,s.color];};
+    const toolbar=[...document.querySelectorAll('#accounts-page .search,#account-scope,#say-hi-all,#refresh-all')].filter(el=>el.getClientRects().length).map(box);
+    const actions=[...document.querySelectorAll('#say-hi-all,#refresh-all')];
+    return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,toolbar,styles:actions.map(style),detail:[...document.querySelectorAll('#use-gateway,#say-hi-one')].map(box),centers:actions.map(el=>{const icon=el.querySelector('.icon').getBoundingClientRect(),text=el.querySelector('span').getBoundingClientRect();return Math.abs(icon.top+icon.height/2-text.top-text.height/2);})};
+  })()`);
+  assert.equal(layout.overflow,false);
+  assert(layout.toolbar.every(r=>r.width>0&&!r.clipped),'Codex toolbar labels fit: '+JSON.stringify(layout.toolbar));
+  for(const r of layout.toolbar){assert(Math.abs(r.top-layout.toolbar[0].top)<1&&Math.abs(r.bottom-layout.toolbar[0].bottom)<1,'Codex toolbar controls share top/bottom edges: '+JSON.stringify(layout.toolbar));}
+  for(let i=1;i<layout.toolbar.length;i++)assert(layout.toolbar[i].left>=layout.toolbar[i-1].right,'Codex toolbar controls do not overlap');
+  assert.deepEqual(layout.styles[0],layout.styles[1],'Say hi and Refresh share button styling');
+  assert(layout.centers.every(delta=>delta<1),'Toolbar icons and labels are vertically centered');
+  assert(layout.detail.every(r=>r.width>0&&!r.clipped));
+  assert(Math.abs(layout.detail[0].top-layout.detail[1].top)<1&&Math.abs(layout.detail[0].bottom-layout.detail[1].bottom)<1,'Account actions share top/bottom edges');
+  assert(layout.detail[1].left>=layout.detail[0].right+7,'Account actions have a clear gap');
+}
 (async () => {
   await fs.mkdir(root,{recursive:true}); app.setPath('appData',root); app.setPath('userData',path.join(root,'browser')); app.setName('PADSwitcher QA');
   timeout = setTimeout(() => {console.error('Electron UI verification timed out.'); app.exit(1);},45000);
@@ -42,6 +67,36 @@ let timeout;
         const layout = await preview.webContents.executeJavaScript("({count:document.querySelectorAll('.account-card').length,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,imagesLoaded:[...document.images].every(i=>i.complete&&i.naturalWidth>0)})");
         assert.equal(layout.count,3); assert.equal(layout.overflow,false);
         assert.equal(layout.imagesLoaded,true);
+        for(const variant of ['light-vi','dark-en']) {
+          await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();");
+          for(const width of [1920,1260,1000]) {
+            preview.setSize(width,width===1000?680:900);await checkCodexActions(preview);
+            await captureFixture(preview,'say-hi-idle-'+variant+'-'+width+'.png');
+          }
+        }
+        preview.setSize(1260,900);
+        // Greeting UI uses only synthetic accounts and the preview action bridge.
+        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#say-hi-all').click();for(let n=0;n<100;n++){await new Promise(r=>setTimeout(r,20));if(!document.querySelector('#say-hi-all').disabled)break;}document.querySelector('#say-hi-results').open=true;return true;})()");
+        for(const variant of ['light-vi','dark-en']) {
+          await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();");
+          for(const width of [1920,1260,1000]) {
+            preview.setSize(width,width===1000?680:900);
+            await checkCodexActions(preview);
+            const greeting=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,rows:document.querySelectorAll('.say-hi-row').length,summary:document.querySelector('#say-hi-summary').textContent,buttons:[...document.querySelectorAll('#say-hi-one,#say-hi-all,#refresh-all')].map(el=>{const r=el.getBoundingClientRect();return {width:r.width,right:r.right,clipped:el.scrollWidth>el.clientWidth};})};})()");
+            assert.equal(greeting.overflow,false);assert.equal(greeting.rows,3);assert(greeting.summary.includes('2/3'));assert(greeting.buttons.every(b=>b.width>0&&b.right<=width&&!b.clipped));
+            await captureFixture(preview,'say-hi-'+variant+'-'+width+'.png');
+          }
+        }
+        await preview.webContents.executeJavaScript("window.finishedSayHi=structuredClone(state.sayHi);state.sayHi={active:true,stopping:true,activeProfileId:state.profiles[0].id,rows:state.profiles.map((p,i)=>({id:p.id,label:p.label,status:i===0?'sending':'queued'}))};render();");
+        for(const variant of ['light-vi','dark-en']) {
+          await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();");
+          preview.setSize(1000,680);await checkCodexActions(preview);
+          await captureFixture(preview,'say-hi-running-'+variant+'-1000.png');
+        }
+        await preview.webContents.executeJavaScript("state.sayHi=window.finishedSayHi;delete window.finishedSayHi;render();");
+        await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#say-hi-dismiss').click();await new Promise(r=>setTimeout(r,30));window.padUI.setTheme('light');window.padUI.setLanguage('vi');render();return true;})()");
+        preview.setSize(1260,900);
+        console.log('Say hi idle/running/results, aligned toolbar and account actions, VI/EN, light/dark at 1920/1260/1000px: passed.');
         await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#use-gateway').click();await new Promise(r=>setTimeout(r,100));document.querySelectorAll('.account-card')[1].click();return document.querySelector('#gateway-status').textContent;})()");
         await preview.webContents.executeJavaScript("document.querySelector('#toasts').replaceChildren()");
         await new Promise(resolve=>setTimeout(resolve,250));

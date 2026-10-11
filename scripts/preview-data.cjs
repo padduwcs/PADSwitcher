@@ -21,6 +21,15 @@ ${require('./kaggle-preview-data.cjs')}
     onState: cb => { callback = cb; },onDevice:cb => {deviceCallback=cb;},
     action:async (command,args={}) => {
       if(command.startsWith('kaggle'))return kaggleAction(command,args);
+      if(command==='sayHi'||command==='sayHiAll'){
+        if(state.sayHi?.active)return {ok:false,error:{code:'SAY_HI_BUSY',message:'Say hi đang chạy. Hãy chờ hoàn tất.'},state:clone(state)};
+        const targets=command==='sayHiAll'?state.profiles:state.profiles.filter(p=>p.id===args.id);
+        state.sayHi={active:true,stopping:false,rows:targets.map(p=>({id:p.id,label:p.label,status:'queued'}))};publish();
+        const run=async()=>{for(const row of state.sayHi.rows){if(state.sayHi.stopping){row.status='cancelled';continue;}state.sayHi.activeProfileId=row.id;row.status='sending';publish();await new Promise(r=>setTimeout(r,25));const p=state.profiles.find(p=>p.id===row.id);row.status=p.status==='error'?'failed':'sent';row.sentAt=new Date().toISOString();row.quotaRefreshed=row.status==='sent';if(row.status==='failed')row.error={code:'SAY_HI_FAILED',message:'Codex chưa hoàn tất lời chào. Làm mới quota trước khi gửi lại.'};publish();}state.sayHi.active=false;state.sayHi.activeProfileId=null;publish();};run();
+        return {ok:true,state:clone(state)};
+      }
+      if(command==='sayHiStop'){if(state.sayHi)state.sayHi.stopping=true;publish();return {ok:true,state:clone(state)};}
+      if(command==='sayHiDismiss'){if(!state.sayHi?.active)state.sayHi=null;publish();return {ok:true,state:clone(state)};}
       if(command==='prepareReset'){const p=state.profiles.find(p=>p.id===args.id);p.resetAttempt={key:'fixture-reset-key',creditId:args.creditId,status:'prepared'};return {ok:true,result:{...p.resetAttempt,retry:false},state:clone(state)};}
       if(command==='consumeReset'){const p=state.profiles.find(p=>p.id===args.id);if(!args.confirmed||args.key!==p.resetAttempt?.key)return {ok:false,error:{code:'RESET_STALE',message:'Xác nhận đã cũ.'},state:clone(state)};if(p.resetAttempt.status!=='completed'){p.resetCredits.availableCount--;p.resetCredits.credits=p.resetCredits.credits?.slice(1)||null;p.resetAttempt.status='completed';p.quota.forEach(b=>b.windows.forEach(w=>w.usedPercent=0));}publish();return {ok:true,result:{outcome:'reset',quotaRefreshed:true},state:clone(state)};}
       if (command==='state') {scopes();return {ok:true,result:clone(state)};}

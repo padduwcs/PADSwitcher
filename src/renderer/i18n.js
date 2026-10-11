@@ -170,6 +170,28 @@ window.padUI = (() => {
     'Profile PowerShell có chữ ký. Giữ nguyên tệp; dùng lệnh sao chép trong terminal hiện tại.':'This PowerShell profile is signed. It was preserved; use the copied command in your current terminal.',
     'Chưa tạo được lệnh terminal Kaggle. Kiểm tra quyền thư mục dữ liệu.':'Could not export the Kaggle terminal command. Check data folder permissions.'
   });
+  Object.assign(dictionary, {
+    'Say hi tất cả':'Say hi to all', 'Dừng sau lượt này':'Stop after this turn', 'Đóng kết quả':'Dismiss results',
+    'Tiến độ Say hi':'Say hi progress', 'Kết quả từng tài khoản':'Results by account',
+    'Gửi một lời chào ngắn qua từng tài khoản để bắt đầu chu kỳ quota sớm.':'Send a short greeting from each account to start its quota cycle early.',
+    'Gửi một lời chào ngắn để bắt đầu chu kỳ quota sớm.':'Send a short greeting to start the quota cycle early.',
+    'Say hi tạo cuộc trò chuyện mới, trả lời ngắn và tiêu hao một ít quota.':'Say hi starts a new conversation with a short reply and uses a little quota.',
+    'Say hi tiêu hao một ít quota.':'Say hi uses a little quota.',
+    'Mỗi tài khoản nhận một lời chào trong cuộc trò chuyện mới và tiêu hao một ít quota.':'Each account receives a greeting in a new conversation and uses a little quota.',
+    'Đang chờ':'Queued', 'Đang say hi…':'Sending greeting…', 'Đã say hi':'Greeting sent',
+    'Đã bỏ qua':'Skipped', 'Chưa gửi được':'Not sent', 'Chưa rõ kết quả':'Outcome uncertain', 'Đã dừng':'Stopped',
+    'Đã dừng Say hi.':'Say hi stopped.', 'Say hi đang chạy. Hãy chờ hoàn tất.':'Say hi is running. Wait for it to finish.',
+    'Thêm tài khoản trước khi Say hi.':'Add an account before using Say hi.',
+    'Chờ Say hi hoàn tất trước khi thay phiên tài khoản này.':'Wait for Say hi to finish before replacing or removing this account.',
+    'Chờ Say hi hoàn tất trước khi đổi đường dẫn Codex.':'Wait for Say hi to finish before changing Codex paths.',
+    'Phiên đã hết hạn. Hãy đăng nhập lại tài khoản này.':'This session expired. Sign in to this account again.',
+    'Tài khoản đã hết quota. Chưa gửi được lời chào.':'This account has exhausted its quota. The greeting was not sent.',
+    'Codex chưa cung cấp model cho lời chào.':'Codex did not provide a model for the greeting.',
+    'Không tạo được cuộc trò chuyện cho lời chào.':'Could not create a conversation for the greeting.',
+    'Chưa xác định lời chào đã hoàn tất. Làm mới quota trước khi gửi lại.':'The greeting outcome is uncertain. Refresh quota before sending again.',
+    'Codex chưa hoàn tất lời chào. Làm mới quota trước khi gửi lại.':'Codex did not complete the greeting. Refresh quota before sending again.',
+    'Đã say hi, chưa cập nhật được giờ reset. Hãy làm mới quota.':'Greeting sent, but the reset time could not be refreshed. Refresh quota.'
+  });
   const patterns = [
     [/^Cập nhật (\d+) phút trước · Dữ liệu cũ$/, 'Updated $1 minutes ago · Outdated data'],
     [/^Cập nhật (\d+) giờ trước · Dữ liệu cũ$/, 'Updated $1 hours ago · Outdated data'],

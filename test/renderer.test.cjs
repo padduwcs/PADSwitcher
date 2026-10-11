@@ -8,6 +8,33 @@ const html = fs.readFileSync(path.join(__dirname,'../src/renderer/index.html'),'
 const script = fs.readFileSync(path.join(__dirname,'../src/renderer/app.js'),'utf8');
 const mock = require('../scripts/preview-data.cjs');
 const settle = async () => { await new Promise(resolve => setTimeout(resolve,10)); };
+test('Say hi sends the selected account without activation and all means every saved account, including search-hidden rows',async t=>{
+  const w=dom(t);await settle();const d=w.document,calls=[],action=w.pad.action;
+  w.pad.action=async(command,args)=>{calls.push({command,args});return action(command,args);};
+  d.querySelector('[data-service=codex]').click();d.querySelectorAll('.account-card')[1].click();
+  const id=d.querySelector('.account-card.selected').dataset.id;d.querySelector('#say-hi-one').click();await settle();
+  assert.equal(calls[0].command,'sayHi');assert.equal(calls[0].args.id,id);assert(d.querySelector('#say-hi-one').disabled);
+  assert(!d.querySelector('#refresh-all').disabled);await new Promise(r=>setTimeout(r,60));
+  assert(d.querySelector('#say-hi-summary').textContent.includes('1/1'));assert.equal(d.querySelectorAll('.say-hi-row').length,1);
+  d.querySelector('#search').value='Dự án';d.querySelector('#search').dispatchEvent(new w.Event('input'));
+  d.querySelector('#say-hi-all').click();await settle();
+  for(let wait=0;wait<100&&d.querySelector('#say-hi-all').disabled;wait++)await settle();
+  assert.equal(d.querySelectorAll('.say-hi-row').length,3);assert(d.querySelector('#say-hi-summary').textContent.includes('2/3'));
+  assert(!calls.some(c=>['gateway','switch','launch'].includes(c.command)));
+  d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#say-hi-all').textContent,'Say hi to all');
+  assert.match(d.querySelector('#say-hi-summary').textContent,/2\/3 sent/);assert(d.querySelector('.say-hi-row.failed').textContent.includes('Codex did not complete'));
+  d.querySelector('#say-hi-dismiss').click();await settle();assert(d.querySelector('#say-hi-panel').classList.contains('hidden'));
+});
+test('Say hi stop, in-flight account protection, empty state and error text remain safe',async t=>{
+  const empty=dom(t,false);await settle();assert(empty.document.querySelector('#say-hi-all').disabled);
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-service=codex]').click();
+  d.querySelector('#say-hi-all').click();await settle();assert(d.querySelector('#reauth-profile').disabled);assert(d.querySelector('#remove-profile').disabled);
+  d.querySelector('#say-hi-stop').click();await new Promise(r=>setTimeout(r,60));
+  assert.equal(d.querySelectorAll('.say-hi-row.cancelled').length,2);assert(!d.querySelector('#say-hi-one').disabled);
+  const unsafe=dom(t,true,s=>{s.sayHi={active:false,rows:[{id:s.profiles[0].id,label:'<img src=x onerror=alert(1)>',status:'uncertain',error:{code:'SAY_HI_UNCERTAIN',message:'<script>bad</script>'}}]};});await settle();
+  assert.equal(unsafe.document.querySelector('#say-hi-rows img'),null);assert.equal(unsafe.document.querySelector('#say-hi-rows script'),null);
+  assert(unsafe.document.querySelector('#say-hi-rows').textContent.includes('<img'));
+});
 test('services are the entry point; navigation preserves selection and never switches or launches an account',async t=>{
   const w=dom(t);await settle();const d=w.document,calls=[],action=w.pad.action;
   w.pad.action=async(command,args)=>{calls.push(command);return action(command,args);};

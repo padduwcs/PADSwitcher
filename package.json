@@ -1,6 +1,6 @@
 {
   "name": "padswitcher",
-  "version": "1.18.0",
+  "version": "1.19.1",
   "description": "Profile Account Directory Switcher — Codex and Kaggle account manager for Windows",
   "private": true,
   "main": "src/main.cjs",
@@ -20,6 +20,7 @@
     "smoke:gateway": "node scripts/gateway-smoke.cjs --live --inference",
     "smoke:recovery": "node scripts/recovery-native-smoke.cjs --live",
     "smoke:protocol": "node scripts/router-protocol-smoke.cjs",
+    "smoke:say-hi": "node scripts/say-hi-protocol-smoke.cjs",
     "prebuild": "node scripts/build-helper.cjs",
     "predist": "node scripts/build-helper.cjs",
     "build": "electron-builder --win dir",

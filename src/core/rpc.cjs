@@ -6,6 +6,10 @@ class CodexRpc {
   constructor(executable, home, options = {}) {
     const env = { ...process.env, CODEX_HOME: home };
     for (const name of ['CODEX_SQLITE_HOME','CODEX_ACCESS_TOKEN','CODEX_API_KEY','OPENAI_API_KEY','ACCESS_TOKEN','OPENAI_IDENTITY_TOKEN_FILE','OPENAI_WORKSPACE_ID','OPENAI_FEDERATION_RULE_ID']) delete env[name];
+    // A greeting must not inherit a parent Codex app's tools pipe or thread identity.
+    if (options.isolated) for (const name of Object.keys(env)) {
+      if ((name.startsWith('CODEX_') && name !== 'CODEX_HOME') || ['OPENAI_BASE_URL','NODE_OPTIONS'].includes(name)) delete env[name];
+    }
     this.child = (options.spawn || spawn)(executable, ['app-server', '--listen', 'stdio://', ...(options.ephemeralStore ? ['-c','cli_auth_credentials_store="ephemeral"'] : options.fileStore ? ['-c', 'cli_auth_credentials_store="file"'] : [])], { env, cwd: home, stdio: ['pipe','pipe','pipe'], windowsHide: true });
     this.pending = new Map(); this.listeners = new Set(); this.sequence = 0; this.closed = false;
     this.child.stderr.resume(); this.child.stdin.on('error', () => {});
@@ -22,7 +26,7 @@ class CodexRpc {
       if (message.error) entry.reject(new UserError('Codex chưa thực hiện được yêu cầu. Phiên có thể đã hết hạn, dịch vụ đang lỗi hoặc phiên bản chưa hỗ trợ.', 'CODEX_RPC_ERROR'));
       else entry.resolve(message.result);
     } else if (message.method && message.id != null) {
-      // This client never runs inference; refuse unsolicited tool requests.
+      // Account operations and the isolated greeting never accept tool requests.
       this.send({ id: message.id, error: { code: -32601, message: 'Method not supported by PADSwitcher' } });
     } else if (message.method) {
       for (const callback of this.listeners) callback(message.method, message.params || {});

@@ -13,6 +13,7 @@ const windows = require('./windows.cjs');
 const { CodexRpc } = require('./rpc.cjs');
 const { SEAL_SESSION } = require('./guardian.cjs');
 const {defaults:routeDefaults,validate:validateRoutes,SCOPES}=require('./client-routes.cjs');
+const { SayHiService } = require('./say-hi.cjs');
 
 class ProfileService extends EventEmitter {
   constructor(root, adapters = {}) {
@@ -22,6 +23,7 @@ class ProfileService extends EventEmitter {
     this.platform = { ...windows, ...adapters };
     this.rpcFactory = adapters.rpcFactory || ((exe,home,opts) => new CodexRpc(exe,home,opts));
     this.running = new Map(); this.busy = false; this.login = null;
+    this.sayHi = new SayHiService(this, adapters.sayHiOptions);
     this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), workspace: process.cwd(), autoRefresh: true }, activeDesktopId: null, rollback: null };
     this.state.autoSwitch={enabled:false,order:[]};this.state.quotaCooldowns={};
     this.state.clientRoutes=routeDefaults();
@@ -61,6 +63,7 @@ class ProfileService extends EventEmitter {
     return {
       version: require('../../package.json').version, profiles: this.state.profiles.map(p => ({ ...p, running: this.running.has(p.id), desktopActive: p.id === this.state.activeDesktopId })),
       settings: { ...this.state.settings }, busy: this.busy||!!this.gateway?.flight, login: this.login ? { profileId: this.login.profileId } : null,
+      sayHi: this.sayHi.view(),
       autoSwitch:{...this.state.autoSwitch,order:[...this.state.autoSwitch.order]},
       clientRoutes:JSON.parse(JSON.stringify(this.state.clientRoutes)),
       canRestore: Boolean(this.state.rollback), recoveryPending: this.recoveryPending || false,
@@ -97,6 +100,7 @@ class ProfileService extends EventEmitter {
   async capture(bytes, label) {
     const identity = parseAuth(bytes);
     let p = this.state.profiles.find(p => p.identity === identity.identity);
+    if (p && this.sayHi.isUsing(p.id)) throw new UserError('Chờ Say hi hoàn tất trước khi thay phiên tài khoản này.', 'SAY_HI_PROFILE');
     const created = !p;
     if (!p) {
       p = { id: crypto.randomUUID(), ...identity, label: cleanText(label || identity.email || `Tài khoản ${this.state.profiles.length+1}`,80), notes: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), quota: [], quotaAt: null, status: 'ready', lastError: null };
@@ -305,6 +309,7 @@ class ProfileService extends EventEmitter {
   }
   async addAccount(label, openUrl, device = false, expectedId = null, onDevice = () => {}) {
     return this.exclusive(async () => {
+      if (expectedId && this.sayHi.isUsing(expectedId)) throw new UserError('Chờ Say hi hoàn tất trước khi thay phiên tài khoản này.', 'SAY_HI_PROFILE');
       if(expectedId&&(this.gateway?.isUsing?.(expectedId)||this.gateway?.profileId===expectedId||this.gateway?.pendingId===expectedId||this.gateway?.router?.isUsing(expectedId)))throw new UserError('Dừng gateway hoặc chọn tài khoản khác trước khi đăng nhập lại hồ sơ này.', 'PROFILE_ACTIVE');
       if (expectedId && this.running.has(expectedId)) throw new UserError('Hãy đóng CLI của hồ sơ trước khi đăng nhập lại.', 'PROFILE_RUNNING');
       if (expectedId && (await this.desktopIdentity())?.identity === this.get(expectedId).identity) throw new UserError('Hồ sơ này đang dùng cho desktop. Chuyển desktop sang tài khoản khác trước khi đăng nhập lại; hoặc đăng nhập lại trong Codex rồi bấm Lưu tài khoản hiện tại.', 'PROFILE_ACTIVE');
@@ -490,6 +495,7 @@ class ProfileService extends EventEmitter {
   }
   async remove(id) {
     return this.exclusive(async () => {
+      if (this.sayHi.isUsing(id)) throw new UserError('Chờ Say hi hoàn tất trước khi thay phiên tài khoản này.', 'SAY_HI_PROFILE');
       const p = this.get(id); await this.checkRecovered();
       if(this.gateway?.isUsing?.(id)||this.gateway?.profileId===id||this.gateway?.pendingId===id||this.gateway?.router?.isUsing(id))throw new UserError('Hãy chọn tài khoản khác trong gateway trước khi xóa.', 'PROFILE_ACTIVE');
       if (this.running.has(id)) throw new UserError('Hãy đóng CLI trước khi xóa hồ sơ.', 'PROFILE_RUNNING');
@@ -544,6 +550,7 @@ class ProfileService extends EventEmitter {
       const next = { ...this.state.settings };
       for (const field of ['codexPath','workspace','desktopHome']) if (input[field] !== undefined) { if (typeof input[field] !== 'string' || input[field].length > 2048) throw new UserError('Đường dẫn không hợp lệ.', 'INVALID_SETTINGS'); next[field] = input[field]; }
       const pathsChanged=['codexPath','workspace','desktopHome'].some(field=>next[field]!==this.state.settings[field]);
+      if (pathsChanged && this.sayHi.flight) throw new UserError('Chờ Say hi hoàn tất trước khi đổi đường dẫn Codex.', 'SAY_HI_BUSY');
       if(pathsChanged&&this.gateway&&!['stopped','error'].includes(this.gateway.status))throw new UserError('Dừng gateway trước khi đổi đường dẫn.', 'GATEWAY_RUNNING');
       if (next.codexPath) await this.platform.findCodex(next.codexPath);
       await assertDirectory(next.workspace); await assertDirectory(next.desktopHome);
@@ -573,7 +580,7 @@ class ProfileService extends EventEmitter {
     const modelUsage=routes.filter(([,v])=>v?.usage).map(([scope,v])=>({scope,...v.usage}));
     return { codex: executable, version: /^codex-cli [\w.+-]+$/.test(version) ? version : 'Codex CLI', blockers: [...new Set(blocked.map(p => p.Name))], storage: this.root, loginRecovery: await exists(path.join(this.root,'login','auth.json')),modelUsage };
   }
-  async close() { this.cancelLogin(); }
+  async close() { this.cancelLogin(); await this.sayHi.shutdown(); }
 }
 function cleanText(value,max) { if (typeof value !== 'string') return ''; return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'').trim().slice(0,max); }
 function hash(bytes) { return bytes ? crypto.createHash('sha256').update(bytes).digest('hex') : null; }
