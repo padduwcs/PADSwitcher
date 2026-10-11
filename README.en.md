@@ -82,7 +82,7 @@ All three client types share one account by default. You can also assign a separ
 3. Select an account → **Copy command** or **Open new terminal**.
 4. Submit notebooks with the Kaggle CLI and monitor quotas/runs in PADSwitcher.
 
-Each PowerShell keeps its own account selection, so multiple terminals can use different accounts in parallel within Kaggle's limits. See the [complete Kaggle guide](docs/KAGGLE.md).
+Each PowerShell keeps its own account selection, so multiple terminals can use different accounts in parallel within Kaggle's limits. See the [complete Kaggle guide](docs/KAGGLE.en.md).
 
 ## Security and boundaries
 
@@ -92,7 +92,7 @@ Each PowerShell keeps its own account selection, so multiple terminals can use d
 - Organization accounts, WSL, SSH/containers, Codex cloud, Windows auto-start, and automatic updates are not currently supported.
 - Codex sandboxing and tool-approval prompts remain in place.
 
-Read more: [Security](SECURITY.md) · [Routing boundaries](ROUTING.md) · [Validation scope](VALIDATION.md)
+Read more: [Security](SECURITY.md) · [Routing boundaries](ROUTING.en.md) · [Validation scope](VALIDATION.md)
 
 ## Development
 

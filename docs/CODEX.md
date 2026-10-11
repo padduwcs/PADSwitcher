@@ -134,4 +134,4 @@ PADSwitcher does not replay after response output, network errors, non-quota err
 - Sessions are encrypted with Windows DPAPI under `%APPDATA%\PADSwitcher\data`. Do not share this directory or gateway files.
 - The portable build is unsigned and has no automatic updater.
 
-See [security](../SECURITY.md), [routing boundaries](../ROUTING.md), and [validation scope](../VALIDATION.md).
+See [security](../SECURITY.md), [routing boundaries](../ROUTING.en.md), and [validation scope](../VALIDATION.md).

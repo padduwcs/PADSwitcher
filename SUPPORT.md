@@ -5,7 +5,7 @@ PADSwitcher is a community-maintained project.
 ## Get help
 
 1. Read the [README](README.en.md) and the in-app Help page.
-2. Check the [Codex guide](docs/CODEX.md#english) or [Kaggle guide](docs/KAGGLE.md).
+2. Check the [Codex guide](docs/CODEX.md#english) or [Kaggle guide](docs/KAGGLE.en.md).
 3. Search [existing issues](https://github.com/padduwcs/PADSwitcher/issues).
 4. If the problem is reproducible, open a [bug report](https://github.com/padduwcs/PADSwitcher/issues/new/choose).
 

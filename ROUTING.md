@@ -1,4 +1,6 @@
-# Định tuyến model — PADSwitcher 1.9.0
+# Định tuyến model
+
+[English](ROUTING.en.md)
 
 ## Quyết định triển khai
 

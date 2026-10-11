@@ -9,3 +9,8 @@ auth.json
 src/assets/PADCodex.exe
 __pycache__/
 *.pyc
+.vscode/
+.idea/
+*.user
+Thumbs.db
+Desktop.ini
