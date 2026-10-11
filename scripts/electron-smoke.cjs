@@ -177,20 +177,39 @@ let timeout;
           await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1&kgmany=1'});
           await preview.webContents.executeJavaScript("document.fonts.ready.then(()=>true)");
           await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();navigate('kaggle');window.kgPageCalls=0;const originalKgAction=window.pad.action;window.pad.action=(command,args)=>{if(command==='kaggleNotebooksMore')window.kgPageCalls++;return originalKgAction(command,args);};true;");
-          for(const width of [1260,1000]){
-            preview.setSize(width,width===1000?680:900);
-            const metrics=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,body:[document.querySelector('#kg-detail-body').scrollHeight,document.querySelector('#kg-detail-body').clientHeight],regions:['pinned','recent'].map(name=>{const el=document.querySelector('#kg-notebooks-'+name);return {height:el.clientHeight,content:el.scrollHeight,count:el.querySelectorAll('.kg-notebook').length};}),detail:document.querySelector('#kg-detail').getBoundingClientRect().bottom,viewport:innerHeight};})()");
-            assert.equal(metrics.overflow,false);assert(metrics.body[0]>metrics.body[1]);assert(metrics.detail<=metrics.viewport,'Kaggle detail stays within the viewport: '+JSON.stringify(metrics));
-            assert.equal(metrics.regions[0].count,20);assert(metrics.regions.every(r=>r.content>r.height&&r.height<=208));
-            await preview.webContents.executeJavaScript("(()=>{const body=document.querySelector('#kg-detail-body');body.scrollTop+=document.querySelector('#kg-notebooks-pinned').closest('section').getBoundingClientRect().top-body.getBoundingClientRect().top-12;document.querySelector('#kg-notebooks-pinned').scrollTop=40;})()");
+          for(const width of [1920,1260,1000]){
+            preview.setSize(width,width===1920?1080:width===1000?680:900);
+            const metrics=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,bodyOverflow:getComputedStyle(document.querySelector('#kg-detail-body')).overflowY,regions:['pinned','recent'].map(name=>{const el=document.querySelector('#kg-notebooks-'+name);return {height:el.clientHeight,content:el.scrollHeight,count:el.querySelectorAll('.kg-notebook').length};}),width:document.querySelector('#kg-layout').clientWidth};})()");
+            assert.equal(metrics.overflow,false);assert.equal(metrics.bodyOverflow,'visible');if(width===1920)assert(metrics.width>1700,'Kaggle uses the wide viewport');
+            assert.equal(metrics.regions[0].count,20);assert(metrics.regions.every(r=>r.content>r.height&&r.height>=250),'Roomy responsive lists: '+JSON.stringify(metrics));
+            await preview.webContents.executeJavaScript("window.scrollTo(0,document.querySelector('#kg-notebooks-pinned').closest('section').getBoundingClientRect().top+scrollY-110);document.querySelector('#kg-notebooks-pinned').scrollTop=40;");
             await new Promise(resolve=>setTimeout(resolve,100));
             const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-scroll-'+variant+'-'+width+'.png'),frame);
           }
           const paging=await preview.webContents.executeJavaScript("(async()=>{const recent=document.querySelector('#kg-notebooks-recent');recent.scrollTop=recent.scrollHeight;await new Promise(r=>setTimeout(r,180));const expanded=document.querySelector('#kg-notebooks-recent');const top=expanded.scrollTop;document.querySelector('#kg-refresh-one').click();await new Promise(r=>setTimeout(r,60));return {calls:window.kgPageCalls,recent:document.querySelectorAll('#kg-notebooks-recent .kg-notebook').length,pinned:document.querySelectorAll('#kg-notebooks-pinned .kg-notebook').length,pinnedTop:document.querySelector('#kg-notebooks-pinned').scrollTop,top,after:document.querySelector('#kg-notebooks-recent').scrollTop};})()");
           assert.equal(paging.calls,1);assert.equal(paging.recent,24);assert.equal(paging.pinned,20);assert.equal(paging.pinnedTop,40);assert.equal(paging.after,paging.top);
+          // Send real Chromium mouse input, including pointer capture across a refresh.
+          const handle=await preview.webContents.executeJavaScript("(()=>{const el=document.querySelector('[data-kg-resize=recent]');el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),height:document.querySelector('#kg-notebooks-recent').clientHeight};})()");
+          preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y});preview.webContents.sendInputEvent({type:'mouseDown',x:handle.x,y:handle.y,button:'left',clickCount:1});
+          preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+120,button:'left'});
+          await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#kg-refresh-one').click();await new Promise(r=>setTimeout(r,60));return true;})()");
+          preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+140,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:handle.x,y:handle.y+140,button:'left',clickCount:1});
+          const resized=await preview.webContents.executeJavaScript("({height:document.querySelector('#kg-notebooks-recent').clientHeight,saved:JSON.parse(localStorage.getItem('pad-kaggle-layout')),cursor:document.body.classList.contains('kg-resizing-height')})");
+          assert.equal(resized.height,handle.height+140);assert(Math.abs(resized.saved.recent-resized.height)<=1);assert.equal(resized.cursor,false);
+          const column=await preview.webContents.executeJavaScript("(()=>{window.scrollTo(0,0);const r=document.querySelector('[data-kg-resize=width]').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),width:document.querySelector('#kg-list').clientWidth};})()");
+          preview.webContents.sendInputEvent({type:'mouseMove',x:column.x,y:column.y});preview.webContents.sendInputEvent({type:'mouseDown',x:column.x,y:column.y,button:'left',clickCount:1});preview.webContents.sendInputEvent({type:'mouseMove',x:column.x+80,y:column.y,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:column.x+80,y:column.y,button:'left',clickCount:1});
+          const columnWidth=await preview.webContents.executeJavaScript("document.querySelector('#kg-list').clientWidth");assert(Math.abs(columnWidth-column.width-80)<=1);
+          await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1&kgmany=1'});await preview.webContents.executeJavaScript("navigate('kaggle')");
+          assert.equal(await preview.webContents.executeJavaScript("document.querySelector('#kg-notebooks-recent').clientHeight"),resized.height);
+          assert.equal(await preview.webContents.executeJavaScript("document.querySelector('#kg-list').clientWidth"),columnWidth);
+          await preview.webContents.executeJavaScript("document.querySelector('#kg-layout-reset').click()");
+          assert.equal(await preview.webContents.executeJavaScript("localStorage.getItem('pad-kaggle-layout')"),null);
+          const tallList=await preview.webContents.executeJavaScript("(async()=>{window.scrollTo(0,0);const grip=document.querySelector('[data-kg-resize=recent]');grip.dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}));const recent=document.querySelector('#kg-notebooks-recent');const fits=recent.scrollHeight<=recent.clientHeight;window.scrollTo(0,recent.getBoundingClientRect().bottom+scrollY-innerHeight+20);await new Promise(r=>setTimeout(r,160));return {fits,rows:document.querySelectorAll('#kg-notebooks-recent .kg-notebook').length};})()");
+          assert(tallList.fits);assert.equal(tallList.rows,24,'Page scrolling also loads more when the list is tall enough to fit its current rows');
+          await preview.webContents.executeJavaScript("document.querySelector('#kg-layout-reset').click()");
           preview.setSize(1260,900);
         }
-        preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1260/1000px; independent notebook scrolling and incremental loading: passed.');
+        preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1920/1260/1000px; scrolling, pagination, native drag resizing and persisted layout: passed.');
         clearTimeout(timeout); app.exit(0);
       } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.stack); app.exit(1); }
     });

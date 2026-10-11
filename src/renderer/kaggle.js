@@ -14,6 +14,74 @@ window.padKaggleUI = (() => {
   const act=(command,args={},success)=>hooks.call(command,args,success);
   const button=(id,label,kind='secondary',disabled=false)=>`<button type="button" id="${id}" class="button ${kind}" ${disabled?'disabled':''}>${label}</button>`;
   const literal=body=>`<div data-literal>${body}</div>`;
+  const layoutKey='pad-kaggle-layout';
+  let sizes={},resize=null,loadNext=null;
+  try{const saved=JSON.parse(localStorage.getItem(layoutKey));if(saved?.version===1)for(const key of ['width','accounts','pinned','recent'])if(Number.isFinite(saved[key])&&(key==='width'?saved[key]>=.15&&saved[key]<=.7:saved[key]>=80&&saved[key]<=10000))sizes[key]=saved[key];}catch{}
+  const grip=(key,label,vertical=false)=>`<div class="kg-resizer ${vertical?'kg-column-resizer':'kg-row-resizer'}" data-kg-resize="${key}" role="separator" tabindex="0" aria-orientation="${vertical?'vertical':'horizontal'}" aria-label="${label}" title="${label}"><span aria-hidden="true"></span></div>`;
+  function bounds(key){
+    if(key!=='width')return [key==='accounts'?160:80,Math.max(480,window.innerHeight*2)];
+    const width=Math.max(1,$('#kg-layout').clientWidth-48);
+    return [Math.min(.4,240/width),Math.max(.4,Math.min(.6,1-360/width))];
+  }
+  const constrain=(key,value)=>{const [min,max]=bounds(key);return Math.max(min,Math.min(max,value));};
+  function saveSizes(){try{if(Object.keys(sizes).length)localStorage.setItem(layoutKey,JSON.stringify({version:1,...sizes}));else localStorage.removeItem(layoutKey);}catch{}}
+  function applySizes(){
+    const root=$('#kaggle-content'),layout=$('#kg-layout');if(!layout||layout.classList.contains('hidden')||!layout.clientWidth)return;
+    const width=Math.max(1,layout.clientWidth-48),top=layout.getBoundingClientRect().top+window.scrollY;
+    const automaticAccounts=Math.max(320,window.innerHeight-top-24);
+    root.style.setProperty('--kg-account-width',Math.round(constrain('width',sizes.width??.3)*width)+'px');
+    root.style.setProperty('--kg-accounts-auto',automaticAccounts+'px');
+    for(const key of ['accounts','pinned','recent']){
+      const property='--kg-'+key+'-height';
+      if(sizes[key]!=null)root.style.setProperty(property,constrain(key,sizes[key])+'px');else root.style.removeProperty(property);
+    }
+    for(const handle of root.querySelectorAll('[data-kg-resize]')){
+      const key=handle.dataset.kgResize,[min,max]=bounds(key),region=document.getElementById(key==='accounts'?'kg-list':'kg-notebooks-'+key);
+      const value=key==='width'?constrain(key,sizes.width??.3)*100:region?.getBoundingClientRect().height||sizes[key]||min;
+      handle.setAttribute('aria-valuemin',Math.round(key==='width'?min*100:min));handle.setAttribute('aria-valuemax',Math.round(key==='width'?max*100:max));handle.setAttribute('aria-valuenow',Math.round(value));
+      handle.setAttribute('aria-valuetext',Math.round(value)+(key==='width'?'%':' px'));
+    }
+  }
+  function endResize(cancel=false){
+    if(!resize)return;const previous=resize;resize=null;
+    if(cancel)sizes=previous.before;else saveSizes();
+    document.body.classList.remove('kg-resizing-width','kg-resizing-height');applySizes();
+    const root=$('#kaggle-content');if(root.hasPointerCapture?.(previous.id))root.releasePointerCapture(previous.id);
+  }
+  function setupResizing(root){
+    root.addEventListener('pointerdown',event=>{
+      const handle=event.target.closest('[data-kg-resize]');if(!handle||event.button!==0)return;
+      const key=handle.dataset.kgResize,region=document.getElementById(key==='accounts'?'kg-list':'kg-notebooks-'+key);
+      endResize();resize={key,id:event.pointerId,x:event.clientX,y:event.clientY,width:Math.max(1,$('#kg-layout').clientWidth-48),value:key==='width'?constrain(key,sizes.width??.3):region.getBoundingClientRect().height,before:{...sizes}};
+      root.setPointerCapture?.(event.pointerId);document.body.classList.add(key==='width'?'kg-resizing-width':'kg-resizing-height');handle.focus({preventScroll:true});event.preventDefault();
+    });
+    root.addEventListener('pointermove',event=>{
+      if(!resize||event.pointerId!==resize.id)return;
+      sizes[resize.key]=constrain(resize.key,resize.value+(resize.key==='width'?(event.clientX-resize.x)/resize.width:event.clientY-resize.y));applySizes();
+    });
+    root.addEventListener('pointerup',event=>{if(event.pointerId===resize?.id)endResize();});
+    root.addEventListener('pointercancel',event=>{if(event.pointerId===resize?.id)endResize(true);});
+    root.addEventListener('lostpointercapture',()=>endResize());
+    root.addEventListener('dblclick',event=>{const key=event.target.closest('[data-kg-resize]')?.dataset.kgResize;if(key){delete sizes[key];saveSizes();applySizes();}});
+    root.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&resize){endResize(true);event.preventDefault();return;}
+      const handle=event.target.closest('[data-kg-resize]');if(!handle)return;
+      const key=handle.dataset.kgResize,up=key==='width'?'ArrowRight':'ArrowDown',down=key==='width'?'ArrowLeft':'ArrowUp';
+      if(![up,down,'Home','End','Enter'].includes(event.key))return;event.preventDefault();
+      if(event.key==='Enter')delete sizes[key];
+      else {const [min,max]=bounds(key),current=Number(handle.getAttribute('aria-valuenow'))/(key==='width'?100:1),step=(key==='width'?.02:20)*(event.shiftKey?5:1);sizes[key]=constrain(key,event.key==='Home'?min:event.key==='End'?max:current+(event.key===up?step:-step));}
+      saveSizes();applySizes();
+    });
+    window.addEventListener('resize',applySizes);
+    let lastPageTop=window.scrollY;
+    window.addEventListener('scroll',()=>{
+      const down=window.scrollY>lastPageTop;lastPageTop=window.scrollY;
+      if(!down||resize||$('#kaggle-page').classList.contains('hidden'))return;
+      const recent=$('#kg-notebooks-recent'),p=data?.accounts.find(p=>p.id===selected);
+      if(!recent||p?.notebookList?.error||recent.scrollHeight>recent.clientHeight)return;
+      const rect=recent.getBoundingClientRect();if(rect.bottom<=window.innerHeight+40&&rect.bottom>90)loadNext?.();
+    },{passive:true});
+  }
   function dialog(title,body,submit,label){hooks.showModal(title,literal(body),submit,label);}
   function render(next,defaultWorkspace) {
     data=next||{accounts:[],settings:{autoRefresh:true},tool:null,editing:false};workspace=defaultWorkspace||workspace;
@@ -23,9 +91,10 @@ window.padKaggleUI = (() => {
     const focusAccount=active?.dataset.kgAccount;
     const focusNotebook=root.contains(active)?['kgOpen','kgUnpin','kgPinRef'].find(key=>active.dataset[key]):null;
     const focusRef=focusNotebook?active.dataset[focusNotebook]:null;
+    const focusResize=root.contains(active)?active?.dataset.kgResize:null;
     if(!root.dataset.ready){
-      root.innerHTML='<div id="kg-heading" class="page-heading"></div><div id="kg-tool-hint"></div><div id="kg-toolbar" class="toolbar"><div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="kg-search" type="search"></div><div id="kg-refresh" class="toolbar-right"></div></div><div id="kg-empty"></div><div class="kg-layout" id="kg-layout"><div id="kg-list" class="kg-list"></div><aside id="kg-detail" class="kg-detail"></aside></div><div id="kg-guide"></div>';
-      root.dataset.ready='1';$('#kg-search').oninput=event=>{query=event.target.value;render(data,workspace);};
+      root.innerHTML='<div id="kg-heading" class="page-heading"></div><div id="kg-tool-hint"></div><div id="kg-toolbar" class="toolbar"><div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="kg-search" type="search"></div><div id="kg-refresh" class="toolbar-right"></div></div><div id="kg-empty"></div><p id="kg-layout-hint" class="kg-layout-hint"></p><div class="kg-layout" id="kg-layout"><div class="kg-account-pane"><div id="kg-list" class="kg-list"></div><div id="kg-accounts-grip"></div></div><div id="kg-column-grip"></div><aside id="kg-detail" class="kg-detail"></aside></div><div id="kg-guide"></div>';
+      root.dataset.ready='1';setupResizing(root);$('#kg-search').oninput=event=>{query=event.target.value;render(data,workspace);};
     }
     $('#kg-heading').innerHTML=`<div><h1 tabindex="-1">Kaggle</h1><div class="list-heading"><h2>${data.accounts.length} ${t('tài khoản','accounts')}</h2></div></div><div class="heading-actions">${button('kg-setup',t('Thiết lập','Setup'),'secondary')}${button('kg-add',t('＋ Thêm tài khoản','＋ Add account'),'primary',data.editing)}</div>`;
     $('#kg-setup').onclick=setup;$('#kg-add').onclick=()=>account();
@@ -35,11 +104,16 @@ window.padKaggleUI = (() => {
     $('#kg-search').placeholder=t('Tìm tên hoặc username','Search name or username');$('#kg-search').setAttribute('aria-label',$('#kg-search').placeholder);
     $('#kg-toolbar').classList.toggle('hidden',!data.accounts.length);
     const any=data.accounts.some(p=>p.refreshing);
-    $('#kg-refresh').innerHTML=button('kg-refresh-all',`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-5v5h5M4 13a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></svg><span>${any?t('Đang cập nhật…','Refreshing…'):t('Làm mới','Refresh')}</span>`,'ghost refresh-button',any||unavailable);
+    $('#kg-refresh').innerHTML=button('kg-layout-reset',t('Bố cục mặc định','Reset layout'),'ghost')+button('kg-refresh-all',`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-5v5h5M4 13a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></svg><span>${any?t('Đang cập nhật…','Refreshing…'):t('Làm mới','Refresh')}</span>`,'ghost refresh-button',any||unavailable);
+    $('#kg-layout-reset').onclick=()=>{endResize(true);sizes={};saveSizes();applySizes();};
     $('#kg-refresh-all').onclick=()=>act('kaggleRefreshAll',{},t('Đã cập nhật các tài khoản. Xem chi tiết nếu có lỗi.','Accounts refreshed. Check details for any errors.'));
     const rows=data.accounts.filter(p=>(p.label+' '+p.username).toLowerCase().includes(query.toLowerCase()));
     if(!rows.some(p=>p.id===selected))selected=rows[0]?.id;
     $('#kg-layout').classList.toggle('hidden',!rows.length);
+    $('#kg-layout-hint').classList.toggle('hidden',!rows.length);
+    $('#kg-layout-hint').textContent=t('Kéo vạch giữa hai cột hoặc dưới danh sách để đổi kích thước.','Drag between columns or below a list to resize.');
+    $('#kg-column-grip').innerHTML=grip('width',t('Đổi chiều rộng cột tài khoản · phím trái/phải; Enter để đặt lại','Resize account column · left/right arrows; Enter to reset'),true);
+    $('#kg-accounts-grip').innerHTML=grip('accounts',t('Đổi chiều cao danh sách tài khoản · phím lên/xuống; Enter để đặt lại','Resize account list · up/down arrows; Enter to reset'));
     $('#kg-empty').innerHTML=!data.accounts.length?`<div class="empty kg-empty"><div class="service-mark kaggle">k</div><h2>${t('Thêm tài khoản Kaggle đầu tiên','Add your first Kaggle account')}</h2><p>${t('Lưu API token một lần, chọn tài khoản từ terminal khi cần.','Save an API token once, then select an account from your terminal.')}</p>${button('kg-empty-add',t('Thêm tài khoản','Add account'),'primary',data.editing)}<small>${t('Token được mã hóa bằng tài khoản Windows của bạn.','Tokens are encrypted for your Windows user.')}</small></div>`:!rows.length?`<div class="no-results">${t('Không tìm thấy tài khoản.','No matching accounts.')}</div>`:'';
     $('#kg-empty-add')?.addEventListener('click',()=>account());
     if($('#kg-empty-add'))$('#kg-empty-add').disabled=unavailable;
@@ -50,12 +124,15 @@ window.padKaggleUI = (() => {
       return `<button class="kg-account ${selected===p.id?'selected':''}" data-kg-account="${e(p.id)}" aria-pressed="${selected===p.id}"><span class="kg-account-top"><span class="avatar">${e(p.username.slice(0,2).toUpperCase())}</span><span class="kg-account-name"><strong>${e(p.label)}</strong><small>@${e(p.username)}</small></span></span><span class="kg-account-quota">${['GPU','TPU'].map(resource=>`<span><span>${resource}</span><b>${hours(p.quota?.find(q=>q.resource===resource)?.remaining)}</b></span>`).join('')}</span><span class="kg-account-hint ${older?'kg-stale':active?'kg-fresh':''}">${!older&&active?'<span class="status-dot ready"></span>':''}${e(hint)}</span></button>`;
     }).join('');
     document.querySelectorAll('[data-kg-account]').forEach(el=>el.onclick=()=>{selected=el.dataset.kgAccount;render(data,workspace);});
-    detail(rows.find(p=>p.id===selected));guide();
+    detail(rows.find(p=>p.id===selected));guide();applySizes();
+    window.requestAnimationFrame?.(applySizes);
     if(focusId)document.getElementById(focusId)?.focus({preventScroll:true});
     else if(focusAccount)root.querySelector(`[data-kg-account="${focusAccount}"]`)?.focus({preventScroll:true});
     else if(focusRef){const attribute={kgOpen:'data-kg-open',kgUnpin:'data-kg-unpin',kgPinRef:'data-kg-pin-ref'}[focusNotebook];root.querySelector(`[${attribute}="${focusRef}"]`)?.focus({preventScroll:true});}
+    else if(focusResize)root.querySelector(`[data-kg-resize="${focusResize}"]`)?.focus({preventScroll:true});
   }
   function detail(p){
+    loadNext=null;
     const box=$('#kg-detail');if(!p){box.innerHTML='';delete box.dataset.account;return;}
     const opened=box.dataset.account===p.id?new Set([...box.querySelectorAll('details[open]')].map(el=>el.id)):new Set();
     const scroll=box.dataset.account===p.id?new Map([...box.querySelectorAll('[data-kg-scroll]')].map(el=>[el.id,el.scrollTop])):new Map();
@@ -76,11 +153,11 @@ window.padKaggleUI = (() => {
         const stamp=n.readAt||p.notebooksAt;
         return `<div class="kg-notebook"><div class="kg-notebook-main"><button class="text-button kg-notebook-link" data-kg-open="${e(n.ref)}" title="${e(n.ref)}">${e(n.title||n.ref)} ↗</button><small>${e(n.ref)}${n.accelerator?' · '+e(n.accelerator):''}</small>${n.error?`<small class="danger-text">${e(window.padUI.t(n.error))}</small>`:''}</div><span class="kg-run-status ${older?'unknown':Object.hasOwn(names,n.status)?n.status:'unknown'}" title="${e(date(stamp))}${older?' · '+t('Dữ liệu cũ','Older data'):''}">${e(status(n.status))}</span><button class="icon-button kg-notebook-toggle" ${isPinned?'data-kg-unpin':'data-kg-pin-ref'}="${e(n.ref)}" aria-label="${isPinned?t('Bỏ ghim','Unpin'):t('Ghim','Pin')} ${e(n.ref)}" title="${isPinned?t('Bỏ ghim','Unpin'):t('Ghim','Pin')}" ${disabled||(!isPinned&&p.watch.length>=20)?'disabled':''}>${isPinned?'×':'<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5-4 1-4 5-3 1-1-3 5-4 2-5ZM10 14l-7 7"/></svg>'}</button></div>`;
       }).join('');
-      return `<section class="kg-notebook-group" aria-labelledby="${id}-title"><div class="kg-section-title kg-notebook-heading"><h3 id="${id}-title">${label}<span class="kg-notebook-count">${rows.length}</span></h3>${isPinned?button('kg-pin',t('＋ Ghim notebook','＋ Pin notebook'),'ghost',disabled||p.watch.length>=20):''}</div><div id="${id}" class="kg-notebooks" data-kg-scroll tabindex="0" role="region" aria-labelledby="${id}-title" ${!isPinned?`aria-busy="${!!listing.loading}"`:''}>${content||`<div class="kg-no-runs">${empty}</div>`}${isPinned?'':more}</div></section>`;
+      return `<section class="kg-notebook-group" aria-labelledby="${id}-title"><div class="kg-section-title kg-notebook-heading"><h3 id="${id}-title">${label}<span class="kg-notebook-count">${rows.length}</span></h3>${isPinned?button('kg-pin',t('＋ Ghim notebook','＋ Pin notebook'),'ghost',disabled||p.watch.length>=20):''}</div><div id="${id}" class="kg-notebooks" data-kg-scroll tabindex="0" role="region" aria-labelledby="${id}-title" ${!isPinned?`aria-busy="${!!listing.loading}"`:''}>${content||`<div class="kg-no-runs">${empty}</div>`}${isPinned?'':more}</div>${grip(isPinned?'pinned':'recent',isPinned?t('Đổi chiều cao Đã ghim · phím lên/xuống; Enter để đặt lại','Resize Pinned · up/down arrows; Enter to reset'):t('Đổi chiều cao Gần đây · phím lên/xuống; Enter để đặt lại','Resize Recent · up/down arrows; Enter to reset'))}</section>`;
     };
     box.innerHTML=`
       <div class="kg-detail-heading"><div class="avatar">${e(p.username.slice(0,2).toUpperCase())}</div><div class="kg-detail-identity"><h2>${e(p.label)}</h2><span>@${e(p.username)}</span></div><span class="badge">Kaggle</span></div>
-      <div id="kg-detail-body" class="kg-detail-body" data-kg-scroll tabindex="0" role="region" aria-label="${t('Quota và notebook của tài khoản','Account quota and notebooks')}">
+      <div id="kg-detail-body" class="kg-detail-body">
         ${p.lastError?`<div class="banner danger">${e(window.padUI.t(p.lastError))}</div>`:''}
         <div class="kg-section-title"><h3>${t('Quota còn lại','Remaining quota')}</h3><span class="kg-update ${quotaStale?'kg-stale':''}">${e(date(p.quotaAt))}${p.quotaAt&&quotaStale?' · '+t('Dữ liệu cũ','Older data'):''}</span></div>
         <div class="kg-quota-grid">${quotas}</div>
@@ -107,14 +184,14 @@ window.padKaggleUI = (() => {
       if(disabled||!listing.hasMore||listing.loading||loadingPages.has(p.id))return;
       loadingPages.add(p.id);try{await act('kaggleNotebooksMore',{id:p.id});}finally{loadingPages.delete(p.id);}
     };
+    loadNext=loadMore;
     $('#kg-load-more')?.addEventListener('click',loadMore);
-    const recentBox=$('#kg-notebooks-recent'),body=$('#kg-detail-body');
-    for(const region of [recentBox,body]){
+    const recentBox=$('#kg-notebooks-recent');
+    for(const region of [recentBox]){
       let previous=region.scrollTop;
       region.addEventListener('scroll',()=>{
         const down=region.scrollTop>previous;previous=region.scrollTop;
         if(!down||listing.error||region.scrollHeight-region.clientHeight-region.scrollTop>40)return;
-        if(region===body){if(recentBox.scrollHeight>recentBox.clientHeight)return;const r=recentBox.getBoundingClientRect(),b=body.getBoundingClientRect();if(r.top>=b.bottom||r.bottom<=b.top)return;}
         loadMore();
       },{passive:true});
     }
@@ -159,5 +236,5 @@ window.padKaggleUI = (() => {
     box.innerHTML=`<details class="panel disclosure kg-guide" ${open?'open':''}><summary>${t('Làm việc từ code local với Kaggle','Work with local code and Kaggle')}</summary><ol><li>${t('Thêm tài khoản bằng API token một lần. Dùng padkaggle use username trong PowerShell, hoặc sao chép lệnh từ nút Dùng ở terminal.','Add each account once. Use padkaggle use username in PowerShell, or copy Use in terminal.')}</li><li>${t('Viết code bằng VS Code như bình thường. Trong terminal tài khoản, tạo cấu hình notebook:','Write code in VS Code as usual. In the account terminal, create notebook metadata:')}<pre>kaggle kernels init -p ./job</pre>${t('Sửa kernel-metadata.json: id đúng username/notebook-slug, code_file trỏ đến code, enable_gpu: true nếu cần GPU; khai báo nguồn dữ liệu.','Edit kernel-metadata.json: set id to username/notebook-slug, code_file to your code, enable_gpu: true for GPU; specify data sources.')}</li><li>${t('Gửi code lên Kaggle và lấy kết quả bằng CLI:','Send code to Kaggle and fetch results using the CLI:')}<pre>kaggle kernels push -p ./job\nkaggle kernels status username/notebook-slug\nkaggle kernels output username/notebook-slug -p ./results</pre></li><li>${t('Mở terminal của tài khoản khác để gửi công việc khác song song, trong giới hạn và điều khoản của Kaggle.','Open another account’s terminal to submit another job in parallel, within Kaggle’s limits and terms.')}</li></ol><p>${t('python train.py vẫn chạy local. GPU Kaggle được dùng bởi notebook gửi lên Kaggle. PADSwitcher không chia job hay tự đổi tài khoản. Đóng PADSwitcher không dừng job đã gửi hoặc terminal đã mở.','python train.py runs locally. Kaggle GPUs run the notebooks you submit to Kaggle. PADSwitcher does not split jobs or switch accounts automatically. Closing PADSwitcher does not stop submitted jobs or open terminals.')}</p>${button('kg-docs',t('Tài liệu Kaggle CLI ↗','Kaggle CLI documentation ↗'),'ghost')}</details>`;
     $('#kg-docs').onclick=()=>act('kaggleOpen',{kind:'docs'});
   }
-  return {init(value){hooks=value;},render};
+  return {init(value){hooks=value;},render,layout:applySizes};
 })();

@@ -6,6 +6,15 @@ Since 1.15.0, open **Dịch vụ → Kaggle** (Services → Kaggle). Account opt
 
 Since 1.16.0, Pinned and Recent have separate scroll areas. Recent loads 12 notebooks per page on downward end scroll, with Load more/Retry buttons for keyboard access and failures. Loaded counts reflect the visible collection, not an API total.
 
+Since 1.17.0, the Kaggle page uses the window's available width and the details
+scroll with the page. Drag the divider between columns to change the account
+column width, or the grip below Accounts/Pinned/Recent to adjust that list's
+height. Sizes are remembered locally across accounts, refreshes and restarts;
+choose **Bố cục mặc định / Reset layout** to restore automatic sizing. Focus a
+divider and use arrow keys to resize, Shift for larger steps, Enter or a double
+click to reset that divider. Escape cancels an active drag. Window resizing keeps
+columns within readable bounds; the narrow layout stacks them.
+
 ![Pinned and Recent notebook lists with independent scrolling](images/kaggle-notebooks.png)
 
 ## Luồng sử dụng
@@ -48,7 +57,7 @@ Gửi job khác từ terminal của tài khoản B bằng cấu hình notebook c
 
 **Theo dõi:** quota GPU/TPU lấy từ API chính thức, gồm số giờ còn lại, tổng, giữ chỗ và thời điểm đặt lại nếu có. Số giờ còn lại là tổng trừ đã dùng, còn bao gồm phần giữ chỗ; đây không phải bảo đảm GPU còn sẵn. `—` nghĩa là chưa biết, không phải 0.
 
-**Đã ghim** và **Gần đây** có vùng cuộn riêng; phần chi tiết tài khoản cũng cuộn để trang không dài theo số notebook. Gần đây tải 12 notebook mỗi trang khi cuộn xuống cuối hoặc bấm **Tải thêm**. Nếu có lỗi, danh sách đã tải được giữ và có nút **Thử lại**. Số bên cạnh tên mục là số notebook hiện đã tải trong mục đó, không phải tổng trên Kaggle. Notebook đã ghim chỉ xuất hiện ở Đã ghim, có thể ghim nhanh từ Gần đây hoặc nhập `username/notebook-slug` / URL `https://www.kaggle.com/code/username/notebook-slug`, tối đa 20 mục có quyền xem.
+**Đã ghim** và **Gần đây** có vùng cuộn riêng, chiều cao tự thích ứng theo cửa sổ hoặc do bạn kéo chọn. Trang chi tiết cuộn theo chiều dọc để giữ nội dung thoáng. Gần đây tải 12 notebook mỗi trang khi cuộn xuống cuối hoặc bấm **Tải thêm**; nếu khung đủ cao để chứa các mục đã tải, cuộn trang đến cuối khung cũng tải thêm. Nếu có lỗi, danh sách đã tải được giữ và có nút **Thử lại**. Số bên cạnh tên mục là số notebook hiện đã tải trong mục đó, không phải tổng trên Kaggle. Notebook đã ghim chỉ xuất hiện ở Đã ghim, có thể ghim nhanh từ Gần đây hoặc nhập `username/notebook-slug` / URL `https://www.kaggle.com/code/username/notebook-slug`, tối đa 20 mục có quyền xem.
 
 Mỗi notebook hiển thị lượt chạy mới nhất. API không cung cấp đầy đủ mọi phiên tương tác trên web hoặc mọi phiên bản đang chạy. **Làm mới** cập nhật quota, trang đầu và các notebook ghim; các trang tải thêm giữ ảnh chụp tại lúc tải trong phiên mở app, rê chuột lên trạng thái để xem thời điểm đọc. Đóng rồi mở lại app sẽ bắt đầu từ trang đầu. Kaggle phân trang theo thời điểm chạy nên danh sách có thể thay đổi trong lúc đọc; PADSwitcher loại trùng theo đường dẫn notebook. Trạng thái không phải sự kiện trực tiếp liên tục. Nút mở notebook dẫn tới Kaggle để xem thêm; có thể cần đăng nhập tài khoản phù hợp trong trình duyệt.
 

@@ -92,13 +92,38 @@ test('Kaggle empty state and removal explain terminal credential lifetime',async
 test('Kaggle separates pinned rows, preserves all scroll positions and moves quick pins without duplication',async t=>{
   const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();
   assert.equal(d.querySelectorAll('#kg-notebooks-pinned .kg-notebook').length,1);assert.equal(d.querySelectorAll('#kg-notebooks-recent .kg-notebook').length,2);
-  const regions=['kg-detail-body','kg-notebooks-pinned','kg-notebooks-recent'];
+  const regions=['kg-notebooks-pinned','kg-notebooks-recent'];
   regions.forEach((id,i)=>d.getElementById(id).scrollTop=(i+1)*23);
   d.querySelector('#kg-refresh-one').click();await settle();regions.forEach((id,i)=>assert.equal(d.getElementById(id).scrollTop,(i+1)*23));
   const ref='padresearch/feature-index';d.querySelector(`[data-kg-pin-ref="${ref}"]`).click();await settle();
   assert(d.querySelector(`#kg-notebooks-pinned [data-kg-open="${ref}"]`));assert.equal(d.querySelector(`#kg-notebooks-recent [data-kg-open="${ref}"]`),null);
   d.querySelector(`[data-kg-unpin="${ref}"]`).click();await settle();assert(d.querySelector(`#kg-notebooks-recent [data-kg-open="${ref}"]`));
   d.querySelectorAll('.kg-account')[1].click();regions.forEach(id=>assert.equal(d.getElementById(id).scrollTop,0));
+});
+test('Kaggle resizing supports keyboard, persistence through updates, responsive bounds and reset',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();
+  const layout=d.querySelector('#kg-layout');Object.defineProperty(layout,'clientWidth',{value:1000,configurable:true});
+  for(const id of ['kg-list','kg-notebooks-pinned','kg-notebooks-recent'])d.getElementById(id).getBoundingClientRect=()=>({height:300,top:0});
+  w.padKaggleUI.layout();const root=d.querySelector('#kaggle-content');
+  let handle=d.querySelector('[data-kg-resize=recent]');handle.focus();handle.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+  assert.equal(root.style.getPropertyValue('--kg-recent-height'),'320px');assert.equal(JSON.parse(w.localStorage.getItem('pad-kaggle-layout')).recent,320);
+  d.querySelector('#kg-refresh-one').click();await settle();assert.equal(root.style.getPropertyValue('--kg-recent-height'),'320px');
+  d.querySelector('[data-kg-resize=width]').dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+  assert.equal(JSON.parse(w.localStorage.getItem('pad-kaggle-layout')).width,.32);
+  Object.defineProperty(layout,'clientWidth',{value:700,configurable:true});w.dispatchEvent(new w.Event('resize'));assert.equal(root.style.getPropertyValue('--kg-account-width'),'240px');
+  d.querySelector('#language-toggle').click();assert(d.querySelector('[data-kg-resize=recent]').getAttribute('aria-label').includes('Resize Recent'));
+  d.querySelector('#kg-layout-reset').click();assert.equal(w.localStorage.getItem('pad-kaggle-layout'),null);assert.equal(root.style.getPropertyValue('--kg-recent-height'),'');
+  assert.equal(d.querySelector('#kg-detail-body').hasAttribute('data-kg-scroll'),false);
+});
+test('Kaggle drag resizing survives a state update and cancellation restores the prior size',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();
+  Object.defineProperty(d.querySelector('#kg-layout'),'clientWidth',{value:1000});d.querySelector('#kg-notebooks-pinned').getBoundingClientRect=()=>({height:240});w.padKaggleUI.layout();
+  const pointer=(type,y)=>{const event=new w.MouseEvent(type,{bubbles:true,clientY:y,button:0});Object.defineProperty(event,'pointerId',{value:7});return event;};
+  d.querySelector('[data-kg-resize=pinned]').dispatchEvent(pointer('pointerdown',200));
+  d.querySelector('#kaggle-content').dispatchEvent(pointer('pointermove',360));assert.equal(d.querySelector('#kaggle-content').style.getPropertyValue('--kg-pinned-height'),'400px');
+  d.querySelector('#kg-refresh-one').click();await settle();d.querySelector('#kaggle-content').dispatchEvent(pointer('pointermove',380));assert.equal(d.querySelector('#kaggle-content').style.getPropertyValue('--kg-pinned-height'),'420px');
+  d.querySelector('#kaggle-content').dispatchEvent(pointer('pointercancel',380));assert.equal(d.querySelector('#kaggle-content').style.getPropertyValue('--kg-pinned-height'),'');assert.equal(w.localStorage.getItem('pad-kaggle-layout'),null);assert(!d.body.classList.contains('kg-resizing-height'));
+  d.querySelector('#kg-notebooks-pinned').getBoundingClientRect=()=>({height:240});d.querySelector('[data-kg-resize=pinned]').dispatchEvent(pointer('pointerdown',200));d.querySelector('#kaggle-content').dispatchEvent(pointer('pointermove',300));d.querySelector('#kaggle-content').dispatchEvent(pointer('pointerup',300));assert.equal(JSON.parse(w.localStorage.getItem('pad-kaggle-layout')).pinned,340);
 });
 test('Kaggle loads one page on downward end scroll, waits while busy and leaves errors for explicit retry',async t=>{
   const w=dom(t);await settle();const d=w.document,action=w.pad.action,calls=[];

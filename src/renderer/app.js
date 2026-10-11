@@ -261,6 +261,7 @@ function navigate(next) {
   if (next === 'codex-settings'&&!$('#settings-form').dataset.dirty) fillSettings();
   ui.apply();
   document.documentElement.scrollTop=0;
+  if(next==='kaggle')window.padKaggleUI.layout();
   document.querySelector('#'+next+'-page h1')?.focus({preventScroll:true});
 }
 document.addEventListener('click',event=>{const button=event.target.closest('button[data-page]');if(button&&!button.disabled)navigate(button.dataset.page);});

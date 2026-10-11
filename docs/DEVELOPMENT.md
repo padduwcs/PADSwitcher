@@ -93,6 +93,11 @@ independent scroll geometry, end-scroll loading and position preservation in bot
 themes/languages and window sizes. Additional notebook pages are account-specific
 memory caches; persisted first-page/pinned snapshots keep their existing bounds.
 
+Kaggle layout preferences live in renderer localStorage under `pad-kaggle-layout`.
+Window-relative defaults apply until a size is chosen. Native Chromium mouse
+checks cover drag capture through state updates, column/list resizing, reloading
+saved sizes, reset and page-scroll pagination when a custom list fits its rows.
+
 ## Layout
 
 | Folder | Purpose |

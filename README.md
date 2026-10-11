@@ -63,6 +63,8 @@ Bản **1.15.0** gom các dịch vụ vào một cửa vào chung. Mở **Dịch
 
 Bản **1.16.0** tách **Đã ghim** và **Gần đây** thành hai vùng cuộn. Cuộn Gần đây xuống cuối để tải thêm 12 notebook mỗi lần, hoặc bấm **Tải thêm**. Các notebook đã tải và vị trí cuộn được giữ khi làm mới quota; trạng thái của trang tải thêm là dữ liệu tại lúc tải.
 
+Bản **1.17.0** mở rộng bố cục theo kích thước cửa sổ. Kéo vạch giữa hai cột để đổi chiều rộng, kéo vạch dưới danh sách tài khoản / Đã ghim / Gần đây để đổi chiều cao. App nhớ kích thước bạn chọn; bấm **Bố cục mặc định** để về kích thước tự động.
+
 Mỗi PowerShell giữ lựa chọn riêng và giữ tài khoản khi đổi thư mục bằng `cd`. Terminal thứ nhất có thể dùng A, terminal thứ hai dùng B để gửi công việc song song trong giới hạn Kaggle. `python train.py` vẫn chạy local; GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).
 
 ### Dùng chung hoặc tài khoản riêng

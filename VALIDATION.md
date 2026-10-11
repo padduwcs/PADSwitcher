@@ -1,4 +1,23 @@
-# PADSwitcher 1.16.0 — validation
+# PADSwitcher 1.17.0 — validation
+
+## Responsive and user-resizable Kaggle layout — 1.17.0
+
+Validated on Windows x64 on 2026-10-11 using disposable app data and synthetic accounts.
+
+- Kaggle uses available window width, page scrolling for details and adaptive list
+  heights. Column width and Accounts/Pinned/Recent heights can be dragged, changed
+  with the keyboard, reset individually or restored to automatic sizing together.
+- Renderer checks cover saved preferences, responsive bounds, reset, drag capture
+  through state updates and cancellation. Node suite: 184 tests, 183 pass locally
+  and one PowerShell 7 check is skipped. All 39 renderer checks pass.
+- Real Chromium mouse input verifies column/list drags, preserved sizes across
+  refresh/reload and cursor cleanup. Light/dark, VI/EN screenshots cover 1920×1080,
+  1260×900 and 1000×680, with no horizontal overflow. Pagination still works when
+  a tall custom list fits all loaded rows and the user scrolls the page to its end.
+- Changes are limited to the renderer, version/docs and QA. The running user's
+  PADSwitcher processes, Codex gateway, live credentials and shell profiles are
+  untouched. Portable packaging and packaged smoke pass, including service
+  navigation, the Python bridge and isolated Codex helper/routes.
 
 ## Scrollable notebooks and pagination — 1.16.0
 

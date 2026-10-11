@@ -63,6 +63,8 @@ Version **1.15.0** brings services into a shared entry page. Open **Services →
 
 Version **1.16.0** separates **Pinned** and **Recent** into independent scroll areas. Scroll Recent to its end to load 12 more notebooks, or choose **Load more**. Loaded rows and scroll positions survive quota refresh; additional pages show their snapshot from the time they were loaded.
 
+Version **1.17.0** adapts the layout to the window. Drag between columns to adjust width, or below Accounts / Pinned / Recent to adjust that list's height. The app remembers your sizes; **Reset layout** restores automatic sizing.
+
 Each PowerShell keeps its own selection when changing directories with `cd`. Use A in one terminal and B in another to submit jobs in parallel within Kaggle's limits. `python train.py` still runs locally; Kaggle GPUs run the notebooks submitted with `kaggle kernels push`. See [Kaggle usage and limits](docs/KAGGLE.md).
 
 ### Shared or separate accounts
