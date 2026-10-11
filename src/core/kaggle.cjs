@@ -32,9 +32,13 @@ function validSnapshot(p){
   if(!['ready','error','reauth'].includes(p.status)||p.label.length>80||p.workspace.length>32768)return false;
   if(['quotaAt','notebooksAt','verifiedAt','lastAttemptAt','lastTerminalAt'].some(key=>!optionalDate(p[key])))return false;
   if(['lastError','quotaError','notebooksError'].some(key=>!optionalText(p[key])))return false;
+  if(p.notebooksHasMore!=null&&typeof p.notebooksHasMore!=='boolean')return false;
   if(p.quota!=null&&(!Array.isArray(p.quota)||p.quota.length>2||p.quota.some(q=>!q||!['GPU','TPU'].includes(q.resource)||!optionalDate(q.refreshAt)||['used','remaining','total','reserved'].some(key=>q[key]!=null&&(!Number.isFinite(q[key])||q[key]<0)))))return false;
   if(p.notebooks!=null&&(!Array.isArray(p.notebooks)||p.notebooks.length>32||p.notebooks.some(n=>!n||!REF.test(n.ref)||!optionalText(n.title,200)||!RUN_STATUSES.includes(n.status)||(n.accelerator!=null&&!['GPU','TPU','CPU'].includes(n.accelerator))||!optionalText(n.machineShape,80)||!optionalDate(n.lastRunAt)||!optionalText(n.error))))return false;
   return true;
+}
+function notebookRows(rows,token,limit=32){
+  return rows.filter(n=>n&&REF.test(n.ref)).slice(0,limit).map(n=>({ref:n.ref,title:clean(n.title).replaceAll(token,'[redacted]'),status:RUN_STATUSES.includes(n.status)?n.status:'unknown',accelerator:['CPU','GPU','TPU'].includes(n.accelerator)?n.accelerator:null,machineShape:clean(n.machineShape,80).replaceAll(token,'[redacted]'),lastRunAt:Number.isFinite(Date.parse(n.lastRunAt))?n.lastRunAt:null,error:n.errorCode?MESSAGES[n.errorCode]||MESSAGES.KAGGLE_RESPONSE:null}));
 }
 function notebookRef(value) {
   let ref = String(value || '').trim();
@@ -98,7 +102,7 @@ class KaggleService extends EventEmitter {
     this.shell=new KaggleShell(this.root,adapters);this.terminal={scriptPath:this.shell.script,configured:null};
     this.platform={...windows,...adapters};this.bridge=adapters.bridge||runBridge;this.launcher=adapters.launchTerminal||launchTerminal;
     this.state={version:1,accounts:[],settings:{pythonPath:'',autoRefresh:true}};
-    this.tool=null;this.flights=new Map();this.editing=false;this.controllers=new Set();this.stopping=false;
+    this.tool=null;this.flights=new Map();this.notebookPages=new Map();this.editing=false;this.controllers=new Set();this.stopping=false;
   }
   async init() {
     await fs.mkdir(this.root,{recursive:true});await assertDirectory(this.root);await this.platform.protectDirectory(this.root);
@@ -116,10 +120,12 @@ class KaggleService extends EventEmitter {
   view() {
     return {settings:{pythonPath:this.state.settings.pythonPath,autoRefresh:this.state.settings.autoRefresh},tool:this.tool,terminal:this.terminal,editing:this.editing,storeError:this.initError||null,
       accounts:this.state.accounts.map(p=>({id:p.id,username:p.username,label:p.label,workspace:p.workspace,watch:[...p.watch],
-        status:p.status,quota:p.quota||[],quotaAt:p.quotaAt||null,notebooks:p.notebooks||[],notebooksAt:p.notebooksAt||null,
+        status:p.status,quota:p.quota||[],quotaAt:p.quotaAt||null,notebooks:this.notebookView(p),notebooksAt:p.notebooksAt||null,notebookList:this.notebookList(p),
         verifiedAt:p.verifiedAt||null,lastAttemptAt:p.lastAttemptAt||null,lastTerminalAt:p.lastTerminalAt||null,
         lastError:p.lastError||null,quotaError:p.quotaError||null,notebooksError:p.notebooksError||null,refreshing:this.flights.has(p.id)}))};
   }
+  notebookList(p){const page=this.notebookPages.get(p.id);return {hasMore:page?.hasMore??p.notebooksHasMore??(p.notebooks||[]).length>=12,loading:page?.loading||false,error:page?.error||null};}
+  notebookView(p){const rows=new Map((p.notebooks||[]).map(n=>[n.ref,{...n,readAt:p.notebooksAt||null}]));for(const n of this.notebookPages.get(p.id)?.rows.values()||[])if(!rows.has(n.ref))rows.set(n.ref,{...n});return [...rows.values()];}
   changed(){this.emit('change',this.view());}
   save(){const snapshot=JSON.stringify(this.state,null,2);const write=(this.saveFlight||Promise.resolve()).catch(()=>{}).then(()=>atomicWrite(this.file,snapshot));this.saveFlight=write;return write;}
   get(id){profilePath(this.root,id);const p=this.state.accounts.find(a=>a.id===id);if(!p)throw new UserError('Không tìm thấy tài khoản Kaggle.', 'KAGGLE_ACCOUNT');return p;}
@@ -166,7 +172,7 @@ class KaggleService extends EventEmitter {
     return p.id;
   });}
   async edit({id,label,workspace}){return this.exclusive(async()=>{const p=this.get(id);if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');await assertDirectory(workspace);if(!path.isAbsolute(workspace))throw new UserError('Chọn thư mục làm việc tuyệt đối.', 'KAGGLE_WORKSPACE');const old={label:p.label,workspace:p.workspace};p.label=clean(label,80)||p.username;p.workspace=path.resolve(workspace);try{await this.save();}catch(error){Object.assign(p,old);throw error;}});}
-  async remove(id){return this.exclusive(async()=>{const p=this.get(id),index=this.state.accounts.indexOf(p);if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');this.state.accounts.splice(index,1);try{await this.save();}catch(error){this.state.accounts.splice(index,0,p);throw error;}try{await fs.unlink(this.vault(id));}catch(error){if(error.code!=='ENOENT'){this.state.accounts.splice(index,0,p);await this.save();throw error;}}});}
+  async remove(id){return this.exclusive(async()=>{const p=this.get(id),index=this.state.accounts.indexOf(p);if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');this.state.accounts.splice(index,1);try{await this.save();}catch(error){this.state.accounts.splice(index,0,p);throw error;}try{await fs.unlink(this.vault(id));}catch(error){if(error.code!=='ENOENT'){this.state.accounts.splice(index,0,p);await this.save();throw error;}}this.notebookPages.delete(id);});}
   async settings({pythonPath,autoRefresh}){return this.exclusive(async()=>{if(typeof pythonPath!=='string'||(pythonPath&&(!path.isAbsolute(pythonPath)||path.basename(pythonPath).toLowerCase()!=='python.exe'))||typeof autoRefresh!=='boolean')throw new UserError('Cấu hình Kaggle không hợp lệ.', 'KAGGLE_SETTINGS');if(this.toolFlight)throw new UserError('Một thao tác Kaggle khác đang chạy.','BUSY');const old=this.state.settings;this.state.settings={pythonPath,autoRefresh};try{await this.save();this.tool=null;}catch(error){this.state.settings=old;throw error;}});}
   async watch(id,value,remove=false){return this.exclusive(async()=>{const p=this.get(id),ref=notebookRef(value),old=[...p.watch];if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');if(remove)p.watch=p.watch.filter(r=>r!==ref);else if(!p.watch.includes(ref)){if(p.watch.length>=20)throw new UserError('Theo dõi tối đa 20 notebook ghim cho mỗi tài khoản.', 'KAGGLE_LIMIT');p.watch.push(ref);}try{await this.save();}catch(error){p.watch=old;throw error;}});}
   refresh(id) {
@@ -178,11 +184,30 @@ class KaggleService extends EventEmitter {
         const now=new Date().toISOString();p.status='ready';p.lastError=null;p.verifiedAt=now;
         if(Array.isArray(data.quota)){p.quota=data.quota.filter(q=>['GPU','TPU'].includes(q.resource)).slice(0,2).map(q=>({resource:q.resource,...Object.fromEntries(['used','remaining','total','reserved'].map(k=>[k,Number.isFinite(q[k])&&q[k]>=0?q[k]:null])),refreshAt:Number.isFinite(Date.parse(q.refreshAt))?q.refreshAt:null}));p.quotaAt=now;}
         p.quotaError=data.quotaError?MESSAGES[data.quotaError]||MESSAGES.KAGGLE_RESPONSE:null;
-        if(Array.isArray(data.notebooks)){const rows=data.notebooks.filter(n=>n&&REF.test(n.ref)).slice(0,32).map(n=>({ref:n.ref,title:clean(n.title).replaceAll(token,'[redacted]'),status:['queued','running','complete','error','stopping','cancelled','saved'].includes(n.status)?n.status:'unknown',accelerator:['CPU','GPU','TPU'].includes(n.accelerator)?n.accelerator:null,machineShape:clean(n.machineShape,80).replaceAll(token,'[redacted]'),lastRunAt:Number.isFinite(Date.parse(n.lastRunAt))?n.lastRunAt:null,error:n.errorCode?MESSAGES[n.errorCode]||MESSAGES.KAGGLE_RESPONSE:null}));p.notebooks=data.notebooksError?[...rows,...(p.notebooks||[]).filter(n=>!rows.some(r=>r.ref===n.ref)).map(n=>({...n,status:'unknown'}))].slice(0,32):rows;if(!data.notebooksError)p.notebooksAt=now;}
+        if(Array.isArray(data.notebooks)){const rows=notebookRows(data.notebooks,token);p.notebooks=data.notebooksError?[...rows,...(p.notebooks||[]).filter(n=>!rows.some(r=>r.ref===n.ref)).map(n=>({...n,status:'unknown'}))].slice(0,32):rows;if(!data.notebooksError){p.notebooksAt=now;p.notebooksHasMore=typeof data.hasMore==='boolean'?data.hasMore:data.notebooks.length>=12;const page=this.notebookPages.get(id);if(page?.nextPage===2){page.hasMore=p.notebooksHasMore;page.error=null;}}}
         p.notebooksError=data.notebooksError?MESSAGES[data.notebooksError]||MESSAGES.KAGGLE_RESPONSE:null;
       } catch(error){if(error.code!=='KAGGLE_CANCELLED'){p.status=['KAGGLE_AUTH','KAGGLE_IDENTITY','KAGGLE_TOKEN'].includes(error.code)?'reauth':'error';p.lastError=MESSAGES[error.code]||MESSAGES.KAGGLE_NETWORK;}}
       await this.save();
     })();this.flights.set(id,work);this.changed();return work.finally(()=>{this.flights.delete(id);this.changed();});
+  }
+  notebooksMore(id){
+    this.requireStore();const p=this.get(id);if(this.flights.has(id))return this.flights.get(id);if(this.editing||this.stopping)return Promise.resolve();
+    let page=this.notebookPages.get(id);
+    if(!page){page={rows:new Map(),nextPage:2,hasMore:this.notebookList(p).hasMore,loading:false,error:null};this.notebookPages.set(id,page);}
+    if(!page.hasMore)return Promise.resolve();
+    page.loading=true;page.error=null;
+    const work=(async()=>{
+      try{
+        const token=await this.loadToken(id),data=await this.request({action:'notebooks',token,username:p.username,page:page.nextPage});
+        if(typeof data.username!=='string'||data.username.toLowerCase()!==p.username.toLowerCase())throw fail('KAGGLE_IDENTITY');
+        if(data.notebooksError)throw fail(Object.hasOwn(MESSAGES,data.notebooksError)?data.notebooksError:'KAGGLE_RESPONSE');
+        if(data.page!==page.nextPage||typeof data.hasMore!=='boolean'||!Array.isArray(data.notebooks)||data.notebooks.length>12)throw fail('KAGGLE_RESPONSE');
+        const readAt=new Date().toISOString();for(const n of notebookRows(data.notebooks,token,12))page.rows.set(n.ref,{...n,readAt});
+        page.nextPage++;page.hasMore=data.hasMore;
+      }catch(error){
+        if(error.code!=='KAGGLE_CANCELLED'){page.error=MESSAGES[error.code]||MESSAGES.KAGGLE_NETWORK;if(['KAGGLE_AUTH','KAGGLE_IDENTITY','KAGGLE_TOKEN'].includes(error.code)){p.status='reauth';p.lastError=page.error;await this.save();}}
+      }
+    })();this.flights.set(id,work);this.changed();return work.finally(()=>{page.loading=false;this.flights.delete(id);this.changed();});
   }
   async refreshAll(dueOnly=false) {
     if(this.refreshFlight)return this.refreshFlight;

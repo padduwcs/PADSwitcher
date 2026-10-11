@@ -2,6 +2,7 @@
 // Account management only. Job execution remains in the official Kaggle CLI.
 window.padKaggleUI = (() => {
   let hooks, data, selected, workspace='', query='', toolsBusy=false,accountBusy=false;
+  const loadingPages=new Set();
   const $=s=>document.querySelector(s);
   const t=(vi,en)=>window.padUI.language==='en'?en:vi;
   const e=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -9,7 +10,7 @@ window.padKaggleUI = (() => {
   const date=stamp=>Number.isFinite(Date.parse(stamp))?new Date(stamp).toLocaleString(window.padUI.language==='en'?'en-GB':'vi-VN',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):t('Chưa cập nhật','Not refreshed');
   const hours=value=>Number.isFinite(value)?value.toLocaleString(window.padUI.language==='en'?'en-GB':'vi-VN',{maximumFractionDigits:1})+' h':'—';
   const names={running:['Đang chạy','Running'],queued:['Đang chờ','Queued'],complete:['Hoàn tất','Complete'],error:['Lỗi','Error'],stopping:['Đang dừng','Stopping'],cancelled:['Đã hủy','Cancelled'],saved:['Chưa chạy','Saved'],unknown:['Chưa rõ','Unknown']};
-  const status=value=>t(...(names[value]||names.unknown));
+  const status=value=>t(...(Object.hasOwn(names,value)?names[value]:names.unknown));
   const act=(command,args={},success)=>hooks.call(command,args,success);
   const button=(id,label,kind='secondary',disabled=false)=>`<button type="button" id="${id}" class="button ${kind}" ${disabled?'disabled':''}>${label}</button>`;
   const literal=body=>`<div data-literal>${body}</div>`;
@@ -20,6 +21,8 @@ window.padKaggleUI = (() => {
     const root=$('#kaggle-content'),active=document.activeElement;
     const focusId=root.contains(active)?active.id:null;
     const focusAccount=active?.dataset.kgAccount;
+    const focusNotebook=root.contains(active)?['kgOpen','kgUnpin','kgPinRef'].find(key=>active.dataset[key]):null;
+    const focusRef=focusNotebook?active.dataset[focusNotebook]:null;
     if(!root.dataset.ready){
       root.innerHTML='<div id="kg-heading" class="page-heading"></div><div id="kg-tool-hint"></div><div id="kg-toolbar" class="toolbar"><div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="kg-search" type="search"></div><div id="kg-refresh" class="toolbar-right"></div></div><div id="kg-empty"></div><div class="kg-layout" id="kg-layout"><div id="kg-list" class="kg-list"></div><aside id="kg-detail" class="kg-detail"></aside></div><div id="kg-guide"></div>';
       root.dataset.ready='1';$('#kg-search').oninput=event=>{query=event.target.value;render(data,workspace);};
@@ -50,10 +53,12 @@ window.padKaggleUI = (() => {
     detail(rows.find(p=>p.id===selected));guide();
     if(focusId)document.getElementById(focusId)?.focus({preventScroll:true});
     else if(focusAccount)root.querySelector(`[data-kg-account="${focusAccount}"]`)?.focus({preventScroll:true});
+    else if(focusRef){const attribute={kgOpen:'data-kg-open',kgUnpin:'data-kg-unpin',kgPinRef:'data-kg-pin-ref'}[focusNotebook];root.querySelector(`[${attribute}="${focusRef}"]`)?.focus({preventScroll:true});}
   }
   function detail(p){
     const box=$('#kg-detail');if(!p){box.innerHTML='';delete box.dataset.account;return;}
     const opened=box.dataset.account===p.id?new Set([...box.querySelectorAll('details[open]')].map(el=>el.id)):new Set();
+    const scroll=box.dataset.account===p.id?new Map([...box.querySelectorAll('[data-kg-scroll]')].map(el=>[el.id,el.scrollTop])):new Map();
     box.dataset.account=p.id;box.setAttribute('aria-label',t('Chi tiết tài khoản Kaggle','Kaggle account details'));
     const disabled=data.editing||!!data.storeError||p.refreshing,quotaStale=stale(p.quotaAt)||!!p.lastError||!!p.quotaError,notebookStale=stale(p.notebooksAt)||!!p.lastError||!!p.notebooksError;
     const resources=['GPU','TPU'];
@@ -62,29 +67,57 @@ window.padKaggleUI = (() => {
       return `<div class="kg-quota"><div class="kg-quota-top"><strong>${resource}</strong><span>${t('Còn lại','Remaining')}</span></div><b>${hours(q?.remaining)}</b><span class="kg-quota-total"> / ${hours(q?.total)}</span><progress max="100" value="${percent}" aria-label="${resource}: ${hours(q?.remaining)}"></progress></div>`;
     }).join('');
     const notebookRows=p.notebooks||[];
+    const listing=p.notebookList||{hasMore:false,loading:false,error:null};
+    const more=listing.loading?`<div class="kg-page-note" role="status">${t('Đang tải thêm…','Loading more…')}</div>`:listing.error?`<div class="kg-page-error" role="status"><span>${e(window.padUI.t(listing.error))}</span>${button('kg-load-more',t('Thử lại','Retry'),'ghost',disabled)}</div>`:listing.hasMore?`<div class="kg-page-note"><span>${t('Cuộn xuống để tải thêm','Scroll down to load more')}</span>${button('kg-load-more',t('Tải thêm','Load more'),'ghost',disabled)}</div>`:p.notebooksAt&&!p.notebooksError?`<div class="kg-page-note">${t('Đã xem hết danh sách gần đây','End of the recent list')}</div>`:'';
+    const watched=new Set(p.watch),pinned=p.watch.map(ref=>notebookRows.find(n=>n.ref===ref)||{ref,title:ref,status:'unknown'}),recent=notebookRows.filter(n=>!watched.has(n.ref));
+    const group=(id,label,rows,isPinned,empty)=>{
+      const content=rows.map(n=>{
+        const older=notebookStale||stale(n.readAt||p.notebooksAt)||!!n.error;
+        const stamp=n.readAt||p.notebooksAt;
+        return `<div class="kg-notebook"><div class="kg-notebook-main"><button class="text-button kg-notebook-link" data-kg-open="${e(n.ref)}" title="${e(n.ref)}">${e(n.title||n.ref)} ↗</button><small>${e(n.ref)}${n.accelerator?' · '+e(n.accelerator):''}</small>${n.error?`<small class="danger-text">${e(window.padUI.t(n.error))}</small>`:''}</div><span class="kg-run-status ${older?'unknown':Object.hasOwn(names,n.status)?n.status:'unknown'}" title="${e(date(stamp))}${older?' · '+t('Dữ liệu cũ','Older data'):''}">${e(status(n.status))}</span><button class="icon-button kg-notebook-toggle" ${isPinned?'data-kg-unpin':'data-kg-pin-ref'}="${e(n.ref)}" aria-label="${isPinned?t('Bỏ ghim','Unpin'):t('Ghim','Pin')} ${e(n.ref)}" title="${isPinned?t('Bỏ ghim','Unpin'):t('Ghim','Pin')}" ${disabled||(!isPinned&&p.watch.length>=20)?'disabled':''}>${isPinned?'×':'<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 5 5-4 1-4 5-3 1-1-3 5-4 2-5ZM10 14l-7 7"/></svg>'}</button></div>`;
+      }).join('');
+      return `<section class="kg-notebook-group" aria-labelledby="${id}-title"><div class="kg-section-title kg-notebook-heading"><h3 id="${id}-title">${label}<span class="kg-notebook-count">${rows.length}</span></h3>${isPinned?button('kg-pin',t('＋ Ghim notebook','＋ Pin notebook'),'ghost',disabled||p.watch.length>=20):''}</div><div id="${id}" class="kg-notebooks" data-kg-scroll tabindex="0" role="region" aria-labelledby="${id}-title" ${!isPinned?`aria-busy="${!!listing.loading}"`:''}>${content||`<div class="kg-no-runs">${empty}</div>`}${isPinned?'':more}</div></section>`;
+    };
     box.innerHTML=`
       <div class="kg-detail-heading"><div class="avatar">${e(p.username.slice(0,2).toUpperCase())}</div><div class="kg-detail-identity"><h2>${e(p.label)}</h2><span>@${e(p.username)}</span></div><span class="badge">Kaggle</span></div>
-      <div class="kg-detail-body">
+      <div id="kg-detail-body" class="kg-detail-body" data-kg-scroll tabindex="0" role="region" aria-label="${t('Quota và notebook của tài khoản','Account quota and notebooks')}">
         ${p.lastError?`<div class="banner danger">${e(window.padUI.t(p.lastError))}</div>`:''}
         <div class="kg-section-title"><h3>${t('Quota còn lại','Remaining quota')}</h3><span class="kg-update ${quotaStale?'kg-stale':''}">${e(date(p.quotaAt))}${p.quotaAt&&quotaStale?' · '+t('Dữ liệu cũ','Older data'):''}</span></div>
         <div class="kg-quota-grid">${quotas}</div>
         ${p.quotaError?`<p class="kg-inline-error">${e(window.padUI.t(p.quotaError))}</p>`:''}
         <details class="kg-quota-info" id="kg-quota-info" ${opened.has('kg-quota-info')?'open':''}><summary>${t('Chi tiết quota','Quota details')}</summary><p>${t('Giờ còn lại bao gồm phần giữ chỗ.','Remaining time includes reserved time.')}</p>${resources.map(resource=>{const q=p.quota?.find(q=>q.resource===resource);return `<p><strong>${resource}</strong> · ${t('Giữ chỗ','Reserved')}: ${hours(q?.reserved)}${q?.refreshAt?' · '+t('Đặt lại','Resets')+' '+e(date(q.refreshAt)):''}</p>`;}).join('')}</details>
         <div class="kg-use"><div class="kg-actions">${button('kg-terminal-copy',t('Dùng ở terminal','Use in terminal'),'primary',disabled)}${button('kg-launch',t('Mở terminal mới','Open new terminal'),'secondary',disabled)}</div><div class="kg-terminal-hint"><code>padkaggle use ${e(p.username)}</code>${button('kg-terminal-setup',t('Thiết lập lệnh','Set up command'),'ghost',!!data.storeError)}</div></div>
-        <div class="kg-section-title kg-notebook-heading"><h3>${t('Notebook','Notebooks')}</h3>${button('kg-pin',t('＋ Ghim','＋ Pin'),'ghost',disabled)}</div>
         <div class="kg-monitor-caption"><span class="${notebookStale?'kg-stale':''}">${e(date(p.notebooksAt))}${p.notebooksAt&&notebookStale?' · '+t('Dữ liệu cũ','Older data'):''}</span><button type="button" class="text-button" id="kg-scope-info">${t('Phạm vi theo dõi','Monitoring scope')}</button></div>
         ${p.notebooksError?`<p class="kg-inline-error">${e(window.padUI.t(p.notebooksError))}</p>`:''}
-        <div class="kg-notebooks">${notebookRows.length?notebookRows.map(n=>`<div class="kg-notebook"><div class="kg-notebook-main"><button class="text-button kg-notebook-link" data-kg-open="${e(n.ref)}" title="${e(n.ref)}">${e(n.title||n.ref)} ↗</button><small>${e(n.ref)}${n.accelerator?' · '+e(n.accelerator):''}${p.watch.includes(n.ref)?' · '+t('Đã ghim','Pinned'):''}</small>${n.error?`<small class="danger-text">${e(window.padUI.t(n.error))}</small>`:''}</div><span class="kg-run-status ${notebookStale?'unknown':names[n.status]?n.status:'unknown'}">${e(status(n.status))}</span>${p.watch.includes(n.ref)?`<button class="icon-button kg-unpin" data-kg-unpin="${e(n.ref)}" aria-label="${t('Bỏ ghim','Unpin')} ${e(n.ref)}" ${disabled?'disabled':''}>×</button>`:''}</div>`).join(''):`<div class="kg-no-runs">${p.notebooksAt?t('Chưa có notebook. Ghim notebook để theo dõi.','No notebooks yet. Pin a notebook to monitor it.'):t('Làm mới để xem notebook từ Kaggle.','Refresh to view notebooks from Kaggle.')}</div>`}</div>
+        ${group('kg-notebooks-pinned',t('Đã ghim','Pinned'),pinned,true,t('Chưa ghim notebook. Ghim từ danh sách gần đây hoặc thêm bằng đường dẫn.','No pinned notebooks. Pin from the recent list or add a notebook link.'))}
+        ${group('kg-notebooks-recent',t('Gần đây','Recent'),recent,false,p.notebooksAt?t('Chưa có notebook khác trong danh sách gần đây.','No other notebooks in the recent list.'):t('Làm mới để xem notebook từ Kaggle.','Refresh to view notebooks from Kaggle.'))}
         <details class="kg-management" id="kg-management" ${opened.has('kg-management')?'open':''}><summary>${t('Tùy chọn tài khoản','Account options')}</summary><div class="kg-workspace"><span>${t('Thư mục mở terminal mới','New terminal folder')}</span><code>${e(p.workspace)}</code></div><div class="kg-manage">${button('kg-edit',t('Sửa tên / thư mục','Edit name / folder'),'ghost',disabled)}${button('kg-token',t('Cập nhật token','Update token'),'ghost',disabled)}${button('kg-refresh-one',p.refreshing?t('Đang cập nhật…','Refreshing…'):t('Làm mới tài khoản','Refresh account'),'ghost',disabled)}${button('kg-remove',t('Xóa tài khoản','Remove account'),'ghost danger-text',disabled)}</div></details>
       </div>`;
     $('#kg-terminal-copy').onclick=()=>act('kaggleTerminalCopy',{id:p.id},t('Đã sao chép. Dán lệnh vào terminal PowerShell đang mở.','Copied. Paste the command in your existing PowerShell terminal.'));
     $('#kg-terminal-setup').onclick=terminalSetup;
     $('#kg-launch').onclick=()=>act('kaggleLaunch',{id:p.id},t('Đã mở PowerShell riêng cho @','Opened a separate PowerShell for @')+p.username+'.');
     $('#kg-refresh-one').onclick=()=>act('kaggleRefresh',{id:p.id});$('#kg-edit').onclick=()=>account(p,true);$('#kg-token').onclick=()=>account(p);$('#kg-pin').onclick=()=>pin(p);
-    $('#kg-scope-info').onclick=()=>dialog(t('Phạm vi theo dõi Kaggle','Kaggle monitoring scope'),`<p>${t('PADSwitcher đọc lượt chạy mới nhất của 12 notebook gần đây và tối đa 20 notebook ghim có quyền xem. Không bao gồm đầy đủ phiên tương tác trên web hay mọi phiên bản đang chạy.','PADSwitcher reads the latest run of 12 recent notebooks and up to 20 accessible pinned notebooks. This does not cover every interactive web session or every running version.')}</p><p>${t('Dữ liệu là lần đọc gần nhất, không phải trạng thái trực tiếp liên tục. Quota và khả năng cấp GPU vẫn do Kaggle quyết định.','Data is the most recent snapshot, not a continuous live status. Kaggle determines quota and GPU availability.')}</p>`,async()=>hooks.closeModal(),t('Đã hiểu','Got it'));
+    $('#kg-scope-info').onclick=()=>dialog(t('Phạm vi theo dõi Kaggle','Kaggle monitoring scope'),`<p>${t('Gần đây tải 12 notebook mỗi trang khi cuộn; Đã ghim theo dõi riêng tối đa 20 notebook có quyền xem. Mỗi notebook hiển thị lượt chạy mới nhất, không bao gồm đầy đủ phiên tương tác trên web hay mọi phiên bản đang chạy.','Recent loads 12 notebooks per page as you scroll; Pinned separately monitors up to 20 accessible notebooks. Each notebook shows its latest run, which does not cover every interactive web session or every running version.')}</p><p>${t('Làm mới cập nhật quota, trang đầu và notebook ghim. Các trang tải thêm giữ dữ liệu tại lúc tải trong phiên mở app; rê chuột lên trạng thái để xem thời điểm đọc. Dữ liệu không phải trạng thái trực tiếp liên tục. Kaggle quyết định quota và khả năng cấp GPU.','Refresh updates quota, the first page and pinned notebooks. Additional pages retain their snapshot for this app session; hover a status to see when it was read. Data is not continuously live. Kaggle determines quota and GPU availability.')}</p>`,async()=>hooks.closeModal(),t('Đã hiểu','Got it'));
     $('#kg-remove').onclick=()=>dialog(t('Xóa tài khoản Kaggle?','Remove Kaggle account?'),`<p>${t('Xóa token đã lưu của','Remove the saved token for')} <strong>@${e(p.username)}</strong>.</p><p>${t('Terminal đã mở vẫn giữ token trong phiên đó. Đóng các terminal đó và thu hồi token trên Kaggle nếu muốn ngắt truy cập hoàn toàn.','Open terminals retain their token for that session. Close those terminals and revoke the token on Kaggle to remove access completely.')}</p>`,async()=>{const r=await act('kaggleRemove',{id:p.id});if(r)hooks.closeModal();},t('Xóa token đã lưu','Remove saved token'));
     box.querySelectorAll('[data-kg-open]').forEach(el=>el.onclick=()=>act('kaggleOpen',{ref:el.dataset.kgOpen}));
     box.querySelectorAll('[data-kg-unpin]').forEach(el=>el.onclick=async()=>{const r=await act('kaggleWatch',{id:p.id,ref:el.dataset.kgUnpin,remove:true});if(r)await act('kaggleRefresh',{id:p.id});});
+    box.querySelectorAll('[data-kg-pin-ref]').forEach(el=>el.onclick=async()=>{const r=await act('kaggleWatch',{id:p.id,ref:el.dataset.kgPinRef});if(r)await act('kaggleRefresh',{id:p.id});});
+    for(const [id,top] of scroll){const region=document.getElementById(id);if(region)region.scrollTop=top;}
+    const loadMore=async()=>{
+      if(disabled||!listing.hasMore||listing.loading||loadingPages.has(p.id))return;
+      loadingPages.add(p.id);try{await act('kaggleNotebooksMore',{id:p.id});}finally{loadingPages.delete(p.id);}
+    };
+    $('#kg-load-more')?.addEventListener('click',loadMore);
+    const recentBox=$('#kg-notebooks-recent'),body=$('#kg-detail-body');
+    for(const region of [recentBox,body]){
+      let previous=region.scrollTop;
+      region.addEventListener('scroll',()=>{
+        const down=region.scrollTop>previous;previous=region.scrollTop;
+        if(!down||listing.error||region.scrollHeight-region.clientHeight-region.scrollTop>40)return;
+        if(region===body){if(recentBox.scrollHeight>recentBox.clientHeight)return;const r=recentBox.getBoundingClientRect(),b=body.getBoundingClientRect();if(r.top>=b.bottom||r.bottom<=b.top)return;}
+        loadMore();
+      },{passive:true});
+    }
   }
   async function account(p=null,edit=false){
     if(accountBusy||toolsBusy||$('#modal').open)return;

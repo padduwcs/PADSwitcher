@@ -24,8 +24,9 @@ TOKEN = "KGAT_fixture-only-contract-token"
 
 
 class Client:
-    def __init__(self, active=True, quota_error=None, list_error=None, status_error=None):
+    def __init__(self, active=True, quota_error=None, list_error=None, status_error=None, count=1):
         self.active, self.quota_error, self.list_error, self.status_error = active, quota_error, list_error, status_error
+        self.count, self.pages, self.quota_calls = count, [], 0
         self.security = NS(oauth_client=NS(introspect_token=self.identity))
         self.kernels = NS(kernels_api_client=NS(get_accelerator_quota_statistics=self.quota, list_kernels=self.listing, get_kernel_session_status=self.status))
         self.refs = []
@@ -40,6 +41,7 @@ class Client:
         return response
 
     def quota(self, request):
+        self.quota_calls += 1
         if self.quota_error: raise self.quota_error
         # Nested quota data exercises the official response properties and timedelta units.
         response = ApiGetAcceleratorQuotaStatisticsResponse()
@@ -51,6 +53,7 @@ class Client:
         return response
 
     def listing(self, request):
+        self.pages.append(request.page)
         if self.list_error: raise self.list_error
         assert request.group == KernelsListViewType.PROFILE
         assert request.sort_by == KernelsListSortType.DATE_RUN
@@ -59,6 +62,12 @@ class Client:
         notebook.ref, notebook.title, notebook.enable_gpu = "fixtureuser/job", "Job", True
         response = ApiListKernelsResponse()
         response.kernels = [notebook]
+        if self.count != 1:
+            response.kernels = []
+            for i in range(self.count):
+                item = ApiKernelMetadata()
+                item.ref, item.title = f"fixtureuser/page-{request.page}-job-{i}", f"Job {i}"
+                response.kernels.append(item)
         return response
 
     def status(self, request):
@@ -111,6 +120,34 @@ class Contract(unittest.TestCase):
         self.assertEqual(result["notebooksError"], "KAGGLE_FORBIDDEN")
         self.assertEqual(result["notebooks"][0]["errorCode"], "KAGGLE_NOT_FOUND")
         self.assertEqual(result["notebooks"][0]["status"], "unknown")
+        self.assertNotIn(TOKEN, json.dumps(result))
+
+    def test_pagination_uses_requested_page_without_quota_or_pinned_calls(self):
+        client = Client(count=12)
+        result = self.read(client, action="notebooks", page=2, watch=["fixtureuser/pinned"])
+        self.assertEqual(client.pages, [2])
+        self.assertEqual(client.quota_calls, 0)
+        self.assertNotIn("quota", result)
+        self.assertEqual(result["page"], 2)
+        self.assertTrue(result["hasMore"])
+        self.assertEqual(len(result["notebooks"]), 12)
+        self.assertEqual(len(client.refs), 12)
+        self.assertNotIn("fixtureuser/pinned", client.refs)
+        self.assertNotIn(TOKEN, json.dumps(result))
+        for count in (0, 5):
+            result = self.read(Client(count=count), action="notebooks", page=3)
+            self.assertFalse(result["hasMore"])
+            self.assertEqual(len(result["notebooks"]), count)
+
+    def test_pagination_errors_are_safe_and_invalid_pages_do_not_list(self):
+        for page in (True, "2", 0, -1, 1000001):
+            client = Client()
+            self.assertEqual(self.read(client, action="notebooks", page=page)["code"], "KAGGLE_REQUEST")
+            self.assertEqual(client.pages, [])
+            self.assertEqual(client.quota_calls, 0)
+        result = self.read(Client(list_error=http_error(429)), action="notebooks", page=2)
+        self.assertEqual(result["notebooksError"], "KAGGLE_RATE_LIMIT")
+        self.assertNotIn("hasMore", result)
         self.assertNotIn(TOKEN, json.dumps(result))
 
 

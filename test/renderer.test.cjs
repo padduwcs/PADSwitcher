@@ -89,6 +89,37 @@ test('Kaggle empty state and removal explain terminal credential lifetime',async
   const w=dom(t,false);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();assert(d.querySelector('#kg-empty').textContent.includes('đầu tiên'));assert(d.querySelector('#kg-toolbar').classList.contains('hidden'));
   const other=dom(t);await settle();const od=other.document;od.querySelector('[data-page=kaggle]').click();od.querySelector('#kg-remove').click();assert(od.querySelector('#modal-body').textContent.includes('Terminal đã mở vẫn giữ token'));od.querySelector('#modal-form').dispatchEvent(new other.Event('submit',{cancelable:true}));await settle();assert.equal(od.querySelectorAll('.kg-account').length,2);
 });
+test('Kaggle separates pinned rows, preserves all scroll positions and moves quick pins without duplication',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();
+  assert.equal(d.querySelectorAll('#kg-notebooks-pinned .kg-notebook').length,1);assert.equal(d.querySelectorAll('#kg-notebooks-recent .kg-notebook').length,2);
+  const regions=['kg-detail-body','kg-notebooks-pinned','kg-notebooks-recent'];
+  regions.forEach((id,i)=>d.getElementById(id).scrollTop=(i+1)*23);
+  d.querySelector('#kg-refresh-one').click();await settle();regions.forEach((id,i)=>assert.equal(d.getElementById(id).scrollTop,(i+1)*23));
+  const ref='padresearch/feature-index';d.querySelector(`[data-kg-pin-ref="${ref}"]`).click();await settle();
+  assert(d.querySelector(`#kg-notebooks-pinned [data-kg-open="${ref}"]`));assert.equal(d.querySelector(`#kg-notebooks-recent [data-kg-open="${ref}"]`),null);
+  d.querySelector(`[data-kg-unpin="${ref}"]`).click();await settle();assert(d.querySelector(`#kg-notebooks-recent [data-kg-open="${ref}"]`));
+  d.querySelectorAll('.kg-account')[1].click();regions.forEach(id=>assert.equal(d.getElementById(id).scrollTop,0));
+});
+test('Kaggle loads one page on downward end scroll, waits while busy and leaves errors for explicit retry',async t=>{
+  const w=dom(t);await settle();const d=w.document,action=w.pad.action,calls=[];
+  let error=false;
+  w.pad.action=async(command,args)=>{
+    calls.push(command);const r=await action(command,args);
+    if(command==='state'||command==='kaggleRefresh'||command==='kaggleNotebooksMore'){
+      const k=command==='state'?r.result.kaggle:r.state.kaggle;
+      k.accounts[0].notebookList={hasMore:true,loading:false,error:error?'Kaggle đang giới hạn yêu cầu. Chờ trước khi làm mới lại.':null};
+    }
+    return r;
+  };
+  d.querySelector('[data-page=kaggle]').click();d.querySelector('#kg-refresh-one').click();await settle();
+  const metrics=region=>{Object.defineProperties(region,{clientHeight:{value:100,configurable:true},scrollHeight:{value:300,configurable:true}});};
+  let box=d.querySelector('#kg-notebooks-recent');metrics(box);box.scrollTop=160;box.dispatchEvent(new w.Event('scroll'));box.dispatchEvent(new w.Event('scroll'));
+  await settle();assert.equal(calls.filter(c=>c==='kaggleNotebooksMore').length,1);assert(d.querySelector('#kg-notebooks-recent').getAttribute('aria-busy')==='true');
+  await new Promise(resolve=>setTimeout(resolve,50));assert.equal(d.querySelector('#kg-notebooks-recent').scrollTop,160);assert(d.querySelectorAll('#kg-notebooks-recent .kg-notebook').length>2);
+  error=true;d.querySelector('#kg-load-more').click();await new Promise(resolve=>setTimeout(resolve,60));assert(d.querySelector('.kg-page-error'));const count=calls.filter(c=>c==='kaggleNotebooksMore').length;
+  box=d.querySelector('#kg-notebooks-recent');metrics(box);box.scrollTop=200;box.dispatchEvent(new w.Event('scroll'));await settle();assert.equal(calls.filter(c=>c==='kaggleNotebooksMore').length,count);
+  error=false;d.querySelector('#kg-load-more').click();await new Promise(resolve=>setTimeout(resolve,60));assert.equal(calls.filter(c=>c==='kaggleNotebooksMore').length,count+1);assert.equal(d.querySelector('.kg-page-error'),null);
+});
 test('scoped UI changes only the selected account and auto-switch policy, and translates separate account setup',async t=>{
   const w=dom(t);await settle();const d=w.document;
   d.querySelector('#use-gateway').click();await settle();

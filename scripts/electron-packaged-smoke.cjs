@@ -39,6 +39,7 @@ app.disableHardwareAcceleration();
         }
       };
       const kgState=await action('state');assert.deepEqual(kgState.result.kaggle.accounts,[]);
+      const pagination=await action('kaggleNotebooksMore',{id:'11111111-1111-4111-8111-111111111111'});assert.equal(pagination.ok,false);assert.equal(pagination.error.code,'KAGGLE_ACCOUNT');
       const shellHelper=kgState.result.kaggle.terminal.scriptPath;assert((await fs.stat(shellHelper)).isFile());
       const shellStatus=await windows.ps('. $env:PADSWITCHER_PACKAGED_SHELL; padkaggle status',{env:{...process.env,PADSWITCHER_PACKAGED_SHELL:shellHelper}});
       assert(shellStatus.includes('No account selected'));console.log('Packaged PowerShell command export and loading without account selection: passed.');

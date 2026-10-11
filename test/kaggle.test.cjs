@@ -106,3 +106,51 @@ test('corrupt Kaggle metadata disables its mutations without blocking Codex or o
   const malformed={version:1,settings:{pythonPath:'',autoRefresh:true},accounts:[{id:'11111111-1111-4111-8111-111111111111',username:'fixture',label:'Fixture',workspace:f.directory,watch:[],status:'ready',quota:'invalid cached quota'}]};
   await fs.writeFile(k.file,JSON.stringify(malformed));await assert.rejects(new KaggleService(f.data,f.adapter).init(),{code:'KAGGLE_STORE'});
 });
+
+test('notebook pagination deduplicates requests and refs, isolates accounts, and leaves saved snapshots bounded',async t=>{
+  const f=await setup(t),a=await f.k.add({token:tokenA,workspace:f.directory}),b=await f.k.add({token:tokenB,workspace:f.directory});
+  f.setResponder(async payload=>({ok:true,username:payload.username,quota:[{resource:'GPU',remaining:20,total:30}],notebooks:[{ref:payload.username+'/job',title:'Fresh first page',status:'running'}],hasMore:true}));
+  await f.k.refresh(a);await f.k.refresh(b);const before=f.k.view().accounts[0];
+  let release;const gate=new Promise(resolve=>release=resolve),reads=[];
+  f.setResponder(async payload=>{reads.push(payload);await gate;return {ok:true,username:payload.username,page:payload.page,hasMore:false,notebooks:[{ref:payload.username+'/job',title:'Older duplicate',status:'complete'},{ref:payload.username+'/older',title:tokenA,status:'complete',machineShape:tokenB}]};});
+  const first=f.k.notebooksMore(a),duplicate=f.k.notebooksMore(a),other=f.k.notebooksMore(b);
+  await new Promise(resolve=>setTimeout(resolve,15));assert.equal(reads.length,2);assert(f.k.view().accounts.every(p=>p.notebookList.loading));
+  await assert.rejects(f.k.remove(a),{code:'BUSY'});release();await Promise.all([first,duplicate,other]);
+  assert.deepEqual(reads.map(p=>[p.token,p.page]).sort(),[[tokenA,2],[tokenB,2]]);assert(reads.every(p=>p.action==='notebooks'&&!p.watch));
+  const p=f.k.view().accounts[0];assert.equal(p.notebooks.length,2);assert.equal(p.notebooks[0].title,'Fresh first page');assert(p.notebooks[1].readAt);assert.equal(p.notebookList.hasMore,false);assert.equal(p.notebookList.loading,false);
+  assert.equal(p.quotaAt,before.quotaAt);assert.equal(p.notebooksAt,before.notebooksAt);assert(!JSON.stringify(p).includes(tokenA));
+  assert(f.k.view().accounts[1].notebooks.every(n=>n.ref.startsWith('account-b/')));
+  await f.k.notebooksMore(a);assert.equal(reads.length,2);
+  const saved=JSON.parse(await fs.readFile(f.k.file,'utf8'));assert.equal(saved.accounts[0].notebooks.length,1);assert.equal((await f.create()).view().accounts[0].notebooks.length,1);
+  await f.k.remove(a);assert(!f.k.notebookPages.has(a));
+});
+
+test('pagination retries the same page after partial errors and rejects wrong identity or malformed paging',async t=>{
+  const f=await setup(t),a=await f.k.add({token:tokenA,workspace:f.directory});
+  f.k.get(a).notebooksHasMore=true;const pages=[];
+  for(const response of [
+    {ok:true,username:'account-a',notebooksError:'KAGGLE_RATE_LIMIT',page:2,hasMore:false,notebooks:[]},
+    {ok:true,username:'account-a',page:9,hasMore:true,notebooks:[]},
+    {ok:true,username:'wrong-user',page:2,hasMore:false,notebooks:[]}
+  ]){
+    f.setResponder(async payload=>{pages.push(payload.page);return response;});await f.k.notebooksMore(a);
+    assert.equal(f.k.view().accounts[0].notebooks.length,0);assert(f.k.view().accounts[0].notebookList.error);assert(f.k.view().accounts[0].notebookList.hasMore);
+  }
+  assert.equal(f.k.get(a).status,'reauth');assert.deepEqual(pages,[2,2,2]);
+  f.setResponder(async payload=>{pages.push(payload.page);return {ok:true,username:'account-a',page:2,hasMore:true,notebooks:[{ref:'account-a/older',status:'complete'}]};});await f.k.notebooksMore(a);
+  assert.equal(f.k.view().accounts[0].notebookList.error,null);
+  f.setResponder(async payload=>{pages.push(payload.page);return {ok:true,username:'account-a',page:3,hasMore:false,notebooks:[]};});await f.k.notebooksMore(a);
+  assert.deepEqual(pages,[2,2,2,2,3]);assert.equal(f.k.view().accounts[0].notebooks.length,1);assert.equal(f.k.view().accounts[0].notebookList.hasMore,false);
+});
+
+test('quota refresh preserves expanded pages and their read times; shutdown cancels pagination safely',async t=>{
+  const f=await setup(t),a=await f.k.add({token:tokenA,workspace:f.directory});f.k.get(a).notebooksHasMore=true;
+  f.setResponder(async payload=>({ok:true,username:'account-a',page:payload.page,hasMore:true,notebooks:[{ref:'account-a/older',title:'Older',status:'complete'}]}));await f.k.notebooksMore(a);
+  const older=f.k.view().accounts[0].notebooks[0];
+  f.setResponder(async()=>({ok:true,username:'account-a',quota:[],hasMore:false,notebooks:[{ref:'account-a/newest',status:'running'}]}));await f.k.refresh(a);
+  const p=f.k.view().accounts[0];assert.equal(p.notebooks.length,2);assert.deepEqual(p.notebooks[1],older);assert.equal(p.notebookList.hasMore,true);
+  const original=f.k.bridge;
+  f.k.bridge=async(python,payload,timeout,signal)=>payload.action!=='notebooks'?original(python,payload):new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new UserError('cancelled','KAGGLE_CANCELLED')),{once:true}));
+  const read=f.k.notebooksMore(a);await new Promise(resolve=>setTimeout(resolve,10));await f.k.shutdown();await read;
+  assert.deepEqual(f.k.view().accounts[0].notebooks,p.notebooks);assert.equal(f.k.view().accounts[0].notebookList.error,null);assert.equal(f.k.flights.size,0);assert.equal(f.k.controllers.size,0);
+});

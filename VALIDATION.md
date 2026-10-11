@@ -1,4 +1,26 @@
-# PADSwitcher 1.15.0 — validation
+# PADSwitcher 1.16.0 — validation
+
+## Scrollable notebooks and pagination — 1.16.0
+
+Validated on Windows x64 on 2026-10-11 with synthetic accounts and disposable data.
+
+- Account details and both Pinned/Recent lists have bounded, independent scroll
+  areas. Pinned notebooks appear once; quick pin/unpin preserves layout and scroll.
+- Recent reads 12 rows per page, deduplicates refs and simultaneous requests per
+  account, retries the same cursor after failure and stops after the final page.
+  Quota refresh preserves loaded pages and their individual snapshot read times.
+- Node suite: 182 tests, 181 pass and one PowerShell 7 check is skipped locally.
+  All 37 renderer checks pass without uncaught errors. Six offline Python contract
+  checks use real official SDK types, including page selection, empty/final pages,
+  identity checks and safe failure handling, without Kaggle authentication.
+- Electron layout checks cover light/dark, VI/EN at 1260×900 and 1000×680,
+  including 20 pins, separate scroll geometry, one incremental request per end
+  scroll and preserved positions after refresh. Syntax and isolated regression
+  smoke checks pass. Portable packaging and packaged smoke pass, including the
+  pagination IPC, Kaggle bridge, Codex helper/routes and preserved fixture login.
+- Additional pages are session memory only; persisted snapshots remain bounded.
+  Live Kaggle pagination is an acceptance check requiring real account access.
+  QA does not touch the user's running app, Codex gateway or live credentials.
 
 ## Service navigation and UI — 1.15.0
 

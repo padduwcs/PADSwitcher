@@ -61,6 +61,8 @@ Version **1.15.0** brings services into a shared entry page. Open **Services →
 3. Select an account → **Use in terminal**, then paste the command into your PowerShell terminal, including VS Code. For shorter commands, enable **Set up command** once; new terminals support `padkaggle list`, `padkaggle use username`, `padkaggle status` and `padkaggle off`. You can also **Open new terminal** from the app.
 4. **Refresh** manually or enable two-minute refresh to read quota and latest runs. **Pin notebook** to monitor a particular notebook.
 
+Version **1.16.0** separates **Pinned** and **Recent** into independent scroll areas. Scroll Recent to its end to load 12 more notebooks, or choose **Load more**. Loaded rows and scroll positions survive quota refresh; additional pages show their snapshot from the time they were loaded.
+
 Each PowerShell keeps its own selection when changing directories with `cd`. Use A in one terminal and B in another to submit jobs in parallel within Kaggle's limits. `python train.py` still runs locally; Kaggle GPUs run the notebooks submitted with `kaggle kernels push`. See [Kaggle usage and limits](docs/KAGGLE.md).
 
 ### Shared or separate accounts

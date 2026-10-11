@@ -80,17 +80,22 @@ def read_account(payload, client_factory=None):
         if payload.get("action") == "verify":
             return result
 
+        page = payload.get("page", 1) if payload.get("action") == "notebooks" else 1
+        if type(page) is not int or not 1 <= page <= 1000000:
+            return {"ok": False, "code": "KAGGLE_REQUEST"}
+
         try:
-            quota = client.kernels.kernels_api_client.get_accelerator_quota_statistics(ApiGetAcceleratorQuotaStatisticsRequest())
+            quota = None if payload.get("action") == "notebooks" else client.kernels.kernels_api_client.get_accelerator_quota_statistics(ApiGetAcceleratorQuotaStatisticsRequest())
             rows = []
-            for name, item in (("GPU", quota.gpu_quota), ("TPU", quota.tpu_quota)):
+            for name, item in (("GPU", quota.gpu_quota), ("TPU", quota.tpu_quota)) if quota is not None else ():
                 if item is None:
                     continue
                 used, total = hours(item.time_used), hours(item.total_time_allowed)
                 rows.append({"resource": name, "used": used, "total": total,
                              "remaining": max(0, total - used) if total is not None and used is not None else None,
                              "reserved": hours(item.time_reserved), "refreshAt": stamp(quota.quota_refresh_time)})
-            result["quota"] = rows
+            if quota is not None:
+                result["quota"] = rows
         except Exception as error:
             result["quotaError"] = error_code(error)
 
@@ -100,9 +105,10 @@ def read_account(payload, client_factory=None):
             request.group = KernelsListViewType.PROFILE
             request.sort_by = KernelsListSortType.DATE_RUN
             request.page_size = 12
-            request.page = 1
+            request.page = page
             request.language = request.kernel_type = request.output_type = "all"
             listing = client.kernels.kernels_api_client.list_kernels(request)
+            result["hasMore"] = len(listing.kernels or []) >= 12
             for item in listing.kernels or []:
                 if not item or not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_-]+", item.ref or ""):
                     continue
@@ -113,7 +119,7 @@ def read_account(payload, client_factory=None):
         except Exception as error:
             result["notebooksError"] = error_code(error)
 
-        for ref in payload.get("watch", [])[:20]:
+        for ref in (payload.get("watch", [])[:20] if payload.get("action") != "notebooks" else []):
             if isinstance(ref, str) and re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_-]+", ref):
                 notebooks.setdefault(ref, {"ref": ref, "title": ref, "lastRunAt": None,
                                            "accelerator": None, "machineShape": ""})
@@ -130,6 +136,7 @@ def read_account(payload, client_factory=None):
                 notebook["status"] = "unknown"
                 notebook["errorCode"] = error_code(error)
         result["notebooks"] = list(notebooks.values())
+        result["page"] = page
         result["recentLimit"] = 12
         return result
 
@@ -145,7 +152,7 @@ def main():
                 result = {"ok": True, **versions()}
             elif not versions()["supported"]:
                 result = {"ok": False, "code": "KAGGLE_DEPENDENCIES"}
-            elif payload.get("action") in ("verify", "refresh"):
+            elif payload.get("action") in ("verify", "refresh", "notebooks"):
                 import requests
                 send = requests.Session.send
 

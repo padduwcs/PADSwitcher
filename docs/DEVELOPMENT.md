@@ -87,6 +87,12 @@ offline Python contract tests require Python 3.11+, `kaggle>=2.2.4,<3` and
 interpreter with those packages. See [Kaggle](KAGGLE.md) for the independent
 terminal design, API coverage and the remaining live acceptance checks.
 
+Kaggle preview fixtures accept `?demo=1&kgmany=1` for 20 pinned and 12 recent
+notebooks with synthetic pagination. Electron UI smoke uses this fixture to check
+independent scroll geometry, end-scroll loading and position preservation in both
+themes/languages and window sizes. Additional notebook pages are account-specific
+memory caches; persisted first-page/pinned snapshots keep their existing bounds.
+
 ## Layout
 
 | Folder | Purpose |

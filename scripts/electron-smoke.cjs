@@ -172,7 +172,25 @@ let timeout;
           }
           preview.setSize(1260,900);
         }
-        preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1260/1000px: passed.');
+        // Dense notebook fixtures exercise actual scroll geometry without Kaggle requests.
+        for(const variant of ['light-vi','dark-en']){
+          await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1&kgmany=1'});
+          await preview.webContents.executeJavaScript("document.fonts.ready.then(()=>true)");
+          await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();navigate('kaggle');window.kgPageCalls=0;const originalKgAction=window.pad.action;window.pad.action=(command,args)=>{if(command==='kaggleNotebooksMore')window.kgPageCalls++;return originalKgAction(command,args);};true;");
+          for(const width of [1260,1000]){
+            preview.setSize(width,width===1000?680:900);
+            const metrics=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,body:[document.querySelector('#kg-detail-body').scrollHeight,document.querySelector('#kg-detail-body').clientHeight],regions:['pinned','recent'].map(name=>{const el=document.querySelector('#kg-notebooks-'+name);return {height:el.clientHeight,content:el.scrollHeight,count:el.querySelectorAll('.kg-notebook').length};}),detail:document.querySelector('#kg-detail').getBoundingClientRect().bottom,viewport:innerHeight};})()");
+            assert.equal(metrics.overflow,false);assert(metrics.body[0]>metrics.body[1]);assert(metrics.detail<=metrics.viewport,'Kaggle detail stays within the viewport: '+JSON.stringify(metrics));
+            assert.equal(metrics.regions[0].count,20);assert(metrics.regions.every(r=>r.content>r.height&&r.height<=208));
+            await preview.webContents.executeJavaScript("(()=>{const body=document.querySelector('#kg-detail-body');body.scrollTop+=document.querySelector('#kg-notebooks-pinned').closest('section').getBoundingClientRect().top-body.getBoundingClientRect().top-12;document.querySelector('#kg-notebooks-pinned').scrollTop=40;})()");
+            await new Promise(resolve=>setTimeout(resolve,100));
+            const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-scroll-'+variant+'-'+width+'.png'),frame);
+          }
+          const paging=await preview.webContents.executeJavaScript("(async()=>{const recent=document.querySelector('#kg-notebooks-recent');recent.scrollTop=recent.scrollHeight;await new Promise(r=>setTimeout(r,180));const expanded=document.querySelector('#kg-notebooks-recent');const top=expanded.scrollTop;document.querySelector('#kg-refresh-one').click();await new Promise(r=>setTimeout(r,60));return {calls:window.kgPageCalls,recent:document.querySelectorAll('#kg-notebooks-recent .kg-notebook').length,pinned:document.querySelectorAll('#kg-notebooks-pinned .kg-notebook').length,pinnedTop:document.querySelector('#kg-notebooks-pinned').scrollTop,top,after:document.querySelector('#kg-notebooks-recent').scrollTop};})()");
+          assert.equal(paging.calls,1);assert.equal(paging.recent,24);assert.equal(paging.pinned,20);assert.equal(paging.pinnedTop,40);assert.equal(paging.after,paging.top);
+          preview.setSize(1260,900);
+        }
+        preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1260/1000px; independent notebook scrolling and incremental loading: passed.');
         clearTimeout(timeout); app.exit(0);
       } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.stack); app.exit(1); }
     });

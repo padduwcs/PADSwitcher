@@ -4,6 +4,10 @@ Available in PADSwitcher 1.14.0, with commands for existing PowerShell terminals
 
 Since 1.15.0, open **Dịch vụ → Kaggle** (Services → Kaggle). Account options and quota details are collapsed until needed; **Dùng ở terminal** is the primary action.
 
+Since 1.16.0, Pinned and Recent have separate scroll areas. Recent loads 12 notebooks per page on downward end scroll, with Load more/Retry buttons for keyboard access and failures. Loaded counts reflect the visible collection, not an API total.
+
+![Pinned and Recent notebook lists with independent scrolling](images/kaggle-notebooks.png)
+
 ## Luồng sử dụng
 
 **Thiết lập một lần:** mở Dịch vụ → Kaggle → Thiết lập. Chọn `python.exe` của Python 3.11+ hoặc một venv riêng, hoặc để ứng dụng tìm Python trên PATH. Sao chép lệnh cài và chạy trong PowerShell, sau đó Lưu & kiểm tra. Ứng dụng cần `kaggle >=2.2.4,<3` và `kagglesdk >=0.1.37,<1`; không đóng gói Python hay tự cài package. Có thể xem phiên bản của cả ba trong hộp Thiết lập.
@@ -44,7 +48,9 @@ Gửi job khác từ terminal của tài khoản B bằng cấu hình notebook c
 
 **Theo dõi:** quota GPU/TPU lấy từ API chính thức, gồm số giờ còn lại, tổng, giữ chỗ và thời điểm đặt lại nếu có. Số giờ còn lại là tổng trừ đã dùng, còn bao gồm phần giữ chỗ; đây không phải bảo đảm GPU còn sẵn. `—` nghĩa là chưa biết, không phải 0.
 
-Danh sách đọc lượt chạy mới nhất của 12 notebook gần đây của tài khoản, cộng tối đa 20 notebook ghim có quyền xem. Có thể ghim `username/notebook-slug` hoặc URL `https://www.kaggle.com/code/username/notebook-slug`. API không cung cấp đầy đủ mọi phiên tương tác trên web hoặc mọi phiên bản đang chạy. Trạng thái là ảnh chụp lần đọc gần nhất, không phải sự kiện liên tục. Nút mở notebook dẫn tới Kaggle để xem thêm; có thể cần đăng nhập tài khoản phù hợp trong trình duyệt.
+**Đã ghim** và **Gần đây** có vùng cuộn riêng; phần chi tiết tài khoản cũng cuộn để trang không dài theo số notebook. Gần đây tải 12 notebook mỗi trang khi cuộn xuống cuối hoặc bấm **Tải thêm**. Nếu có lỗi, danh sách đã tải được giữ và có nút **Thử lại**. Số bên cạnh tên mục là số notebook hiện đã tải trong mục đó, không phải tổng trên Kaggle. Notebook đã ghim chỉ xuất hiện ở Đã ghim, có thể ghim nhanh từ Gần đây hoặc nhập `username/notebook-slug` / URL `https://www.kaggle.com/code/username/notebook-slug`, tối đa 20 mục có quyền xem.
+
+Mỗi notebook hiển thị lượt chạy mới nhất. API không cung cấp đầy đủ mọi phiên tương tác trên web hoặc mọi phiên bản đang chạy. **Làm mới** cập nhật quota, trang đầu và các notebook ghim; các trang tải thêm giữ ảnh chụp tại lúc tải trong phiên mở app, rê chuột lên trạng thái để xem thời điểm đọc. Đóng rồi mở lại app sẽ bắt đầu từ trang đầu. Kaggle phân trang theo thời điểm chạy nên danh sách có thể thay đổi trong lúc đọc; PADSwitcher loại trùng theo đường dẫn notebook. Trạng thái không phải sự kiện trực tiếp liên tục. Nút mở notebook dẫn tới Kaggle để xem thêm; có thể cần đăng nhập tài khoản phù hợp trong trình duyệt.
 
 Tự cập nhật mỗi hai phút khi PADSwitcher mở; các lượt làm mới tất cả đọc tối đa hai tài khoản đồng thời. Có thể tắt. Lỗi mạng, giới hạn yêu cầu hoặc thiếu quyền giữ lại dữ liệu cũ và đánh dấu; token hết hạn cần cập nhật. Ghim notebook không cấp thêm quyền xem. PADSwitcher chỉ theo dõi các notebook mà token truy cập được.
 
@@ -53,6 +59,7 @@ Tự cập nhật mỗi hai phút khi PADSwitcher mở; các lượt làm mới 
 ## Storage and implementation
 
 - Metadata: `%APPDATA%\PADSwitcher\data\kaggle\accounts.json`.
+- Pagination stores additional rows and their read times in memory per account; persisted snapshots remain bounded to the first 12 plus up to 20 pins. Page requests verify identity, skip quota/pinned queries, deduplicate simultaneous requests per account and retain the cursor on failure. They cannot mutate or remove an account while its read is active.
 - Credential vault: `kaggle\<UUID>\token.dpapi`, Windows DPAPI CurrentUser and the existing PADSwitcher entropy. The Kaggle directory has the same private Windows ACL policy as Codex data.
 - The renderer receives allowlisted metadata and safe errors. Token input is masked and cleared on submission, cancellation, Escape and dialog close. Tokens are never put in command arguments, clipboard commands, plaintext launchers or metadata files.
 - The Python reader uses the official `kagglesdk` client with an explicit API token and production endpoint. Credentials travel over the subprocess stdin pipe. Inherited Kaggle credentials and Python environment hooks are removed; Python starts with `-E -P` to ignore environment configuration and unsafe import paths while allowing normal user-site installations.
@@ -73,7 +80,7 @@ For the real SDK request/response contract, install the stated packages in a dis
 & '<venv>\Scripts\python.exe' -I test/kaggle-reader-test.py
 ```
 
-This offline suite uses real SDK model types and fixture clients; it makes no Kaggle requests. Electron smoke checks include the Kaggle page in light/dark, VI/EN and 1000/1260px layouts. If `artifacts/kaggle-sdk-probe/Scripts/python.exe` exists, startup and packaged smoke also verify the actual Python bridge and tool detection without authentication.
+This offline suite uses real SDK model types and fixture clients; it makes no Kaggle requests. It checks requested pages, full/short/empty page handling, invalid paging and safe partial errors. Electron smoke checks include the Kaggle page in light/dark, VI/EN and 1000/1260px layouts, with 20 pins, independently bounded scroll areas, incremental loading and scroll preservation. If `artifacts/kaggle-sdk-probe/Scripts/python.exe` exists, startup and packaged smoke also verify the actual Python bridge and tool detection without authentication.
 
 Live acceptance checks use two authorized real Kaggle accounts to verify token creation/revocation, account-specific CLI submissions, parallel jobs, quota and private notebook status. These workflows have not been executed by the automated checks; they require real tokens and consume Kaggle compute when jobs run.
 

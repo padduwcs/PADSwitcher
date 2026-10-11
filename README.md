@@ -61,6 +61,8 @@ Bản **1.15.0** gom các dịch vụ vào một cửa vào chung. Mở **Dịch
 3. Chọn tài khoản → **Dùng ở terminal**, dán lệnh vào PowerShell trong VS Code hoặc cửa sổ PowerShell của bạn. Muốn gọi lệnh ngắn, bật **Thiết lập lệnh** một lần; terminal mới dùng `padkaggle list`, `padkaggle use username`, `padkaggle status` và `padkaggle off`. Bạn vẫn có thể **Mở terminal mới** từ ứng dụng.
 4. Dùng **Làm mới** hoặc cập nhật tự động mỗi hai phút để đọc quota và lượt chạy. **Ghim notebook** nếu muốn theo dõi notebook cụ thể.
 
+Bản **1.16.0** tách **Đã ghim** và **Gần đây** thành hai vùng cuộn. Cuộn Gần đây xuống cuối để tải thêm 12 notebook mỗi lần, hoặc bấm **Tải thêm**. Các notebook đã tải và vị trí cuộn được giữ khi làm mới quota; trạng thái của trang tải thêm là dữ liệu tại lúc tải.
+
 Mỗi PowerShell giữ lựa chọn riêng và giữ tài khoản khi đổi thư mục bằng `cd`. Terminal thứ nhất có thể dùng A, terminal thứ hai dùng B để gửi công việc song song trong giới hạn Kaggle. `python train.py` vẫn chạy local; GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).
 
 ### Dùng chung hoặc tài khoản riêng

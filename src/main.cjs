@@ -59,6 +59,7 @@ async function start() {
         case 'kaggleRemove': await kaggle.remove(args.id);break;
         case 'kaggleRefresh': await kaggle.refresh(args.id);break;
         case 'kaggleRefreshAll': await kaggle.refreshAll();break;
+        case 'kaggleNotebooksMore': await kaggle.notebooksMore(args.id);break;
         case 'kaggleLaunch': await kaggle.launch(args.id,uiLocale);break;
         case 'kaggleTerminalStatus': result=await kaggle.terminalStatus();break;
         case 'kaggleTerminalConfigure': result=await kaggle.terminalConfigure(args.enabled);break;
