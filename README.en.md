@@ -5,6 +5,7 @@
 <h1 align="center">PADSwitcher</h1>
 
 <p align="center">
+  <strong>Profile Account Directory Switcher</strong><br>
   <strong>One place to manage Codex and Kaggle accounts on Windows.</strong><br>
   Track quotas, switch accounts safely, and keep working in your IDE or terminal.
 </p>
