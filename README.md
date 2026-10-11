@@ -1,113 +1,100 @@
-# PADSwitcher
+<p align="center">
+  <img src="src/assets/padswitcher-emblem.png" alt="Biểu trưng PADSwitcher" width="120">
+</p>
 
-<img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
+<h1 align="center">PADSwitcher</h1>
 
-Quản lý tài khoản Codex và Kaggle trên Windows. Mở **Dịch vụ** để chọn công cụ cần dùng. Với Codex: xem quota, đổi tài khoản và tiếp tục làm việc trong VS Code, CLI hoặc JetBrains AI Assistant. Giao diện sáng/tối, tiếng Việt/Anh.
+<p align="center">
+  <strong>Một nơi để quản lý tài khoản Codex và Kaggle trên Windows.</strong><br>
+  Theo dõi quota, đổi tài khoản an toàn và tiếp tục làm việc trong IDE hoặc terminal.
+</p>
 
-**[Tải bản Windows](https://github.com/padduwcs/PADSwitcher/releases/latest)** · [English](README.en.md) · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
+<p align="center">
+  <a href="https://github.com/padduwcs/PADSwitcher/releases/latest"><img alt="Phiên bản mới nhất" src="https://img.shields.io/github/v/release/padduwcs/PADSwitcher?style=for-the-badge&color=147de5"></a>
+  <a href="https://github.com/padduwcs/PADSwitcher/actions/workflows/ci.yml"><img alt="Trạng thái kiểm thử" src="https://img.shields.io/github/actions/workflow/status/padduwcs/PADSwitcher/ci.yml?branch=main&style=for-the-badge&label=checks"></a>
+  <a href="LICENSE"><img alt="Giấy phép MIT" src="https://img.shields.io/github/license/padduwcs/PADSwitcher?style=for-the-badge&color=338f85"></a>
+  <img alt="Windows 10 và 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows11">
+</p>
 
-<img src="docs/images/light.png" alt="Giao diện sáng với tài khoản mẫu" width="49%"> <img src="docs/images/dark.png" alt="Giao diện tối với tài khoản mẫu" width="49%">
+<p align="center">
+  <a href="https://github.com/padduwcs/PADSwitcher/releases/latest"><strong>⬇️ Tải bản Windows mới nhất</strong></a>
+  &nbsp;·&nbsp; <a href="README.en.md">English</a>
+  &nbsp;·&nbsp; <a href="https://github.com/padduwcs/PADSwitcher/issues/new/choose">Báo lỗi</a>
+</p>
 
-<img src="docs/images/services.png" alt="Chọn dịch vụ Codex hoặc Kaggle" width="49%"> <img src="docs/images/kaggle.png" alt="Quản lý Kaggle với tài khoản mẫu" width="49%">
+> [!IMPORTANT]
+> PADSwitcher là ứng dụng portable cho Windows, hiện **chưa ký số**. Hãy tải từ trang Releases chính thức và đối chiếu file `.sha256` đi kèm.
 
-## Cài đặt lần đầu
+<p align="center">
+  <img src="docs/images/light.png" alt="PADSwitcher quản lý tài khoản Codex ở giao diện sáng" width="49%">
+  <img src="docs/images/dark.png" alt="PADSwitcher quản lý tài khoản Codex ở giao diện tối" width="49%">
+</p>
 
-**Yêu cầu:** Windows 10/11 x64, .NET Framework 4.8 và Codex CLI hoặc extension Codex cho VS Code bản Windows. Tuyến kết nối đã kiểm chứng với Codex **0.160.0**; bản cũ hơn không được hỗ trợ. Bản portable không cần Node.js.
+## Điểm nổi bật
 
-1. Tải `PADSwitcher-<version>-Windows.exe` từ Releases, đặt vào thư mục bạn muốn và mở ứng dụng.
-2. Mở **Dịch vụ → Codex → Tài khoản**, bấm **Thêm tài khoản**, đăng nhập trong trình duyệt. Lặp lại cho các tài khoản của bạn. Nếu đã đăng nhập Codex, có thể nhập phiên hiện tại bằng tùy chọn tương ứng trong ứng dụng.
-3. Chọn tài khoản → **Dùng tài khoản này** để bật kết nối.
-4. Cấu hình nơi bạn dùng Codex theo hướng dẫn dưới đây.
+- 🔄 **Codex không gián đoạn:** đổi tài khoản thủ công hoặc tự thử tài khoản dự phòng khi gặp lỗi quota trước khi câu trả lời bắt đầu.
+- 🧩 **Dùng ở nơi bạn làm việc:** hỗ trợ Codex trong VS Code, PowerShell CLI và JetBrains AI Assistant.
+- 📊 **Quota rõ ràng:** xem phần còn lại, thời gian đặt lại, lịch sử đổi và hoạt động model ngay trong ứng dụng.
+- 🚀 **Kaggle song song:** mỗi terminal dùng một tài khoản riêng; theo dõi GPU/TPU, notebook đã ghim và các lượt chạy gần đây.
+- 🔐 **Dữ liệu nằm trên máy:** phiên Codex và token Kaggle được mã hóa bằng Windows DPAPI.
+- 🌗 **Giao diện chỉn chu:** sáng/tối, tiếng Việt/English, bố cục responsive và có thể điều chỉnh.
 
-### Extension trong VS Code
+<p align="center">
+  <img src="docs/images/services.png" alt="Màn hình chọn dịch vụ Codex hoặc Kaggle" width="49%">
+  <img src="docs/images/kaggle.png" alt="Màn hình quản lý nhiều tài khoản Kaggle" width="49%">
+</p>
 
-1. Trong PADSwitcher, mở **Kết nối → Thiết lập VS Code**.
-2. Lưu công việc, chạy **Developer: Reload Window** trong VS Code một lần, rồi mở extension Codex.
-3. Xem trạng thái trong PADSwitcher: **Đã thiết lập · chờ extension** nghĩa là cấu hình đã đúng nhưng extension chưa nối; **Đang kết nối** nghĩa là extension đã hoàn tất kết nối.
+## Bắt đầu trong 3 phút
 
-Cấu hình tự động áp dụng cho VS Code bản thường, hồ sơ User mặc định. Workspace hoặc profile khác có thể ghi đè `chatgpt.cliExecutable`; kiểm tra lại nếu extension chưa nối.
+### Yêu cầu
 
-### CLI trong terminal VS Code hoặc PowerShell
+- Windows 10/11 x64 và .NET Framework 4.8.
+- Với Codex: Codex CLI hoặc extension Codex cho VS Code bản Windows. Đã kiểm chứng với Codex `0.160.0`.
+- Với Kaggle: Python 3.11+ và công cụ Kaggle theo hướng dẫn trong ứng dụng.
+- Bản portable không cần cài Node.js.
 
-Trong **Kết nối**, sao chép lệnh CLI của PADSwitcher và chạy trong terminal bạn đang dùng. Đường dẫn mặc định:
+### Cài đặt
 
-```powershell
-& "$env:APPDATA\PADSwitcher\data\gateway\PADCodex.exe"
-```
+1. Tải `PADSwitcher-<version>-Windows.exe` và file `.sha256` từ [Releases](https://github.com/padduwcs/PADSwitcher/releases/latest).
+2. Kiểm tra file tải về:
 
-Có thể thêm `resume` để mở lại hội thoại. Lệnh `codex` thông thường vẫn dùng đăng nhập riêng và không đi qua PADSwitcher. CLI được kết nối bằng lệnh trên mới nhận việc đổi tài khoản từ ứng dụng.
+   ```powershell
+   Get-FileHash .\PADSwitcher-*-Windows.exe -Algorithm SHA256
+   ```
 
-### Android Studio / JetBrains AI Assistant
+3. Mở ứng dụng → **Dịch vụ** → chọn **Codex** hoặc **Kaggle**.
+4. Làm theo hướng dẫn 3 bước ngay trong ứng dụng để thêm tài khoản và kết nối công cụ.
 
-1. Cài plugin **AI Assistant** và agent **Codex** trong mục **Agents**, mở Codex một lần để IDE tải runtime. Tích hợp hiện hỗ trợ adapter **codex-acp 2.1.1**.
-2. Trong PADSwitcher, bật kết nối bằng **Dùng tài khoản này**, mở **Kết nối → Thiết lập JetBrains**.
-3. Trong **AI Chat**, chọn agent **Codex · PADSwitcher** và mở chat mới. Nếu chưa thấy agent, mở lại IDE một lần.
-4. Xem **Agent → Đang kết nối** trong PADSwitcher để xác nhận chat đang đi qua ứng dụng. **Đã thiết lập** chỉ xác nhận cấu hình, chưa xác nhận chat đang kết nối.
+PADSwitcher là portable: đặt file `.exe` ở thư mục bạn muốn và chạy trực tiếp. Khi nâng cấp, thoát bản cũ từ khay hệ thống rồi mở bản mới; dữ liệu trong `%APPDATA%\PADSwitcher\data` được giữ nguyên.
 
-Đổi tài khoản thủ công/tự động áp dụng cho agent này như VS Code/CLI. Agent **Codex** thông thường vẫn dùng đăng nhập riêng. Hội thoại cũ của agent thông thường không tự chuyển sang agent PADSwitcher. Tích hợp thêm một agent trong `%USERPROFILE%\.jetbrains\acp.json`, giữ các agent khác. Không cần cài Node.js riêng; dùng runtime đã được IDE tải.
+## Kết nối Codex
 
-Muốn trở về cách dùng cũ: chọn lại agent **Codex** trong AI Chat. Có thể gỡ agent PADSwitcher tại **Kết nối → Gỡ kết nối JetBrains**. Bước duyệt công cụ vẫn hiển thị trong IDE.
+- **VS Code:** **Kết nối → Thiết lập VS Code**, sau đó chạy `Developer: Reload Window` một lần.
+- **PowerShell/terminal VS Code:** sao chép lệnh tại trang **Kết nối**. Lệnh `codex` thông thường vẫn dùng phiên riêng.
+- **JetBrains/Android Studio:** cài AI Assistant và Codex agent, sau đó chọn **Codex · PADSwitcher** trong AI Chat.
 
-Cài đặt chung chứa giao diện/ngôn ngữ. Cấu hình Codex và khôi phục dữ liệu nằm ở **Dịch vụ → Codex → Cài đặt**. Trang **Hướng dẫn** có lựa chọn riêng cho Codex và Kaggle.
+Mặc định ba loại kết nối dùng chung một tài khoản. Bạn cũng có thể gán tài khoản và chính sách tự đổi riêng cho từng loại kết nối. Xem [hướng dẫn Codex đầy đủ](docs/CODEX.md).
 
-## Dùng hằng ngày
+## Dùng Kaggle
 
-### Kaggle: nhiều tài khoản và terminal song song
+1. Mở **Dịch vụ → Kaggle → Thiết lập**, cài các công cụ được đề xuất rồi **Lưu & kiểm tra**.
+2. Tạo API token tại [Kaggle Settings](https://www.kaggle.com/settings), sau đó **Thêm tài khoản**.
+3. Chọn tài khoản → **Sao chép lệnh** hoặc **Mở terminal mới**.
+4. Gửi notebook bằng Kaggle CLI và theo dõi quota/lượt chạy trong PADSwitcher.
 
-Mở **Dịch vụ → Kaggle** để chọn tài khoản và theo dõi notebook. Bấm **Cách dùng** nếu cần xem hướng dẫn 3 bước.
+Mỗi PowerShell giữ lựa chọn riêng, nên nhiều terminal có thể dùng nhiều tài khoản song song trong giới hạn của Kaggle. Xem [hướng dẫn Kaggle đầy đủ](docs/KAGGLE.md).
 
-1. Mở **Dịch vụ → Kaggle → Thiết lập**, cài Python 3.11+ và các công cụ bằng lệnh được cung cấp; bấm **Lưu & kiểm tra**.
-2. Tạo **API token** tại [Kaggle Settings](https://www.kaggle.com/settings), bấm **Thêm tài khoản** và dán token. Làm một lần cho mỗi tài khoản bạn có quyền sử dụng.
-3. Chọn tài khoản → **Sao chép lệnh** → dán vào PowerShell, kể cả terminal VS Code. Hoặc bấm **Mở terminal mới**. Muốn dùng `padkaggle use username`, bật **Thiết lập → Thiết lập padkaggle** một lần rồi mở terminal mới.
-4. Dùng **Làm mới** hoặc cập nhật tự động mỗi hai phút để đọc quota và lượt chạy. **Ghim notebook** nếu muốn theo dõi notebook cụ thể.
+## An toàn và giới hạn
 
-**Đã ghim** và **Gần đây** cuộn riêng. Cuộn Gần đây xuống cuối hoặc bấm **Tải thêm** để xem tiếp notebook.
+- PADSwitcher không vận hành proxy trên Internet; gateway chỉ lắng nghe loopback và dùng capability mới ở mỗi lần chạy.
+- Ứng dụng không ghi prompt hoặc credential vào log riêng. Không chia sẻ thư mục dữ liệu, file kết nối hay ảnh chụp có thông tin cá nhân.
+- Tự đổi chỉ hỗ trợ tài khoản Codex cá nhân Free/Plus/Pro và lỗi quota đã xác định trước khi có nội dung trả về.
+- Chưa hỗ trợ tài khoản tổ chức, WSL, SSH/container, Codex cloud, tự mở cùng Windows hoặc tự cập nhật.
+- Ứng dụng không bỏ qua sandbox hay bước duyệt công cụ của Codex.
 
-Kéo vạch giữa hai cột hoặc dưới danh sách để đổi kích thước. App nhớ bố cục; **Bố cục mặc định** đặt lại.
+Đọc thêm: [Bảo mật](SECURITY.md) · [Ranh giới định tuyến](ROUTING.md) · [Phạm vi kiểm chứng](VALIDATION.md)
 
-Mỗi PowerShell giữ lựa chọn riêng và giữ tài khoản khi đổi thư mục bằng `cd`. Terminal thứ nhất có thể dùng A, terminal thứ hai dùng B để gửi công việc song song trong giới hạn Kaggle. `python train.py` vẫn chạy local; GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).
-
-### Dùng chung hoặc tài khoản riêng
-
-Mặc định VS Code, JetBrains và CLI qua PADSwitcher dùng chung tài khoản. Muốn tách:
-
-1. Mở **Kết nối**, bấm **Tài khoản** ở mục VS Code, JetBrains hoặc CLI.
-2. Chọn **Tài khoản riêng**, chọn tài khoản rồi **Lưu thiết lập**. Chờ lượt đang chạy xong trước khi đổi chế độ.
-3. Reload Window trong VS Code, mở lại chat JetBrains hoặc CLI **một lần** để áp dụng chế độ mới. Không phải thiết lập lại đường dẫn kết nối.
-4. Trong trang **Tài khoản**, chọn **Dùng cho → VS Code / JetBrains / CLI**. Nút **Dùng tài khoản này**, **Tự đổi** và lịch sử tự đổi áp dụng cho kết nối đang chọn. Chọn **Dùng chung** để quản lý nhóm dùng chung.
-
-Ví dụ VS Code dùng A → B, JetBrains dùng C → D: VS Code hết quota thì chuyển sang B, JetBrains vẫn dùng C. Các lần đổi tài khoản trong cùng chế độ không cần mở lại IDE. Nếu cùng dùng một tài khoản, hai bên cùng tiêu quota; thông tin tài khoản hết quota được chia sẻ để tránh chọn lại tài khoản đó.
-
-Muốn gộp lại, mở **Kết nối → Tài khoản → Dùng chung**, rồi mở lại kết nối đó một lần. Cấu hình tự đổi riêng được giữ lại để dùng sau. Phạm vi tách là loại kết nối: tất cả cửa sổ VS Code dùng cùng nhóm VS Code, tất cả chat agent PADSwitcher trong JetBrains dùng cùng nhóm JetBrains. CLI trong terminal VS Code thuộc nhóm **CLI**.
-
-Mở PADSwitcher trước khi dùng Codex qua kết nối này. Có thể mở VS Code trước; nếu extension chưa tự nối sau khi PADSwitcher sẵn sàng, Reload Window một lần.
-
-- **Đổi thủ công:** chọn tài khoản khác → **Dùng tài khoản này**. Ứng dụng đợi lượt đang chạy kết thúc rồi đổi. Nếu Codex đã dừng vì quota, nhắn **tiếp tục** trong cùng hội thoại. Không cần đăng nhập hay mở lại VS Code cho mỗi lần đổi.
-- **Đổi tự động:** bật **Tự đổi**, chọn ít nhất hai tài khoản cá nhân và đặt ưu tiên. Khi lần gọi model bị từ chối vì quota trước khi có nội dung trả về, ứng dụng thử lại chính yêu cầu đó bằng tài khoản dự phòng, giữ nguyên ngữ cảnh. Cách này áp dụng cả lúc bắt đầu và sau các bước đã hoàn thành; không tự gửi tin nhắn “tiếp tục”.
-- **Quota:** hai thanh hiển thị phần **còn lại** của cửa sổ ngắn/dài. Làm mới khi cần; dữ liệu cũ được đánh dấu trên giao diện.
-- **Say hi:** bấm **Say hi** trong chi tiết tài khoản hoặc **Say hi tất cả** để gửi một lời chào ngắn qua từng tài khoản đã lưu, giúp bắt đầu chu kỳ quota sớm. Mỗi tài khoản dùng một cuộc trò chuyện mới chạy ngầm, model mặc định của Codex, mức suy luận thấp nhất được hỗ trợ và tốc độ chuẩn; lời chào tiêu hao một ít quota. Kết quả và giờ reset đọc từ server hiện trong bảng riêng. Tài khoản hết quota hoặc cần đăng nhập lại được bỏ qua; lỗi một tài khoản không dừng các tài khoản còn lại. **Dừng sau lượt này** giữ lượt hiện tại và bỏ qua phần còn lại. Nếu kết quả chưa rõ, làm mới quota trước khi gửi lại. Lời chào không đổi tài khoản của các kết nối IDE/CLI đang dùng và không tiêu thụ lượt reset.
-
-Bản **1.13.0** gỡ bỏ hoàn toàn tính năng thử nghiệm GPT Web (các bản 1.10–1.12); mã và hành vi Codex giống 1.9.2. Bản **1.9.2** sửa lỗi làm mất thông tin giữ cache và cắt lượt trả lời dài ở bản cũ. Cập nhật quota **mỗi phút** chỉ đọc thông tin tài khoản, không gọi model; có thể bỏ qua một lần nếu thao tác khác đang chạy. Nếu dùng bản cũ, thoát PADSwitcher bằng biểu tượng khay hệ thống rồi mở bản mới; kết nối lại client để nhận bản sửa. Tài khoản đã lưu được giữ lại.
-
-Nếu muốn kiểm tra mức sử dụng, mở **Cài đặt → Kiểm tra hệ thống → Hoạt động model**: xem số yêu cầu, lần gửi, lần thử tài khoản khác và tỷ lệ ngữ cảnh dùng lại được server báo. Số liệu bắt đầu lại khi khởi động lại kết nối, không phải lượng quota bị trừ. Quota còn phụ thuộc model, mức suy luận và toàn bộ ngữ cảnh; yêu cầu mới ngắn trong hội thoại dài vẫn có thể tốn nhiều, nhất là khi đổi sang tài khoản chưa có cache.
-- **Reset:** chỉ hiện số lượt/hạn dùng khi Codex cung cấp. `—` là chưa có dữ liệu, khác với 0. **Dùng reset** mở bước xác nhận; chỉ xác nhận mới tiêu thụ lượt. Nếu kết quả chưa rõ, dùng **Kiểm tra reset**, tránh gửi một yêu cầu mới. Reset không tự tiếp tục hội thoại đã dừng.
-- **Đóng cửa sổ:** khi kết nối đang chạy, nút **X** ẩn vào khay hệ thống và vẫn phục vụ Codex; nút **–** thu nhỏ xuống taskbar. Muốn thoát hẳn, dùng menu biểu tượng ở khay hệ thống. Nếu kết nối đã dừng, X đóng ứng dụng.
-
-PADSwitcher hiện chưa tự mở cùng Windows và chưa có cập nhật tự động.
-
-## Phạm vi và dữ liệu
-
-Tuyến đổi tự động hỗ trợ tài khoản cá nhân Free/Plus/Pro. Chưa hỗ trợ tài khoản tổ chức, WSL, SSH/containers hay Codex cloud. Ứng dụng dùng Codex cài trên máy; không thay sandbox hoặc bước duyệt công cụ.
-
-Chỉ đổi tự động khi xác định được lỗi quota và chưa chuyển nội dung trả về. Nếu đã nhận một phần câu trả lời, gặp lỗi mạng/lỗi khác hoặc hết tài khoản dự phòng, Codex có thể dừng: chọn tài khoản còn quota rồi tiếp tục trong cùng hội thoại. Không bảo đảm mọi lỗi hoặc phiên bản Codex mới đều tiếp tục tự động.
-
-Phiên tài khoản được mã hóa bằng Windows DPAPI, lưu tại `%APPDATA%\PADSwitcher\data`. Không chia sẻ thư mục này hoặc file kết nối. Mã nguồn và bản phát hành không chứa tài khoản của tác giả. Xem [bảo mật](SECURITY.md) và [phạm vi kiểm chứng](VALIDATION.md). Tính năng **tiêu thụ reset thật chưa được thử**; kiểm thử dùng dữ liệu giả.
-
-**Cập nhật:** thoát bản cũ từ khay hệ thống rồi mở bản mới. Giữ nguyên thư mục dữ liệu; không cần thêm lại tài khoản. Nếu extension chưa nối lại, Reload Window. Bản portable hiện chưa ký số; đối chiếu SHA-256 bằng `Get-FileHash` với file `.sha256` trên Releases.
-
-## Clone và chạy từ mã nguồn
-
-Cần thêm **Node.js 24 LTS** và Git:
+## Phát triển
 
 ```powershell
 git clone https://github.com/padduwcs/PADSwitcher.git
@@ -116,6 +103,25 @@ npm ci
 npm start
 ```
 
-`npm run dist` tạo bản portable trong `dist`. Helper native được build tự động. Hướng dẫn kiểm thử/build: [DEVELOPMENT.md](docs/DEVELOPMENT.md). Chi tiết hệ thống: [ROUTING.md](ROUTING.md).
+Cần Node.js 24 LTS và Git. Các lệnh chính:
 
-Giấy phép [MIT](LICENSE) · [Thành phần bên thứ ba](THIRD_PARTY_NOTICES.md). Dự án độc lập, không phải sản phẩm chính thức của OpenAI.
+```powershell
+npm run check
+npm test
+npm run smoke:ui
+npm run dist
+```
+
+Helper native được build tự động. Xem [hướng dẫn phát triển](docs/DEVELOPMENT.md), [quy trình đóng góp](CONTRIBUTING.md) và [lịch sử phiên bản](CHANGELOG.md).
+
+## Cộng đồng
+
+Nếu gặp lỗi, hãy [mở issue](https://github.com/padduwcs/PADSwitcher/issues/new/choose) với phiên bản ứng dụng, phiên bản Windows và các bước tái hiện; nhớ che thông tin tài khoản. Báo cáo lỗ hổng theo [chính sách bảo mật](SECURITY.md).
+
+---
+
+<p align="center">
+  Phát hành theo <a href="LICENSE">giấy phép MIT</a> ·
+  <a href="THIRD_PARTY_NOTICES.md">Thành phần bên thứ ba</a><br>
+  Dự án độc lập, không phải sản phẩm chính thức của OpenAI, Kaggle hoặc JetBrains.
+</p>

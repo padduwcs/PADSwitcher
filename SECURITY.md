@@ -1,5 +1,11 @@
 # Security and privacy
 
+## Supported versions
+
+Security fixes are shipped in the latest GitHub release. Older portable builds and
+untagged development snapshots are not supported; upgrade before reporting a problem
+that may already be fixed.
+
 PADSwitcher keeps account sessions on your Windows user account using DPAPI.
 The local gateway listens only on loopback and uses a fresh capability at startup.
 Model requests go to the fixed Codex upstream; PADSwitcher does not operate a hosted proxy.
@@ -32,7 +38,11 @@ quota failures before response output. Reset credits always require explicit con
 See [routing boundaries](ROUTING.md) and [validation limits](VALIDATION.md).
 
 To report a vulnerability, use [GitHub private vulnerability reporting](https://github.com/padduwcs/PADSwitcher/security/advisories/new)
-if it is available. Otherwise open an issue asking for a private contact, without posting
-exploit details, account identifiers or credentials. For ordinary bugs, use
+if it is available. Include the affected version, impact, reproduction steps and a
+minimal proof of concept with all credentials removed. Please allow a reasonable time
+for confirmation and a coordinated fix before public disclosure.
+
+Otherwise open an issue asking for a private contact, without posting exploit details,
+account identifiers or credentials. For ordinary bugs, use
 [GitHub Issues](https://github.com/padduwcs/PADSwitcher/issues) with the app version,
 Windows version and steps to reproduce; redact personal information from screenshots.

@@ -1,113 +1,100 @@
-# PADSwitcher
+<p align="center">
+  <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher emblem" width="120">
+</p>
 
-<img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
+<h1 align="center">PADSwitcher</h1>
 
-Manage Codex and Kaggle accounts on Windows. Open **Services** to choose your tool. For Codex: check remaining quota, switch accounts and keep working in VS Code, the CLI or JetBrains AI Assistant. Light/dark themes and Vietnamese/English UI.
+<p align="center">
+  <strong>One place to manage Codex and Kaggle accounts on Windows.</strong><br>
+  Track quotas, switch accounts safely, and keep working in your IDE or terminal.
+</p>
 
-**[Download for Windows](https://github.com/padduwcs/PADSwitcher/releases/latest)** · [Tiếng Việt](README.md) · [Report a bug](https://github.com/padduwcs/PADSwitcher/issues)
+<p align="center">
+  <a href="https://github.com/padduwcs/PADSwitcher/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/padduwcs/PADSwitcher?style=for-the-badge&color=147de5"></a>
+  <a href="https://github.com/padduwcs/PADSwitcher/actions/workflows/ci.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/padduwcs/PADSwitcher/ci.yml?branch=main&style=for-the-badge&label=checks"></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/padduwcs/PADSwitcher?style=for-the-badge&color=338f85"></a>
+  <img alt="Windows 10 and 11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=for-the-badge&logo=windows11">
+</p>
 
-<img src="docs/images/light.png" alt="Light theme with sample accounts" width="49%"> <img src="docs/images/dark.png" alt="Dark theme with sample accounts" width="49%">
+<p align="center">
+  <a href="https://github.com/padduwcs/PADSwitcher/releases/latest"><strong>⬇️ Download for Windows</strong></a>
+  &nbsp;·&nbsp; <a href="README.md">Tiếng Việt</a>
+  &nbsp;·&nbsp; <a href="https://github.com/padduwcs/PADSwitcher/issues/new/choose">Report a bug</a>
+</p>
 
-<img src="docs/images/services.png" alt="Choose Codex or Kaggle" width="49%"> <img src="docs/images/kaggle.png" alt="Kaggle management with sample accounts" width="49%">
+> [!IMPORTANT]
+> PADSwitcher is a portable Windows app and is currently **unsigned**. Download it only from the official Releases page and verify the accompanying `.sha256` file.
 
-## First-time setup
+<p align="center">
+  <img src="docs/images/light.png" alt="PADSwitcher Codex accounts in the light theme" width="49%">
+  <img src="docs/images/dark.png" alt="PADSwitcher Codex accounts in the dark theme" width="49%">
+</p>
 
-**Requirements:** Windows 10/11 x64, .NET Framework 4.8 and a Windows Codex CLI or VS Code Codex extension. Routing has been verified with Codex **0.160.0**; older versions are unsupported. The portable app does not require Node.js.
+## Highlights
 
-1. Download `PADSwitcher-<version>-Windows.exe` from Releases, place it in a folder of your choice and open it.
-2. Open **Services → Codex → Accounts**, click **Add account** and sign in through your browser. Repeat for your accounts. You can also import your existing local Codex session through the app's import option.
-3. Select an account → **Use this account** to start the connection.
-4. Connect your Codex client as described below.
+- 🔄 **Keep Codex moving:** switch manually or retry on a backup account when a confirmed quota error occurs before response output.
+- 🧩 **Works where you do:** connect Codex in VS Code, the PowerShell CLI, and JetBrains AI Assistant.
+- 📊 **Clear quota visibility:** see remaining allowances, reset times, switch history, and model activity in one app.
+- 🚀 **Parallel Kaggle workflows:** select a different account per terminal and monitor GPU/TPU quotas, pinned notebooks, and recent runs.
+- 🔐 **Local-first security:** Codex sessions and Kaggle tokens are encrypted with Windows DPAPI.
+- 🌗 **Polished UI:** light/dark themes, Vietnamese/English, responsive layouts, and adjustable panes.
 
-### VS Code extension
+<p align="center">
+  <img src="docs/images/services.png" alt="Codex and Kaggle service selector" width="49%">
+  <img src="docs/images/kaggle.png" alt="Multiple Kaggle accounts in PADSwitcher" width="49%">
+</p>
 
-1. Open **Connections → Set up VS Code** in PADSwitcher.
-2. Save your work, run **Developer: Reload Window** in VS Code once, then open the Codex extension.
-3. Check the app's status: **Configured · waiting for extension** means the path is configured but the extension has not connected; **Connected** means the extension completed its connection handshake.
+## Start in three minutes
 
-Automatic setup targets regular VS Code and its default User profile. Workspace settings or other profiles can override `chatgpt.cliExecutable`; check those if the extension does not connect.
+### Requirements
 
-### CLI in a VS Code terminal or PowerShell
+- Windows 10/11 x64 and .NET Framework 4.8.
+- For Codex: the Windows Codex CLI or VS Code Codex extension. Verified with Codex `0.160.0`.
+- For Kaggle: Python 3.11+ and the Kaggle tools described in the app.
+- The portable build does not require Node.js.
 
-Copy the CLI command from **Connections** and run it in your terminal. Default path:
+### Install
 
-```powershell
-& "$env:APPDATA\PADSwitcher\data\gateway\PADCodex.exe"
-```
+1. Download `PADSwitcher-<version>-Windows.exe` and its `.sha256` file from [Releases](https://github.com/padduwcs/PADSwitcher/releases/latest).
+2. Verify the download:
 
-Append `resume` to reopen a conversation. The regular `codex` command uses its own login and does not route through PADSwitcher. Only the connected CLI receives account changes from the app.
+   ```powershell
+   Get-FileHash .\PADSwitcher-*-Windows.exe -Algorithm SHA256
+   ```
 
-### Android Studio / JetBrains AI Assistant
+3. Open the app → **Services** → choose **Codex** or **Kaggle**.
+4. Follow the in-app three-step guide to add an account and connect your tool.
 
-1. Install **AI Assistant** and the **Codex** agent in **Agents**; open Codex once so the IDE downloads its runtime. Integration currently supports **codex-acp 2.1.1**.
-2. Start the PADSwitcher connection with **Use this account**, then open **Connections → Set up JetBrains**.
-3. Select **Codex · PADSwitcher** in **AI Chat** and start a new chat. Restart the IDE once if the agent is missing.
-4. Check **Agent → Connected** in PADSwitcher. **Configured** confirms setup only; it does not confirm a live chat connection.
+PADSwitcher is portable: put the `.exe` wherever you prefer and run it directly. To update, quit the old version from the system tray and open the new one; data under `%APPDATA%\PADSwitcher\data` is retained.
 
-Manual/automatic account switching applies to this agent just as it does to VS Code/CLI. The regular **Codex** agent keeps its own login. Existing regular-agent chats are not transferred automatically. Setup adds an agent to `%USERPROFILE%\.jetbrains\acp.json` and preserves other agents. It uses the IDE-managed Node.js runtime; no separate Node.js installation is needed.
+## Connect Codex
 
-To return to normal operation, select the regular **Codex** agent. Optionally remove the PADSwitcher agent under **Connections → Remove JetBrains connection**. Tool permission prompts remain in the IDE.
+- **VS Code:** choose **Connections → Set up VS Code**, then run `Developer: Reload Window` once.
+- **PowerShell/VS Code terminal:** copy the command from **Connections**. The regular `codex` command continues to use its own session.
+- **JetBrains/Android Studio:** install AI Assistant and the Codex agent, then select **Codex · PADSwitcher** in AI Chat.
 
-Global Settings contains appearance and language. Codex configuration and data recovery are under **Services → Codex → Settings**. Help offers separate guides for Codex and Kaggle.
+All three client types share one account by default. You can also assign a separate account and auto-switch policy to each client type. See the [complete Codex guide](docs/CODEX.md#english).
 
-## Daily use
+## Use Kaggle
 
-### Kaggle: multiple accounts and parallel terminals
+1. Open **Services → Kaggle → Setup**, install the suggested tools, then **Save & check**.
+2. Create an API token in [Kaggle Settings](https://www.kaggle.com/settings), then choose **Add account**.
+3. Select an account → **Copy command** or **Open new terminal**.
+4. Submit notebooks with the Kaggle CLI and monitor quotas/runs in PADSwitcher.
 
-Open **Services → Kaggle** to select accounts and monitor notebooks. **How to use** shows a three-step guide.
+Each PowerShell keeps its own account selection, so multiple terminals can use different accounts in parallel within Kaggle's limits. See the [complete Kaggle guide](docs/KAGGLE.md).
 
-1. Open **Services → Kaggle → Setup**, install Python 3.11+ and the tools using the provided command, then **Save & check**.
-2. Create an **API token** in [Kaggle Settings](https://www.kaggle.com/settings), click **Add account** and paste the token. Do this once for each account you are authorized to use.
-3. Select an account → **Copy command** → paste into PowerShell, including the VS Code terminal. Or choose **Open new terminal**. To use `padkaggle use username`, enable **Setup → Set up padkaggle** once, then open a new terminal.
-4. **Refresh** manually or enable two-minute refresh to read quota and latest runs. **Pin notebook** to monitor a particular notebook.
+## Security and boundaries
 
-**Pinned** and **Recent** scroll separately. Scroll Recent to its end or choose **Load more** to see more notebooks.
+- PADSwitcher does not run an Internet-hosted proxy. Its gateway listens on loopback only and uses a fresh capability on each start.
+- The app does not write prompts or credentials to its own logs. Do not share the app-data directory, connection files, or unredacted screenshots.
+- Automatic switching supports personal Codex Free/Plus/Pro accounts and confirmed quota errors before response output.
+- Organization accounts, WSL, SSH/containers, Codex cloud, Windows auto-start, and automatic updates are not currently supported.
+- Codex sandboxing and tool-approval prompts remain in place.
 
-Drag between columns or below a list to resize. The app remembers your layout; **Reset layout** restores automatic sizing.
+Read more: [Security](SECURITY.md) · [Routing boundaries](ROUTING.md) · [Validation scope](VALIDATION.md)
 
-Each PowerShell keeps its own selection when changing directories with `cd`. Use A in one terminal and B in another to submit jobs in parallel within Kaggle's limits. `python train.py` still runs locally; Kaggle GPUs run the notebooks submitted with `kaggle kernels push`. See [Kaggle usage and limits](docs/KAGGLE.md).
-
-### Shared or separate accounts
-
-VS Code, JetBrains and the connected CLI share an account by default. To separate them:
-
-1. Open **Connections → Account** on the VS Code, JetBrains or CLI card.
-2. Choose **Separate account**, select an account and save. Wait for active turns to finish before changing mode.
-3. Reload VS Code, reopen JetBrains chat or restart the CLI **once**. The helper path stays unchanged.
-4. On **Accounts**, choose **Use for → VS Code / JetBrains / CLI**. **Use this account**, **Auto switch** and switch history apply to the selected connection. Choose **Shared** to manage the shared group.
-
-For example, VS Code can use A → B while JetBrains uses C → D. VS Code's quota fallback to B leaves JetBrains on C. Later account switches within a mode do not require an IDE restart. If both use the same account, they consume the same quota; exhausted-account cooldowns are shared.
-
-To rejoin the shared group, select **Connections → Account → Shared** and reopen that connection once. Its private auto-switch policy is retained. Separation is by client type: all VS Code windows share the VS Code group, and all PADSwitcher JetBrains chats share the JetBrains group. A CLI running in a VS Code terminal belongs to the **CLI** group.
-
-Open PADSwitcher before using Codex through this connection. You can start VS Code first; reload its window once if the extension does not reconnect when PADSwitcher is ready.
-
-- **Manual switching:** select another account → **Use this account**. The app waits for active turns to finish. If Codex already stopped due to quota, send **continue** in the same conversation. Each switch does not require another login or a VS Code restart.
-- **Automatic switching:** enable **Auto switch**, choose at least two personal accounts and set their priority. A model request rejected for quota before response output is retried with a backup account using the exact same request and context. This applies both at the start and after completed steps; no extra “continue” message is sent.
-- **Quota:** the two bars show the **remaining** short/long-window allowance. Refresh when needed; stale data is marked.
-- **Say hi:** select **Say hi** in an account's details or **Say hi to all** to send a short greeting from each saved account and start its quota cycle early. Each account uses a new background conversation, the default Codex model, its lowest supported reasoning effort and standard speed; greetings use a little quota. A separate panel shows results and server-provided reset times. Accounts with exhausted quota or expired sessions are skipped; one failure does not stop the remaining accounts. **Stop after this turn** finishes the current account and skips the rest. Refresh quota before sending again if the outcome is uncertain. Greetings preserve the accounts selected for existing IDE/CLI connections and never consume reset credits.
-
-Version **1.13.0** removes the experimental GPT Web feature (builds 1.10–1.12) entirely; Codex code and behavior are identical to 1.9.2. Version **1.9.2** fixes lost cache-affinity metadata and premature termination of long responses. Usage refresh runs **every minute**, only reads account metadata and does not call the model; a busy operation can delay a refresh. To update an older running version, quit PADSwitcher through its tray icon, open the new build and reconnect your client. Saved accounts are retained.
-
-To investigate usage, open **Settings → Check system → Model activity** for request, upstream-attempt, quota-retry and reported cached-input figures. Counts reset when the connection restarts; they are not quota charges. Consumption also depends on the model, reasoning effort and full context. A short follow-up in a long conversation can still be expensive, especially after switching to an account with a cold cache.
-- **Resets:** counts and expiry dates appear only when supplied by Codex. `—` means unavailable, not zero. **Use reset** opens a confirmation; only confirming consumes a credit. If the outcome is uncertain, use **Check reset** instead of starting another request. A reset does not resume a stopped conversation automatically.
-- **Window controls:** while the connection is running, **X** hides the window to the system tray and Codex stays connected. **–** minimizes to the taskbar. Use the tray menu to quit completely. If the connection is stopped, X closes the app.
-
-There is currently no Windows auto-start or automatic updater.
-
-## Scope and data
-
-Automatic routing supports personal Free/Plus/Pro accounts. Organization accounts, WSL, SSH/containers and Codex cloud are unsupported. The app uses your local Codex installation and preserves its sandbox and tool approval flow.
-
-Automatic switching only handles confirmed quota failures before response output. Partial responses, network/other failures and exhausted backup accounts may still stop Codex: select an account with quota and continue in the same conversation. Seamless recovery is not guaranteed for every failure or future Codex version.
-
-Sessions are encrypted with Windows DPAPI under `%APPDATA%\PADSwitcher\data`. Do not share this directory or gateway connection files. Source and release packages contain no author accounts. See [security](SECURITY.md) and [validation scope](VALIDATION.md). **Real reset consumption has not been tested**; reset tests use fixtures.
-
-**Updates:** quit the previous version from the tray and open the new executable. Keep your app data to preserve accounts. Reload VS Code if it does not reconnect. The portable build is currently unsigned; compare `Get-FileHash` output with the release's `.sha256` file.
-
-## Build from source
-
-Install **Node.js 24 LTS** and Git:
+## Development
 
 ```powershell
 git clone https://github.com/padduwcs/PADSwitcher.git
@@ -116,6 +103,25 @@ npm ci
 npm start
 ```
 
-`npm run dist` creates the portable executable in `dist`. The native helper builds automatically. See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for checks and packaging, and [ROUTING.md](ROUTING.md) for architecture.
+Development requires Node.js 24 LTS and Git. Main checks:
 
-[MIT license](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md). Independent project, not an official OpenAI product.
+```powershell
+npm run check
+npm test
+npm run smoke:ui
+npm run dist
+```
+
+The native helper is built automatically. See the [development guide](docs/DEVELOPMENT.md), [contributing guide](CONTRIBUTING.md), and [changelog](CHANGELOG.md).
+
+## Community
+
+If something breaks, [open an issue](https://github.com/padduwcs/PADSwitcher/issues/new/choose) with the app version, Windows version, and reproduction steps. Redact account information. Report vulnerabilities through the [security policy](SECURITY.md).
+
+---
+
+<p align="center">
+  Released under the <a href="LICENSE">MIT License</a> ·
+  <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a><br>
+  Independent project; not an official OpenAI, Kaggle, or JetBrains product.
+</p>

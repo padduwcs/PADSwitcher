@@ -50,7 +50,8 @@ credits or require logging into a real account. The packaged smoke check runs af
 
 `npm run build` makes `dist/win-unpacked`; `npm run dist` also makes the portable
 `dist/PADSwitcher-<version>-Windows.exe`. GitHub Actions checks and builds on Windows.
-For a release, publish the tested executable and its SHA-256 file through GitHub Releases.
+For a release, follow [RELEASING.md](RELEASING.md); a version tag runs the isolated
+checks and publishes the tested executable with its SHA-256 file through GitHub Releases.
 The portable build currently has no code-signing certificate or automatic updater.
 
 ## Say hi
