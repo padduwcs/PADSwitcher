@@ -44,7 +44,7 @@ jobs:
           $releaseFile = Get-ChildItem -LiteralPath dist -Filter 'PADSwitcher-*-Windows.exe' | Select-Object -First 1
           $releaseHash = (Get-FileHash -LiteralPath $releaseFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           [IO.File]::WriteAllText("$($releaseFile.FullName).sha256", "$releaseHash  $($releaseFile.Name)`n", [Text.UTF8Encoding]::new($false))
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PADSwitcher-Windows
           path: |
