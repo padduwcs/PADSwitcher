@@ -8,17 +8,59 @@ const html = fs.readFileSync(path.join(__dirname,'../src/renderer/index.html'),'
 const script = fs.readFileSync(path.join(__dirname,'../src/renderer/app.js'),'utf8');
 const mock = require('../scripts/preview-data.cjs');
 const settle = async () => { await new Promise(resolve => setTimeout(resolve,10)); };
+test('services are the entry point; navigation preserves selection and never switches or launches an account',async t=>{
+  const w=dom(t);await settle();const d=w.document,calls=[],action=w.pad.action;
+  w.pad.action=async(command,args)=>{calls.push(command);return action(command,args);};
+  assert.equal(d.querySelector('.page:not(.hidden)').id,'services-page');
+  assert.deepEqual([...d.querySelectorAll('.sidebar .nav')].map(n=>n.dataset.page),['services','settings','help']);
+  assert.equal(d.querySelectorAll('.service-card').length,2);
+  d.querySelector('[data-service=codex]').click();assert.equal(d.querySelector('.page:not(.hidden)').id,'accounts-page');
+  assert.equal(d.querySelector('.nav.active').dataset.page,'services');assert.equal(d.querySelector('.service-tab[aria-current]').dataset.page,'accounts');
+  d.querySelectorAll('.account-card')[1].click();const selected=d.querySelector('.account-card.selected').dataset.id;
+  d.querySelector('.service-tab[data-page=connections]').click();assert.equal(d.querySelector('.page:not(.hidden)').id,'connections-page');
+  d.querySelector('#breadcrumb [data-page=services]').click();assert(d.querySelector('#service-context').classList.contains('hidden'));
+  d.querySelector('[data-service=kaggle]').click();assert.equal(d.querySelector('.page:not(.hidden)').id,'kaggle-page');assert(d.querySelector('#service-tabs').classList.contains('hidden'));
+  d.querySelector('#breadcrumb [data-page=services]').click();d.querySelector('[data-service=codex]').click();
+  assert.equal(d.querySelector('.account-card.selected').dataset.id,selected);assert.deepEqual(calls,[]);
+});
+test('service cards remain usable after updates and translate in both languages',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#services-heading h1').textContent,'Services');
+  assert(d.querySelector('[data-service=kaggle]').textContent.includes('3 accounts'));
+  d.querySelector('[data-service=codex]').click();assert.equal(d.querySelector('.service-tab[aria-current]').textContent,'Accounts');
+  d.querySelector('#use-gateway').click();await settle();d.querySelector('#breadcrumb [data-page=services]').click();
+  assert(d.querySelector('[data-service=codex] .service-state').textContent.includes('Connected'));
+  d.querySelector('[data-service=kaggle]').click();assert.equal(d.querySelector('.page:not(.hidden)').id,'kaggle-page');
+});
+test('global settings lead to service settings, preserve unsaved Codex fields and show matching help',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('.nav[data-page=settings]').click();assert.equal(d.querySelector('#settings-page #settings-form'),null);
+  d.querySelector('#service-settings-links [data-page=codex-settings]').click();assert.equal(d.querySelector('.page:not(.hidden)').id,'codex-settings-page');
+  const field=d.querySelector('#workspace');field.value='D:\\Unsaved work';d.querySelector('#settings-form').dataset.dirty='1';
+  d.querySelector('.nav[data-page=help]').click();d.querySelector('[data-help-service=kaggle]').click();
+  assert(d.querySelector('#help-codex').classList.contains('hidden'));assert(!d.querySelector('#help-kaggle').classList.contains('hidden'));assert(d.querySelector('#help-kaggle').textContent.includes('padkaggle use username'));
+  d.querySelector('#language-toggle').click();assert(d.querySelector('#help-kaggle').textContent.includes('Select from your terminal'));
+  d.querySelector('.nav[data-page=settings]').click();d.querySelector('#service-settings-links [data-page=codex-settings]').click();assert.equal(field.value,'D:\\Unsaved work');
+});
+test('Kaggle reveals optional details on demand and preserves them during refreshes',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('[data-service=kaggle]').click();assert.equal(d.querySelector('#kg-management').open,false);assert.equal(d.querySelector('#kg-quota-info').open,false);
+  assert(d.querySelector('#kg-terminal-copy').classList.contains('primary'));
+  d.querySelector('#kg-management').open=true;d.querySelector('#kg-quota-info').open=true;
+  d.querySelector('#kg-refresh-one').click();await settle();assert(d.querySelector('#kg-management').open);assert(d.querySelector('#kg-quota-info').open);
+  d.querySelectorAll('.kg-account')[1].click();assert.equal(d.querySelector('#kg-management').open,false);
+});
 test('Kaggle supports independent account terminals, search, quota and notebook monitoring in both languages',async t=>{
   const w=dom(t);await settle();const d=w.document,commands=[],action=w.pad.action;
   w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
   d.querySelector('[data-page=kaggle]').click();assert.equal(d.querySelector('#kaggle-page').classList.contains('hidden'),false);
   assert.equal(d.querySelectorAll('.kg-account').length,3);assert(d.querySelector('#kg-detail').textContent.includes('18,5 h'));
-  assert(d.querySelector('#kg-detail').textContent.includes('12 notebook'));assert(d.querySelector('#kg-detail').textContent.includes('Đang chạy'));
+  assert(d.querySelector('#kg-scope-info'));d.querySelector('#kg-scope-info').click();assert(d.querySelector('#modal-body').textContent.includes('12 notebook'));d.querySelector('#modal-cancel').click();assert(d.querySelector('#kg-detail').textContent.includes('Đang chạy'));
   d.querySelector('#kg-launch').click();await settle();d.querySelectorAll('.kg-account')[1].click();d.querySelector('#kg-launch').click();await settle();
   const launches=commands.filter(c=>c.command==='kaggleLaunch');assert.equal(launches.length,2);assert.notEqual(launches[0].args.id,launches[1].args.id);assert(!commands.some(c=>c.command==='gateway'||c.command==='switch'));
   const search=d.querySelector('#kg-search');search.value='archive';search.dispatchEvent(new w.Event('input'));assert.equal(d.querySelectorAll('.kg-account').length,1);assert(d.querySelector('#kg-detail').textContent.includes('Dữ liệu cũ'));
   d.querySelector('#language-toggle').click();assert(d.querySelector('#kg-detail').textContent.includes('Older data'));assert(d.querySelector('#kg-detail').textContent.includes('expired or was revoked'));
-  assert.equal(d.querySelector('#kg-launch').textContent,'Open account terminal');assert.equal(search.placeholder,'Search name or username');
+  assert.equal(d.querySelector('#kg-launch').textContent,'Open new terminal');assert.equal(search.placeholder,'Search name or username');
 });
 test('Kaggle verifies a token once, clears password inputs and never inserts token into monitoring state',async t=>{
   const w=dom(t);await settle();const d=w.document;d.querySelector('[data-page=kaggle]').click();d.querySelector('#kg-add').click();await settle();
@@ -71,6 +113,7 @@ test('JetBrains distinguishes configured and connected states, translates and ne
 });
 function dom(t,demo = true, editState = null) {
   const window = new JSDOM(html,{url:'http://localhost/'+(demo?'?demo=1':''),runScripts:'outside-only'}).window;
+  const errors=[];window.addEventListener('error',event=>errors.push(event.message));
   window.HTMLDialogElement.prototype.showModal = function() {this.setAttribute('open','');};
   window.HTMLDialogElement.prototype.close = function() {this.removeAttribute('open');};
   window.eval(mock);
@@ -79,8 +122,9 @@ function dom(t,demo = true, editState = null) {
     window.pad.action = async (...args) => { const response = await action(...args); if (args[0] === 'state') editState(response.result); return response; };
   }
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/i18n.js'),'utf8'));
+  window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/services.js'),'utf8'));
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/kaggle.js'),'utf8'));
-  window.eval(script); t.after(() => window.close()); return window;
+  window.eval(script); t.after(() => {window.close();assert.deepEqual(errors,[],'Renderer must not throw uncaught errors');}); return window;
 }
 test('renderer shows a useful empty state and disables quota refresh with no accounts',async t => {
   const w = dom(t,false); await settle();
@@ -201,10 +245,10 @@ test('connection setup has its own page and shortcuts update navigation accessib
   d.querySelector('.session-label [data-page=connections]').click();
   assert.equal(d.querySelector('#connections-page').classList.contains('hidden'),false);
   assert.equal(d.querySelector('#accounts-page').classList.contains('hidden'),true);
-  assert.equal(d.querySelector('.nav[data-page=connections]').getAttribute('aria-current'),'page');
+  assert.equal(d.querySelector('.service-tab[data-page=connections]').getAttribute('aria-current'),'page');
   assert.equal(d.querySelector('#connect-vscode').disabled,true);
-  d.querySelector('.nav[data-page=accounts]').click();d.querySelectorAll('.account-card')[1].click();d.querySelector('#use-gateway').click();await settle();
-  d.querySelector('.nav[data-page=connections]').click();assert.equal(d.querySelector('#connect-vscode').disabled,false);
+  d.querySelector('.service-tab[data-page=accounts]').click();d.querySelectorAll('.account-card')[1].click();d.querySelector('#use-gateway').click();await settle();
+  d.querySelector('.service-tab[data-page=connections]').click();assert.equal(d.querySelector('#connect-vscode').disabled,false);
   assert(d.querySelector('#connection-hint').textContent.includes('Dự án'));
 });
 
@@ -232,7 +276,7 @@ test('theme and language persist, translate all pages and keep account names int
   assert.equal(d.querySelector('#accounts-page h1').textContent,'Accounts');assert(d.querySelector('.card-identity').textContent.includes('Cá nhân'));
   assert(d.querySelector('#detail progress').getAttribute('aria-label').includes('hours: 0% remaining'));
   assert.equal(d.querySelector('#search').placeholder,'Search accounts');
-  for(const page of ['connections','settings','help']){d.querySelector('.nav[data-page='+page+']').click();assert(!d.querySelector('#'+page+'-page').classList.contains('hidden'));}
+  for(const page of ['connections','settings','help']){d.querySelector('[data-page='+page+']').click();assert(!d.querySelector('#'+page+'-page').classList.contains('hidden'));}
   assert(d.querySelector('#help-page').textContent.includes('How do earned resets work?'));
   d.querySelector('#add-account').click();assert(d.querySelector('#modal-body').textContent.includes('official OpenAI sign-in'));assert(!d.querySelector('#modal-body').textContent.includes('Trình duyệt'));
   d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#accounts-page h1').textContent,'Tài khoản');assert(d.querySelector('#modal-body').textContent.includes('Trình duyệt'));

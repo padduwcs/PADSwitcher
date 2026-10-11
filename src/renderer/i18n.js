@@ -5,6 +5,7 @@ window.padUI = (() => {
   let theme = localStorage.getItem('pad-theme') || 'light';
   if (!['light','dark'].includes(theme)) theme = 'light';
   const dictionary = {
+    'Dịch vụ':'Services','Cài đặt Codex':'Codex settings',
     'Dùng chung':'Shared','Tài khoản riêng':'Separate account','Dùng cho':'Use for','Chế độ':'Mode','Tài khoản':'Account','Tài khoản cho':'Account for',
     'Tài khoản và tự đổi riêng cho kết nối này.':'Separate account and auto-switch for this connection.',
     'Áp dụng cho các kết nối đang dùng chung.':'Applies to connections using the shared account.',

@@ -1,4 +1,21 @@
-# PADSwitcher 1.14.1 — validation
+# PADSwitcher 1.15.0 — validation
+
+## Service navigation and UI — 1.15.0
+
+Validated on Windows x64 on 2026-10-11 with disposable app data and synthetic accounts.
+
+- Shared Services entry for Codex/Kaggle, nested Codex accounts/connections/settings,
+  per-service help and separate global appearance settings.
+- Renderer checks cover navigation without account activation, selection preservation,
+  updated/translated service cards, unsaved settings and optional Kaggle details.
+- Node suite: 177 tests; 176 pass locally and one PowerShell 7 check is skipped
+  because that shell is absent. All 35 renderer checks pass without uncaught errors.
+- Electron screenshots and layout checks cover light/dark, VI/EN at 1260×900 and
+  1000×680, including primary actions, quotas and reset visibility.
+- Syntax, isolated DPAPI/guardian smoke and native Codex protocol fixtures pass.
+  The portable build and packaged smoke pass, including Services navigation,
+  ASAR/PowerShell helper loading, separate native routes, tray close and unchanged
+  fixture credentials. No live credentials or running user gateway are modified.
 
 ## PowerShell account commands — 1.14.1
 

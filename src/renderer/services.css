@@ -1,0 +1,39 @@
+.service-context{max-width:1180px;margin:0 auto;padding:24px 40px 0;display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:62px}
+.service-context:not(.hidden)~.page{padding-top:24px}
+.service-breadcrumb{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--muted)}
+.service-breadcrumb button{border:0;background:none;padding:5px 0;color:var(--muted)}
+.service-breadcrumb button:hover{color:var(--ink)}
+.service-breadcrumb strong{color:var(--ink);font-weight:500}
+.service-tabs{display:flex;gap:4px;background:var(--card-fill);border:1px solid var(--card-edge);border-radius:10px;padding:4px}
+.service-tab{border:0;border-radius:7px;padding:7px 15px;color:var(--muted);background:none;font-size:12px}
+.service-tab.active{background:var(--surface-soft);color:var(--ink);box-shadow:inset 0 -2px var(--mint)}
+.service-tab:hover{color:var(--ink)}
+.service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.service-card{display:flex;flex-direction:column;text-align:left;color:var(--ink);background:var(--card-fill);border:1px solid var(--card-edge);border-radius:17px;padding:28px;box-shadow:0 12px 30px -17px var(--shadow),inset 0 1px var(--surface-border)}
+.service-card:hover{border-color:var(--card-selected);box-shadow:0 18px 36px -18px var(--shadow);transform:translateY(-2px)}
+.service-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.service-mark{width:52px;height:52px;display:grid;place-items:center;border:1px solid var(--detail-line);border-radius:14px;background:var(--detail);color:var(--accent)}
+.service-mark .icon{width:26px;height:26px}
+.service-mark.kaggle{background:var(--mint-soft);border-color:var(--line);color:var(--mint);font-size:32px;font-weight:500;line-height:1}
+.service-open{font-size:22px;color:var(--muted)}
+.service-name{font-size:24px;font-weight:600;letter-spacing:-.6px}
+.service-description{font-size:13px;line-height:1.8;color:var(--muted);margin-top:10px;max-width:360px;flex:1}
+.service-card-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-top:30px;padding-top:18px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.service-state{display:flex;align-items:center;gap:8px}.service-state.ready{color:var(--mint)}
+.detail-label.quota-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.quota-title .timestamp{margin:0;font-size:10px;letter-spacing:0}
+.service-settings-links>h2{font-size:15px;margin:28px 0 16px}
+.service-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.service-settings-card{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin:0}
+.service-settings-card>div:nth-child(2){flex:1;min-width:150px}
+.service-settings-card h3{font-size:16px;font-weight:500;margin:0 0 6px}
+.service-settings-card .service-mark{width:42px;height:42px;border-radius:11px;flex-shrink:0}
+.service-settings-card .button{margin-top:4px}
+.help-service-choice{display:flex;gap:8px;margin-bottom:24px}
+.help-service-choice button{border:1px solid var(--card-edge);border-radius:9px;padding:9px 22px;background:var(--card-fill);color:var(--muted);font-size:12px}
+.help-service-choice button.active{border-color:var(--card-selected);color:var(--ink);box-shadow:inset 0 -2px var(--mint)}
+.help-command{padding:12px 14px;border:1px solid var(--line);border-radius:9px;background:var(--surface-soft);font-size:11px;line-height:1.8;overflow-x:auto;color:var(--ink);margin-top:16px}
+.help-details .help-command{margin:0 0 16px}
+@media(max-height:760px) and (min-width:851px){.service-context{padding-top:12px;min-height:46px}.service-context:not(.hidden)~.page{padding-top:14px}.detail-quotas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.detail-quotas .quota-window{padding:7px 0}.quota-title .timestamp{font-size:9px}}
+@media(max-width:850px){.service-context{padding:20px 24px 0}.service-grid{gap:16px}.service-card{padding:24px}.service-card-footer{align-items:flex-start;flex-direction:column;gap:8px}}
+@media(max-width:620px){.service-grid,.service-settings-grid{grid-template-columns:1fr}.service-context{flex-wrap:wrap;gap:12px}.service-card-top{margin-bottom:16px}}

@@ -13,8 +13,8 @@ let timeout;
   app.once('browser-window-created',(_event,win) => {
     win.webContents.once('did-finish-load',async () => {
       try {
-        const data = await win.webContents.executeJavaScript("(async()=>({title:document.title,hasApi:typeof window.pad?.action==='function',hasNode:typeof require!=='undefined',emptyVisible:!document.querySelector('#empty').classList.contains('hidden'),csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\"]').content,bridgeResponse:await window.pad.action('state')}))()");
-        assert.equal(data.title,'PADSwitcher'); assert.ok(data.hasApi); assert.equal(data.hasNode,false); assert.ok(data.emptyVisible); assert.ok(data.csp.includes("connect-src 'none'")); assert.ok(data.bridgeResponse.ok);
+        const data = await win.webContents.executeJavaScript("(async()=>({title:document.title,hasApi:typeof window.pad?.action==='function',hasNode:typeof require!=='undefined',servicesVisible:!document.querySelector('#services-page').classList.contains('hidden'),serviceCount:document.querySelectorAll('.service-card').length,csp:document.querySelector('meta[http-equiv=\"Content-Security-Policy\"]').content,bridgeResponse:await window.pad.action('state')}))()");
+        assert.equal(data.title,'PADSwitcher'); assert.ok(data.hasApi); assert.equal(data.hasNode,false); assert.ok(data.servicesVisible);assert.equal(data.serviceCount,2); assert.ok(data.csp.includes("connect-src 'none'")); assert.ok(data.bridgeResponse.ok);
         await win.webContents.executeJavaScript('document.fonts.ready.then(()=>true)');
         const image = await win.webContents.capturePage(); await fs.writeFile(path.join(root,'startup.png'),image.toPNG());
         console.log('Actual Electron startup, preload bridge, sandbox and CSP: passed.');
@@ -29,7 +29,7 @@ let timeout;
         await fs.mkdir(path.join(root,'assets/fonts'),{recursive:true});
         for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf','OFL.txt'])await fs.copyFile(path.join(__dirname,'../src/assets/fonts',file),path.join(root,'assets/fonts',file));
         for (const file of ['padswitcher-symbol.png','padswitcher-logo.png','padswitcher-emblem.png']) await fs.copyFile(path.join(__dirname,'../src/assets',file),path.join(root,'assets',file));
-        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','kaggle.css','kaggle.js','app.js']) {
+        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','services.css','services.js','kaggle.css','kaggle.js','app.js']) {
           let content = await fs.readFile(path.join(__dirname,'../src/renderer',file),'utf8');
           if (file === 'index.html') content = content.replace('<script src="app.js" defer></script>','<script src="preview.js" defer></script><script src="app.js" defer></script>');
           await fs.writeFile(path.join(fixtureRoot,file),content);
@@ -38,6 +38,7 @@ let timeout;
         const preview = new BrowserWindow({width:1260,height:900,show:false,webPreferences:{partition:'ui-fixture-'+Date.now(),sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false,offscreen:true}});
         await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1'});
         await preview.webContents.executeJavaScript("document.fonts.ready.then(()=>{for(const weight of [400,500,600])if(!document.fonts.check(weight+' 14px \"Be Vietnam Pro\"','Tài khoản'))throw Error('Local font missing');return true;})");
+        await preview.webContents.executeJavaScript("document.querySelector('[data-service=codex]').click()");
         const layout = await preview.webContents.executeJavaScript("({count:document.querySelectorAll('.account-card').length,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,imagesLoaded:[...document.images].every(i=>i.complete&&i.naturalWidth>0)})");
         assert.equal(layout.count,3); assert.equal(layout.overflow,false);
         assert.equal(layout.imagesLoaded,true);
@@ -54,7 +55,7 @@ let timeout;
         await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
         await preview.webContents.executeJavaScript("document.querySelector('#toasts').replaceChildren()");
         for(const page of ['connections','settings']) {
-          await preview.webContents.executeJavaScript(`document.querySelector('.nav[data-page=${page}]').click()`);
+          await preview.webContents.executeJavaScript(`document.querySelector('[data-page=${page}]').click()`);
           await new Promise(resolve=>setTimeout(resolve,250));
           const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
           await fs.writeFile(path.join(root,page+'-sample.png'),frame);
@@ -72,8 +73,11 @@ let timeout;
         assert.equal(compact.overflow,false); assert.equal(compact.imagesLoaded,true);
         const compactAccounts=await preview.webContents.executeJavaScript("(async()=>{document.querySelector('[data-page=accounts]').click();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,ready:document.querySelector('#gateway-status').textContent.includes('Đã kết nối'),enabled:!document.querySelector('#connect-vscode').disabled,actionVisible:document.querySelector('#use-gateway').getBoundingClientRect().bottom<=innerHeight};})()");
         assert.equal(compactAccounts.overflow,false);assert.equal(compactAccounts.ready,true);assert.equal(compactAccounts.enabled,true);
-        assert.equal(compactAccounts.actionVisible,true);
-        const compactReset=await preview.webContents.executeJavaScript("document.querySelector('.reset-panel').getBoundingClientRect().bottom<=innerHeight");assert.equal(compactReset,true);
+        if(!compactAccounts.actionVisible){await fs.writeFile(path.join(root,'compact-failure.png'),(await preview.webContents.capturePage()).toPNG());}
+        assert.equal(compactAccounts.actionVisible,true,'Codex primary action must fit at 1000x680');
+        const compactReset=await preview.webContents.executeJavaScript("({bottom:document.querySelector('.reset-panel').getBoundingClientRect().bottom,height:innerHeight})");
+        if(compactReset.bottom>compactReset.height){await fs.writeFile(path.join(root,'compact-failure.png'),(await preview.webContents.capturePage()).toPNG());}
+        assert(compactReset.bottom<=compactReset.height,'Codex reset must fit at 1000x680: '+JSON.stringify(compactReset));
         await new Promise(resolve=>setTimeout(resolve,250));
         const compactFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
         await fs.writeFile(path.join(root,'accounts-compact.png'),compactFrame);
@@ -109,7 +113,7 @@ let timeout;
         const settingsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
         await fs.writeFile(path.join(root,'settings-dark-en.png'),settingsFrame);
         // Compare both backgrounds with the same selected account and layout.
-        await preview.webContents.executeJavaScript("document.querySelector('.nav[data-page=accounts]').click();document.querySelectorAll('.account-card')[1].click()");
+        await preview.webContents.executeJavaScript("document.querySelector('.nav[data-page=services]').click();document.querySelector('[data-service=codex]').click();document.querySelectorAll('.account-card')[1].click()");
         for(const variant of ['dark','light']){
           if(variant==='light')await preview.webContents.executeJavaScript("document.querySelector('#theme-toggle').click();document.querySelector('#language-toggle').click()");
           await new Promise(resolve=>setTimeout(resolve,200));
@@ -153,9 +157,24 @@ let timeout;
           const shellFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-shell-'+variant+'.png'),shellFrame);
           await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
         }
-        preview.destroy(); console.log('Sample UI: light/dark, Vietnamese/English, quotas, reset cancellation, separate account controls and Kaggle at 1260/1000px: passed.');
+        for(const variant of ['light-vi','dark-en']){
+          await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();document.querySelector('#toasts').replaceChildren();");
+          for(const page of ['services','settings','codex-settings','help']){
+            await preview.webContents.executeJavaScript("navigate('"+page+"');"+(page==='help'?"document.querySelector('[data-help-service=kaggle]').click();":""));
+            const metrics=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,page:document.querySelector('.page:not(.hidden)').id,active:document.querySelector('.nav.active').dataset.page,cards:document.querySelectorAll('.service-card').length})");
+            assert.equal(metrics.overflow,false);assert.equal(metrics.page,page+'-page');assert.equal(metrics.active,page==='codex-settings'?'services':page);assert.equal(metrics.cards,2);
+            await new Promise(resolve=>setTimeout(resolve,100));
+            const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,page+'-'+variant+'.png'),frame);
+          }
+          preview.setSize(1000,680);
+          for(const page of ['services','settings','codex-settings','help']){
+            const metrics=await preview.webContents.executeJavaScript("(async()=>{navigate('"+page+"');await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth};})()");assert.equal(metrics.overflow,false);
+          }
+          preview.setSize(1260,900);
+        }
+        preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1260/1000px: passed.');
         clearTimeout(timeout); app.exit(0);
-      } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.message); app.exit(1); }
+      } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.stack); app.exit(1); }
     });
   });
   require('../src/main.cjs');

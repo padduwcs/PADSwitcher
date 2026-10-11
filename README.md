@@ -2,18 +2,20 @@
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
 
-Quản lý các tài khoản Codex cá nhân trên Windows: xem quota, đổi tài khoản và tiếp tục làm việc trong VS Code, CLI hoặc JetBrains AI Assistant. Giao diện sáng/tối, tiếng Việt/Anh.
+Quản lý tài khoản Codex và Kaggle trên Windows. Mở **Dịch vụ** để chọn công cụ cần dùng. Với Codex: xem quota, đổi tài khoản và tiếp tục làm việc trong VS Code, CLI hoặc JetBrains AI Assistant. Giao diện sáng/tối, tiếng Việt/Anh.
 
 **[Tải bản Windows](https://github.com/padduwcs/PADSwitcher/releases/latest)** · [English](README.en.md) · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
 
 <img src="docs/images/light.png" alt="Giao diện sáng với tài khoản mẫu" width="49%"> <img src="docs/images/dark.png" alt="Giao diện tối với tài khoản mẫu" width="49%">
+
+<img src="docs/images/services.png" alt="Chọn dịch vụ Codex hoặc Kaggle" width="49%"> <img src="docs/images/kaggle.png" alt="Quản lý Kaggle với tài khoản mẫu" width="49%">
 
 ## Cài đặt lần đầu
 
 **Yêu cầu:** Windows 10/11 x64, .NET Framework 4.8 và Codex CLI hoặc extension Codex cho VS Code bản Windows. Tuyến kết nối đã kiểm chứng với Codex **0.160.0**; bản cũ hơn không được hỗ trợ. Bản portable không cần Node.js.
 
 1. Tải `PADSwitcher-<version>-Windows.exe` từ Releases, đặt vào thư mục bạn muốn và mở ứng dụng.
-2. Bấm **Thêm tài khoản**, đăng nhập trong trình duyệt. Lặp lại cho các tài khoản của bạn. Nếu đã đăng nhập Codex, có thể nhập phiên hiện tại bằng tùy chọn tương ứng trong ứng dụng.
+2. Mở **Dịch vụ → Codex → Tài khoản**, bấm **Thêm tài khoản**, đăng nhập trong trình duyệt. Lặp lại cho các tài khoản của bạn. Nếu đã đăng nhập Codex, có thể nhập phiên hiện tại bằng tùy chọn tương ứng trong ứng dụng.
 3. Chọn tài khoản → **Dùng tài khoản này** để bật kết nối.
 4. Cấu hình nơi bạn dùng Codex theo hướng dẫn dưới đây.
 
@@ -46,15 +48,17 @@ Có thể thêm `resume` để mở lại hội thoại. Lệnh `codex` thông t
 
 Muốn trở về cách dùng cũ: chọn lại agent **Codex** trong AI Chat. Có thể gỡ agent PADSwitcher tại **Kết nối → Gỡ kết nối JetBrains**. Bước duyệt công cụ vẫn hiển thị trong IDE.
 
+Cài đặt chung chứa giao diện/ngôn ngữ. Cấu hình Codex và khôi phục dữ liệu nằm ở **Dịch vụ → Codex → Cài đặt**. Trang **Hướng dẫn** có lựa chọn riêng cho Codex và Kaggle.
+
 ## Dùng hằng ngày
 
 ### Kaggle: nhiều tài khoản và terminal song song
 
-Bản **1.14.1** có trang **Kaggle** độc lập: lưu API token một lần, chọn tài khoản trong terminal đang mở hoặc mở terminal mới, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
+Bản **1.15.0** gom các dịch vụ vào một cửa vào chung. Mở **Dịch vụ → Kaggle** để lưu API token một lần, chọn tài khoản trong terminal đang mở hoặc mở terminal mới, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
 
-1. Mở **Kaggle → Thiết lập**, cài Python 3.11+ và các công cụ bằng lệnh được cung cấp; bấm **Lưu & kiểm tra**.
+1. Mở **Dịch vụ → Kaggle → Thiết lập**, cài Python 3.11+ và các công cụ bằng lệnh được cung cấp; bấm **Lưu & kiểm tra**.
 2. Tạo **API token** tại [Kaggle Settings](https://www.kaggle.com/settings), chọn **Thêm tài khoản**, nhập token và chọn thư mục làm việc. Lặp lại cho các tài khoản bạn có quyền sử dụng, theo điều khoản Kaggle.
-3. Chọn tài khoản → **Dùng ở terminal đang mở**, dán lệnh vào PowerShell trong VS Code hoặc cửa sổ PowerShell của bạn. Muốn gọi lệnh ngắn, bật **Thiết lập lệnh padkaggle** một lần; terminal mới dùng `padkaggle list`, `padkaggle use username`, `padkaggle status` và `padkaggle off`. Bạn vẫn có thể **Mở terminal tài khoản này** từ ứng dụng.
+3. Chọn tài khoản → **Dùng ở terminal**, dán lệnh vào PowerShell trong VS Code hoặc cửa sổ PowerShell của bạn. Muốn gọi lệnh ngắn, bật **Thiết lập lệnh** một lần; terminal mới dùng `padkaggle list`, `padkaggle use username`, `padkaggle status` và `padkaggle off`. Bạn vẫn có thể **Mở terminal mới** từ ứng dụng.
 4. Dùng **Làm mới** hoặc cập nhật tự động mỗi hai phút để đọc quota và lượt chạy. **Ghim notebook** nếu muốn theo dõi notebook cụ thể.
 
 Mỗi PowerShell giữ lựa chọn riêng và giữ tài khoản khi đổi thư mục bằng `cd`. Terminal thứ nhất có thể dùng A, terminal thứ hai dùng B để gửi công việc song song trong giới hạn Kaggle. `python train.py` vẫn chạy local; GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).

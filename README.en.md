@@ -2,18 +2,20 @@
 
 <img src="src/assets/padswitcher-emblem.png" alt="PADSwitcher" width="96">
 
-Manage your personal Codex accounts on Windows: check remaining quota, switch accounts and keep working in VS Code, the CLI or JetBrains AI Assistant. Light/dark themes and Vietnamese/English UI.
+Manage Codex and Kaggle accounts on Windows. Open **Services** to choose your tool. For Codex: check remaining quota, switch accounts and keep working in VS Code, the CLI or JetBrains AI Assistant. Light/dark themes and Vietnamese/English UI.
 
 **[Download for Windows](https://github.com/padduwcs/PADSwitcher/releases/latest)** · [Tiếng Việt](README.md) · [Report a bug](https://github.com/padduwcs/PADSwitcher/issues)
 
 <img src="docs/images/light.png" alt="Light theme with sample accounts" width="49%"> <img src="docs/images/dark.png" alt="Dark theme with sample accounts" width="49%">
+
+<img src="docs/images/services.png" alt="Choose Codex or Kaggle" width="49%"> <img src="docs/images/kaggle.png" alt="Kaggle management with sample accounts" width="49%">
 
 ## First-time setup
 
 **Requirements:** Windows 10/11 x64, .NET Framework 4.8 and a Windows Codex CLI or VS Code Codex extension. Routing has been verified with Codex **0.160.0**; older versions are unsupported. The portable app does not require Node.js.
 
 1. Download `PADSwitcher-<version>-Windows.exe` from Releases, place it in a folder of your choice and open it.
-2. Click **Add account** and sign in through your browser. Repeat for your accounts. You can also import your existing local Codex session through the app's import option.
+2. Open **Services → Codex → Accounts**, click **Add account** and sign in through your browser. Repeat for your accounts. You can also import your existing local Codex session through the app's import option.
 3. Select an account → **Use this account** to start the connection.
 4. Connect your Codex client as described below.
 
@@ -46,15 +48,17 @@ Manual/automatic account switching applies to this agent just as it does to VS C
 
 To return to normal operation, select the regular **Codex** agent. Optionally remove the PADSwitcher agent under **Connections → Remove JetBrains connection**. Tool permission prompts remain in the IDE.
 
+Global Settings contains appearance and language. Codex configuration and data recovery are under **Services → Codex → Settings**. Help offers separate guides for Codex and Kaggle.
+
 ## Daily use
 
 ### Kaggle: multiple accounts and parallel terminals
 
-Version **1.14.1** adds an independent **Kaggle** page: save API tokens once, select an account in an existing terminal or open a new one, and monitor GPU/TPU quota and notebook runs. Keep writing code in VS Code and submit it using the official Kaggle CLI. PADSwitcher manages accounts and reads status; it does not split jobs or rotate accounts.
+Version **1.15.0** brings services into a shared entry page. Open **Services → Kaggle** to save API tokens once, select an account in an existing terminal or open a new one, and monitor GPU/TPU quota and notebook runs. Keep writing code in VS Code and submit it using the official Kaggle CLI. PADSwitcher manages accounts and reads status; it does not split jobs or rotate accounts.
 
-1. Open **Kaggle → Setup**, install Python 3.11+ and the tools using the provided command, then **Save & check**.
+1. Open **Services → Kaggle → Setup**, install Python 3.11+ and the tools using the provided command, then **Save & check**.
 2. Create an **API token** in [Kaggle Settings](https://www.kaggle.com/settings), choose **Add account**, paste the token and choose a workspace. Repeat for accounts you are authorized to use, under Kaggle’s terms.
-3. Select an account → **Use in existing terminal**, then paste the command into your PowerShell terminal, including VS Code. For shorter commands, enable **Set up padkaggle command** once; new terminals support `padkaggle list`, `padkaggle use username`, `padkaggle status` and `padkaggle off`. You can also **Open account terminal** from the app.
+3. Select an account → **Use in terminal**, then paste the command into your PowerShell terminal, including VS Code. For shorter commands, enable **Set up command** once; new terminals support `padkaggle list`, `padkaggle use username`, `padkaggle status` and `padkaggle off`. You can also **Open new terminal** from the app.
 4. **Refresh** manually or enable two-minute refresh to read quota and latest runs. **Pin notebook** to monitor a particular notebook.
 
 Each PowerShell keeps its own selection when changing directories with `cd`. Use A in one terminal and B in another to submit jobs in parallel within Kaggle's limits. `python train.py` still runs locally; Kaggle GPUs run the notebooks submitted with `kaggle kernels push`. See [Kaggle usage and limits](docs/KAGGLE.md).

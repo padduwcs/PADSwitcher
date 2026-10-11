@@ -1,7 +1,7 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
 const e = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let state, selectedId = null, page = 'accounts', privacy = localStorage.getItem('pad-hide-email') === '1', modalSubmit;
+let state, selectedId = null, page = 'services', privacy = localStorage.getItem('pad-hide-email') === '1', modalSubmit;
 let accountScope=localStorage.getItem('pad-account-scope')||'shared';
 if(!['shared','vscode','jetbrains','cli'].includes(accountScope))accountScope='shared';
 const scopeName=k=>({shared:'Dùng chung',vscode:'VS Code',jetbrains:'JetBrains',cli:'CLI'}[k]);
@@ -64,7 +64,7 @@ function render() {
   const own=accountScope!=='shared'&&state.clientRoutes?.[accountScope]?.mode==='private';
   $('#account-target-hint').textContent=own?'Tài khoản và tự đổi riêng cho kết nối này.':'Áp dụng cho các kết nối đang dùng chung.';
   $('#account-target').title=ui.t($('#account-target-hint').textContent);
-  $('#nav-count').textContent = state.profiles.length; $('#total').textContent = state.profiles.length; $('#list-count').textContent = state.profiles.length;
+  $('#total').textContent = state.profiles.length; $('#list-count').textContent = state.profiles.length;
   const known = state.profiles.filter(quotaKnown), available = known.filter(p => windows(p).every(w => w.usedPercent < 100));
   $('#available').textContent = known.length ? available.length : '—';
   $('#available-caption').textContent = known.length ? `${known.length}/${state.profiles.length} hồ sơ có dữ liệu mới` : 'Cập nhật để xem trạng thái';
@@ -117,8 +117,9 @@ function render() {
   $('#restore').disabled = state.busy || !state.canRestore;
   $('#login-bar').classList.toggle('hidden',!state.login);
   if (!state.login) $('#login-detail').textContent = 'Chọn đúng tài khoản trên trình duyệt. Phiên hiện tại vẫn được giữ.';
-  if (page !== 'settings' || !$('#settings-form').dataset.dirty) fillSettings();
+  if (!$('#settings-form').dataset.dirty) fillSettings();
   window.padKaggleUI.render(state.kaggle, state.settings.workspace);
+  window.padServicesUI.render(state,page);
   syncAppearance(); ui.apply();
 }
 function renderDetail(p) {
@@ -130,10 +131,9 @@ function renderDetail(p) {
   $('#detail').innerHTML = `
     <div class="detail-top"><div class="detail-profile"><div class="avatar">${e(initials(p))}</div><div data-literal><h2>${e(p.label)}</h2><p>${e(email(p))}</p></div></div><div class="detail-meta"><span class="badge">${e(planName(p.plan))}</span></div></div>
     <div class="detail-body">
-      <div class="detail-label quota-title">Quota còn lại</div>
+      <div class="detail-label quota-title"><span>Quota còn lại</span><span class="timestamp${stale(p) ? ' stale' : ' fresh'}">${e(quotaAge(p))}${p.quotaAt&&stale(p)?' · Dữ liệu cũ':''}</span></div>
       ${p.lastError ? `<div class="inline-error">${e(ui.error({message:p.lastError,code:p.status==='reauth'?'AUTH_INVALID':'QUOTA_REFRESH'}))}</div>` : ''}
       <div class="detail-quotas">${windows(p).length ? windows(p).map(w => progress(w)).join('') : '<p class="field-help">Chưa có dữ liệu quota.</p>'}</div>
-      <div class="timestamp${stale(p) ? ' stale' : ' fresh'}">${e(quotaAge(p))}${p.quotaAt&&stale(p)?' · Dữ liệu cũ':''}</div>
       <div class="detail-actions"><button class="button primary" id="use-gateway" ${disabled || (current||['starting','stopping'].includes(gatewayForScope()?.status)?'disabled':'')}>${current?'Đang sử dụng':'Dùng tài khoản này'}</button></div>
       ${resetPanel(p,disabled)}
       <details class="detail-management" id="profile-management" ${previous.has('profile-management')?'open':''}><summary>Tùy chọn tài khoản</summary><div class="detail-bottom"><button class="button ghost" id="edit-profile" ${disabled}>Sửa tên</button><button class="button ghost" id="reauth-profile" ${disabled}>Đăng nhập lại</button><button class="button ghost danger-text" id="remove-profile" ${disabled}>Xóa</button></div><button class="button ghost refresh-detail" id="refresh-one" ${disabled}>Làm mới quota tài khoản này</button>${p.notes ? `<p class="detail-note" data-literal>${e(p.notes)}</p>` : ''}
@@ -252,15 +252,23 @@ function fillSettings() {
   $('#autoRefresh').checked = state.settings.autoRefresh;
 }
 function navigate(next) {
+  if(!document.getElementById(next+'-page')?.classList.contains('page'))return;
   page = next;
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('hidden',el.id !== next+'-page'));
-  document.querySelectorAll('.nav').forEach(el => {el.classList.toggle('active',el.dataset.page === next);if(el.dataset.page===next)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
-  $('#breadcrumb').textContent = ({accounts:'Tài khoản',connections:'Kết nối',kaggle:'Kaggle',settings:'Cài đặt',help:'Hướng dẫn'}[next]);
-  if (next === 'settings') fillSettings();
+  const topPage=window.padServicesUI.serviceFor(next)?'services':next;
+  document.querySelectorAll('.nav').forEach(el => {el.classList.toggle('active',el.dataset.page === topPage);if(el.dataset.page===topPage)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current');});
+  window.padServicesUI.context(next);
+  if (next === 'codex-settings'&&!$('#settings-form').dataset.dirty) fillSettings();
   ui.apply();
   document.documentElement.scrollTop=0;
+  document.querySelector('#'+next+'-page h1')?.focus({preventScroll:true});
 }
-document.querySelectorAll('[data-page]').forEach(button => button.onclick = () => navigate(button.dataset.page));
+document.addEventListener('click',event=>{const button=event.target.closest('button[data-page]');if(button&&!button.disabled)navigate(button.dataset.page);});
+document.querySelectorAll('[data-help-service]').forEach(button=>button.onclick=()=>{
+  const service=button.dataset.helpService;
+  document.querySelectorAll('[data-help-service]').forEach(item=>{item.classList.toggle('active',item===button);item.setAttribute('aria-pressed',String(item===button));});
+  for(const id of ['codex','kaggle'])$('#help-'+id).classList.toggle('hidden',id!==service);
+});
 $('#search').oninput = render;
 $('#privacy').onclick = () => { privacy = !privacy; localStorage.setItem('pad-hide-email',privacy ? '1' : '0'); $('.account-menu').open=false; render(); };
 $('#add-account').onclick = () => accountModal();

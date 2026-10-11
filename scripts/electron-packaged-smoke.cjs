@@ -25,6 +25,9 @@ app.disableHardwareAcceleration();
       const loadedFonts=await win.webContents.executeJavaScript("document.fonts.ready.then(()=>Array.from(document.fonts).filter(f=>f.family.includes('Be Vietnam Pro')).map(f=>({weight:f.weight,status:f.status})))");
       for(const weight of ['400','500','600'])assert(loadedFonts.some(f=>f.weight===weight&&f.status==='loaded'));
       console.log('Packaged local font loading: passed.');
+      const navigation=await win.webContents.executeJavaScript("(()=>{const cards=document.querySelectorAll('.service-card').length;document.querySelector('[data-service=kaggle]').click();const kaggle=document.querySelector('.page:not(.hidden)').id;document.querySelector('#breadcrumb [data-page=services]').click();document.querySelector('[data-service=codex]').click();return {cards,kaggle,codex:document.querySelector('.page:not(.hidden)').id,active:document.querySelector('.nav.active').dataset.page};})()");
+      assert.deepEqual(navigation,{cards:2,kaggle:'kaggle-page',codex:'accounts-page',active:'services'});
+      console.log('Packaged Services navigation and Kaggle/Codex pages: passed.');
       const action=async(command,args={})=>{
         // Startup quota refresh may still own the credential lock on a clean CI
         // machine. BUSY rejects before performing these fixture-only operations.

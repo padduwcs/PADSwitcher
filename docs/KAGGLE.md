@@ -2,15 +2,17 @@
 
 Available in PADSwitcher 1.14.0, with commands for existing PowerShell terminals in 1.14.1. This feature is separate from the Codex gateway and can be used without configuring a Codex connection.
 
+Since 1.15.0, open **Dịch vụ → Kaggle** (Services → Kaggle). Account options and quota details are collapsed until needed; **Dùng ở terminal** is the primary action.
+
 ## Luồng sử dụng
 
-**Thiết lập một lần:** mở Kaggle → Thiết lập. Chọn `python.exe` của Python 3.11+ hoặc một venv riêng, hoặc để ứng dụng tìm Python trên PATH. Sao chép lệnh cài và chạy trong PowerShell, sau đó Lưu & kiểm tra. Ứng dụng cần `kaggle >=2.2.4,<3` và `kagglesdk >=0.1.37,<1`; không đóng gói Python hay tự cài package. Có thể xem phiên bản của cả ba trong hộp Thiết lập.
+**Thiết lập một lần:** mở Dịch vụ → Kaggle → Thiết lập. Chọn `python.exe` của Python 3.11+ hoặc một venv riêng, hoặc để ứng dụng tìm Python trên PATH. Sao chép lệnh cài và chạy trong PowerShell, sau đó Lưu & kiểm tra. Ứng dụng cần `kaggle >=2.2.4,<3` và `kagglesdk >=0.1.37,<1`; không đóng gói Python hay tự cài package. Có thể xem phiên bản của cả ba trong hộp Thiết lập.
 
 **Thêm tài khoản:** tạo API token mới tại Kaggle Settings → API. Nhập token, tên dễ nhớ và thư mục làm việc trong PADSwitcher. Token được kiểm tra qua Kaggle trước khi lưu, nhận diện username tự động. Token trùng tài khoản bị từ chối; cập nhật token phải khớp username đã lưu. Bản đầu hỗ trợ API token hiện đại, không nhập `kaggle.json` dạng username/key cũ.
 
-**Dùng terminal đang mở:** chọn tài khoản → **Dùng ở terminal đang mở**, dán lệnh được sao chép vào PowerShell, gồm PowerShell trong VS Code. Terminal đó nhận tài khoản đã chọn và giữ nguyên thư mục hiện tại. Không cần nhập lại token hoặc mở cửa sổ mới.
+**Dùng terminal đang mở:** chọn tài khoản → **Dùng ở terminal**, dán lệnh được sao chép vào PowerShell, gồm PowerShell trong VS Code. Terminal đó nhận tài khoản đã chọn và giữ nguyên thư mục hiện tại. Không cần nhập lại token hoặc mở cửa sổ mới.
 
-**Bật lệnh ngắn một lần:** chọn **Thiết lập lệnh padkaggle → Bật lệnh padkaggle**. PADSwitcher thêm một đoạn được đánh dấu riêng vào profile người dùng của Windows PowerShell và PowerShell 7, giữ các cấu hình khác. Terminal mới có thể gọi:
+**Bật lệnh ngắn một lần:** chọn **Thiết lập lệnh → Bật lệnh padkaggle**. PADSwitcher thêm một đoạn được đánh dấu riêng vào profile người dùng của Windows PowerShell và PowerShell 7, giữ các cấu hình khác. Terminal mới có thể gọi:
 
 ```powershell
 padkaggle list
@@ -23,9 +25,9 @@ padkaggle off
 
 `use` chọn tài khoản cho chính tiến trình PowerShell đang chạy. Có thể dùng tên dễ nhớ trong dấu nháy, ví dụ `padkaggle use 'Nhóm nghiên cứu'`, nếu tên không trùng; username luôn được ưu tiên. Không tự chọn tài khoản khi mở terminal. Terminal đang mở trước khi bật profile dùng nút sao chép ở trên để nạp lệnh ngay. Các phiên khởi động với `-NoProfile` cũng cần nạp bằng lệnh sao chép. Nếu chính sách PowerShell chặn script, cần giải quyết theo chính sách máy; PADSwitcher không bỏ qua execution policy. CMD, Git Bash và WSL chưa hỗ trợ lệnh chọn tài khoản tại chỗ này.
 
-Mỗi terminal giữ lựa chọn riêng: terminal thứ nhất dùng A, terminal thứ hai dùng B; đổi lựa chọn chỉ ảnh hưởng các lệnh bắt đầu sau đó trong terminal đó. `status` cho biết lựa chọn cục bộ, không xác minh token trực tuyến. `off` khôi phục các biến Kaggle trước lần chọn đầu tiên và gỡ các đường dẫn công cụ do lệnh thêm, giữ những thay đổi PATH khác. Nó không dừng tiến trình đã chạy, job trên Kaggle hay thu hồi token. Có thể gỡ đoạn profile tại **Thiết lập lệnh padkaggle**; terminal đã mở vẫn giữ lựa chọn cho tới `off` hoặc khi đóng.
+Mỗi terminal giữ lựa chọn riêng: terminal thứ nhất dùng A, terminal thứ hai dùng B; đổi lựa chọn chỉ ảnh hưởng các lệnh bắt đầu sau đó trong terminal đó. `status` cho biết lựa chọn cục bộ, không xác minh token trực tuyến. `off` khôi phục các biến Kaggle trước lần chọn đầu tiên và gỡ các đường dẫn công cụ do lệnh thêm, giữ những thay đổi PATH khác. Nó không dừng tiến trình đã chạy, job trên Kaggle hay thu hồi token. Có thể gỡ đoạn profile tại **Thiết lập lệnh**; terminal đã mở vẫn giữ lựa chọn cho tới `off` hoặc khi đóng.
 
-**Mở terminal mới từ ứng dụng:** chọn tài khoản rồi **Mở terminal tài khoản này**. PowerShell mới dùng cùng lệnh `padkaggle`, với Kaggle CLI từ môi trường Python đã chọn, và mở tại thư mục đã lưu. Có thể mở terminal của A, B, C cùng lúc. `cd` đến thư mục nào cũng giữ tài khoản của terminal. Bạn tiếp tục sửa code trong VS Code bình thường.
+**Mở terminal mới từ ứng dụng:** chọn tài khoản rồi **Mở terminal mới**. PowerShell mới dùng cùng lệnh `padkaggle`, với Kaggle CLI từ môi trường Python đã chọn, và mở tại thư mục đã lưu. Có thể mở terminal của A, B, C cùng lúc. `cd` đến thư mục nào cũng giữ tài khoản của terminal. Bạn tiếp tục sửa code trong VS Code bình thường.
 
 Ví dụ gửi code local lên Kaggle:
 

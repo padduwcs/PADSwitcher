@@ -14,6 +14,15 @@ npm start
 Use a local Codex CLI or the Windows Codex extension, version 0.160.0 or later;
 newer versions need compatibility verification when their protocol changes.
 
+## Service pages
+
+`src/renderer/services.js` declares the service registry, entry cards and context
+navigation. Add a service there with its existing page IDs and translated labels;
+add the corresponding `.page` section in `index.html` and its renderer/IPC as needed.
+The delegated `data-page` handler supports cards rebuilt by state updates. Opening
+a page only navigates: account activation remains an explicit service action.
+Global appearance belongs to Settings; provider configuration belongs to its service.
+
 ## Checks and packaging
 
 ```powershell

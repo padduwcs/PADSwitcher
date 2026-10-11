@@ -46,6 +46,5 @@ ${require('./kaggle-preview-data.cjs')}
       return {ok:true,state:clone(state)};
     }
   };
-  document.addEventListener('DOMContentLoaded',()=>{document.querySelector('.local-badge').textContent='BẢN XEM TRƯỚC · DỮ LIỆU MẪU';});
 })();
 `;
