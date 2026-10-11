@@ -13,13 +13,13 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
       - run: npm ci
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install official Kaggle tools in an isolated environment
@@ -44,7 +44,7 @@ jobs:
           $releaseFile = Get-ChildItem -LiteralPath dist -Filter 'PADSwitcher-*-Windows.exe' | Select-Object -First 1
           $releaseHash = (Get-FileHash -LiteralPath $releaseFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           [IO.File]::WriteAllText("$($releaseFile.FullName).sha256", "$releaseHash  $($releaseFile.Name)`n", [Text.UTF8Encoding]::new($false))
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: PADSwitcher-Windows
           path: |
