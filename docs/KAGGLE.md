@@ -1,69 +1,86 @@
-# Kaggle account management
+# Dùng Kaggle với PADSwitcher
 
-Available in PADSwitcher 1.14.0, with commands for existing PowerShell terminals in 1.14.1. This feature is separate from the Codex gateway and can be used without configuring a Codex connection.
+Mở **Dịch vụ → Kaggle**. Bạn lưu các tài khoản một lần, chọn tài khoản cho từng terminal và xem giờ GPU/TPU còn lại cùng trạng thái notebook.
 
-Since 1.15.0, open **Dịch vụ → Kaggle** (Services → Kaggle). Account options and quota details are collapsed until needed; **Dùng ở terminal** is the primary action.
+## Bắt đầu trong 3 bước
 
-Since 1.16.0, Pinned and Recent have separate scroll areas. Recent loads 12 notebooks per page on downward end scroll, with Load more/Retry buttons for keyboard access and failures. Loaded counts reflect the visible collection, not an API total.
+1. **Thêm tài khoản.** Tạo API token tại [Kaggle → Settings → API](https://www.kaggle.com/settings), bấm **Thêm tài khoản** và dán token. Tên dễ nhớ là tùy chọn. Nếu ứng dụng yêu cầu cài công cụ, làm theo **Thiết lập** trước.
+2. **Chọn tài khoản trong terminal.** Chọn tài khoản bên trái → **Sao chép lệnh** → dán vào PowerShell, kể cả terminal trong VS Code. Bạn tiếp tục làm việc ở thư mục hiện tại và không cần nhập lại token.
+3. **Chạy và theo dõi.** Gửi notebook bằng Kaggle CLI. Quay lại PADSwitcher để xem quota và trạng thái; bấm **Làm mới** khi cần. Để chạy song song, chọn tài khoản khác trong một terminal khác rồi gửi notebook của tài khoản đó.
 
-Since 1.17.0, the Kaggle page uses the window's available width and the details
-scroll with the page. Drag the divider between columns to change the account
-column width, or the grip below Accounts/Pinned/Recent to adjust that list's
-height. Sizes are remembered locally across accounts, refreshes and restarts;
-choose **Bố cục mặc định / Reset layout** to restore automatic sizing. Focus a
-divider and use arrow keys to resize, Shift for larger steps, Enter or a double
-click to reset that divider. Escape cancels an active drag. Window resizing keeps
-columns within readable bounds; the narrow layout stacks them.
+GPU Kaggle dùng cho notebook chạy trên Kaggle. `python train.py` chạy trực tiếp trong terminal vẫn dùng máy của bạn.
 
-![Pinned and Recent notebook lists with independent scrolling](images/kaggle-notebooks.png)
+![Tài khoản, quota và notebook Kaggle](images/kaggle.png)
 
-## Luồng sử dụng
+## Những thao tác thường dùng
 
-**Thiết lập một lần:** mở Dịch vụ → Kaggle → Thiết lập. Chọn `python.exe` của Python 3.11+ hoặc một venv riêng, hoặc để ứng dụng tìm Python trên PATH. Sao chép lệnh cài và chạy trong PowerShell, sau đó Lưu & kiểm tra. Ứng dụng cần `kaggle >=2.2.4,<3` và `kagglesdk >=0.1.37,<1`; không đóng gói Python hay tự cài package. Có thể xem phiên bản của cả ba trong hộp Thiết lập.
+- **Lệnh ngắn:** mở **Thiết lập → Thiết lập padkaggle**, bật một lần rồi mở terminal PowerShell mới. Gõ `padkaggle list` để xem tài khoản, `padkaggle use username` để chọn, `padkaggle off` để bỏ chọn. Terminal đã mở vẫn dùng được nút **Sao chép lệnh**.
+- **Terminal mới:** bấm **Mở terminal mới** để mở PowerShell với tài khoản đã chọn. Thư mục mở đầu nằm trong **Tùy chọn tài khoản**. Đổi thư mục bằng `cd` vẫn giữ lựa chọn của terminal.
+- **Notebook:** bấm biểu tượng ghim ở **Gần đây**, hoặc **＋ Ghim notebook** để nhập đường dẫn. **Đã ghim** và **Gần đây** cuộn riêng; cuộn Gần đây xuống cuối để tải thêm, hoặc bấm **Tải thêm**.
+- **Bố cục:** kéo vạch giữa hai cột để đổi chiều rộng, kéo vạch dưới danh sách để đổi chiều cao. App nhớ kích thước; **Bố cục mặc định** đặt lại. Có thể dùng phím mũi tên khi chọn vạch, Enter hoặc nhấp đúp để đặt lại từng vạch, Escape để hủy kéo.
+- **Tài khoản:** mở **Tùy chọn tài khoản** để sửa tên, thư mục, cập nhật token hoặc xóa tài khoản. Bấm **Cách dùng** ở đầu trang nếu cần xem lại hướng dẫn.
 
-**Thêm tài khoản:** tạo API token mới tại Kaggle Settings → API. Nhập token, tên dễ nhớ và thư mục làm việc trong PADSwitcher. Token được kiểm tra qua Kaggle trước khi lưu, nhận diện username tự động. Token trùng tài khoản bị từ chối; cập nhật token phải khớp username đã lưu. Bản đầu hỗ trợ API token hiện đại, không nhập `kaggle.json` dạng username/key cũ.
+<details>
+<summary>Cài công cụ lần đầu</summary>
 
-**Dùng terminal đang mở:** chọn tài khoản → **Dùng ở terminal**, dán lệnh được sao chép vào PowerShell, gồm PowerShell trong VS Code. Terminal đó nhận tài khoản đã chọn và giữ nguyên thư mục hiện tại. Không cần nhập lại token hoặc mở cửa sổ mới.
+Mở **Thiết lập**. Nếu chưa sẵn sàng, cài Python, bấm **Sao chép lệnh cài**, chạy lệnh trong PowerShell rồi **Lưu & kiểm tra**.
 
-**Bật lệnh ngắn một lần:** chọn **Thiết lập lệnh → Bật lệnh padkaggle**. PADSwitcher thêm một đoạn được đánh dấu riêng vào profile người dùng của Windows PowerShell và PowerShell 7, giữ các cấu hình khác. Terminal mới có thể gọi:
+Ứng dụng cần Python 3.11+, `kaggle >=2.2.4,<3` và `kagglesdk >=0.1.37,<1`. PADSwitcher không đóng gói Python hoặc tự cài package. Mục **Python & công cụ** cho phép xem phiên bản và chọn `python.exe` riêng, gồm Python trong venv. Mặc định ứng dụng tự tìm Python.
+
+Token phải là API token mới; không nhập mật khẩu hoặc tệp `kaggle.json` cũ. Username được nhận diện tự động khi xác minh token.
+
+</details>
+
+<details>
+<summary>Ví dụ gửi notebook từ máy</summary>
+
+Trong terminal đã chọn tài khoản, tạo cấu hình:
 
 ```powershell
-padkaggle list
-padkaggle use username_a
-kaggle kernels list --mine
-padkaggle use username_b
-padkaggle status
-padkaggle off
+kaggle kernels init -p ./job
 ```
 
-`use` chọn tài khoản cho chính tiến trình PowerShell đang chạy. Có thể dùng tên dễ nhớ trong dấu nháy, ví dụ `padkaggle use 'Nhóm nghiên cứu'`, nếu tên không trùng; username luôn được ưu tiên. Không tự chọn tài khoản khi mở terminal. Terminal đang mở trước khi bật profile dùng nút sao chép ở trên để nạp lệnh ngay. Các phiên khởi động với `-NoProfile` cũng cần nạp bằng lệnh sao chép. Nếu chính sách PowerShell chặn script, cần giải quyết theo chính sách máy; PADSwitcher không bỏ qua execution policy. CMD, Git Bash và WSL chưa hỗ trợ lệnh chọn tài khoản tại chỗ này.
-
-Mỗi terminal giữ lựa chọn riêng: terminal thứ nhất dùng A, terminal thứ hai dùng B; đổi lựa chọn chỉ ảnh hưởng các lệnh bắt đầu sau đó trong terminal đó. `status` cho biết lựa chọn cục bộ, không xác minh token trực tuyến. `off` khôi phục các biến Kaggle trước lần chọn đầu tiên và gỡ các đường dẫn công cụ do lệnh thêm, giữ những thay đổi PATH khác. Nó không dừng tiến trình đã chạy, job trên Kaggle hay thu hồi token. Có thể gỡ đoạn profile tại **Thiết lập lệnh**; terminal đã mở vẫn giữ lựa chọn cho tới `off` hoặc khi đóng.
-
-**Mở terminal mới từ ứng dụng:** chọn tài khoản rồi **Mở terminal mới**. PowerShell mới dùng cùng lệnh `padkaggle`, với Kaggle CLI từ môi trường Python đã chọn, và mở tại thư mục đã lưu. Có thể mở terminal của A, B, C cùng lúc. `cd` đến thư mục nào cũng giữ tài khoản của terminal. Bạn tiếp tục sửa code trong VS Code bình thường.
-
-Ví dụ gửi code local lên Kaggle:
+Sửa `job/kernel-metadata.json`: đặt `id` thành `username/notebook-slug`, `code_file` trỏ tới code, khai báo nguồn dữ liệu và đặt `enable_gpu: true` nếu cần GPU. Sau đó:
 
 ```powershell
-kaggle kernels init -p ./job-a
-# Sửa ./job-a/kernel-metadata.json: id, code_file, nguồn dữ liệu,
-# enable_gpu: true nếu cần GPU. id phải là username/notebook-slug.
-kaggle kernels push -p ./job-a
+kaggle kernels push -p ./job
 kaggle kernels status username/notebook-slug
 kaggle kernels output username/notebook-slug -p ./results
 ```
 
-Gửi job khác từ terminal của tài khoản B bằng cấu hình notebook có username của B. Dùng các tài khoản được phép truy cập và tuân thủ giới hạn, điều khoản Kaggle. PADSwitcher không gửi code, chia dữ liệu, lên lịch, tự đổi tài khoản hay can thiệp vào giới hạn chạy. `python train.py` trong terminal này vẫn chạy bằng CPU/GPU local; GPU Kaggle chỉ phục vụ notebook chạy trên Kaggle.
+Mỗi terminal có thể dùng tài khoản riêng. Khi gửi bằng tài khoản B, notebook phải có `id` của B. Dùng các tài khoản bạn có quyền truy cập và tuân thủ giới hạn Kaggle.
 
-**Theo dõi:** quota GPU/TPU lấy từ API chính thức, gồm số giờ còn lại, tổng, giữ chỗ và thời điểm đặt lại nếu có. Số giờ còn lại là tổng trừ đã dùng, còn bao gồm phần giữ chỗ; đây không phải bảo đảm GPU còn sẵn. `—` nghĩa là chưa biết, không phải 0.
+</details>
 
-**Đã ghim** và **Gần đây** có vùng cuộn riêng, chiều cao tự thích ứng theo cửa sổ hoặc do bạn kéo chọn. Trang chi tiết cuộn theo chiều dọc để giữ nội dung thoáng. Gần đây tải 12 notebook mỗi trang khi cuộn xuống cuối hoặc bấm **Tải thêm**; nếu khung đủ cao để chứa các mục đã tải, cuộn trang đến cuối khung cũng tải thêm. Nếu có lỗi, danh sách đã tải được giữ và có nút **Thử lại**. Số bên cạnh tên mục là số notebook hiện đã tải trong mục đó, không phải tổng trên Kaggle. Notebook đã ghim chỉ xuất hiện ở Đã ghim, có thể ghim nhanh từ Gần đây hoặc nhập `username/notebook-slug` / URL `https://www.kaggle.com/code/username/notebook-slug`, tối đa 20 mục có quyền xem.
+<details>
+<summary>Hiểu quota và trạng thái notebook</summary>
 
-Mỗi notebook hiển thị lượt chạy mới nhất. API không cung cấp đầy đủ mọi phiên tương tác trên web hoặc mọi phiên bản đang chạy. **Làm mới** cập nhật quota, trang đầu và các notebook ghim; các trang tải thêm giữ ảnh chụp tại lúc tải trong phiên mở app, rê chuột lên trạng thái để xem thời điểm đọc. Đóng rồi mở lại app sẽ bắt đầu từ trang đầu. Kaggle phân trang theo thời điểm chạy nên danh sách có thể thay đổi trong lúc đọc; PADSwitcher loại trùng theo đường dẫn notebook. Trạng thái không phải sự kiện trực tiếp liên tục. Nút mở notebook dẫn tới Kaggle để xem thêm; có thể cần đăng nhập tài khoản phù hợp trong trình duyệt.
+- Giờ còn lại bao gồm phần giữ chỗ; Kaggle quyết định việc cấp GPU. `—` nghĩa là chưa có dữ liệu. Xem **Chi tiết quota** để biết phần giữ chỗ và thời điểm đặt lại nếu có.
+- **Đã ghim** theo dõi tối đa 20 notebook mà tài khoản có quyền xem. **Gần đây** tải 12 notebook mỗi lần. Số bên cạnh tên mục là số mục đã tải, không phải tổng notebook trên Kaggle.
+- Trạng thái là lượt chạy mới nhất đã đọc, có thể chưa bao gồm các phiên tương tác trên web hoặc mọi phiên bản đang chạy. Rê chuột lên trạng thái để xem thời điểm cập nhật.
+- **Làm mới** cập nhật quota, trang đầu và các notebook ghim. Trang tải thêm giữ dữ liệu lúc tải trong phiên mở app. Đóng rồi mở lại app sẽ bắt đầu từ trang đầu.
+- Ứng dụng tự làm mới mỗi 2 phút khi đang mở; có thể tắt trong **Thiết lập**. Lỗi đọc giữ lại dữ liệu cũ và đánh dấu. Bấm **Thử lại** khi tải thêm bị lỗi; cập nhật token nếu hết hạn.
+- Bấm tên notebook để mở trên Kaggle; trình duyệt có thể cần đăng nhập tài khoản phù hợp.
 
-Tự cập nhật mỗi hai phút khi PADSwitcher mở; các lượt làm mới tất cả đọc tối đa hai tài khoản đồng thời. Có thể tắt. Lỗi mạng, giới hạn yêu cầu hoặc thiếu quyền giữ lại dữ liệu cũ và đánh dấu; token hết hạn cần cập nhật. Ghim notebook không cấp thêm quyền xem. PADSwitcher chỉ theo dõi các notebook mà token truy cập được.
+</details>
 
-**Xóa hoặc thoát:** xóa tài khoản sẽ xóa token đã lưu trong PADSwitcher. Terminal đã mở giữ token trong môi trường tiến trình cho tới khi đóng; thay token trong ứng dụng cũng không cập nhật terminal cũ. Muốn ngắt truy cập hoàn toàn, đóng terminal và thu hồi token trong Kaggle. Đóng PADSwitcher không dừng terminal hay job đã gửi lên Kaggle.
+<details>
+<summary>Lệnh terminal, token và các trường hợp khác</summary>
+
+`padkaggle use` áp dụng cho chính terminal PowerShell đang chạy, ở bất kỳ thư mục nào. Có thể chọn bằng tên dễ nhớ trong dấu nháy nếu tên không trùng, ví dụ `padkaggle use 'Nhóm nghiên cứu'`. `padkaggle status` xem lựa chọn hiện tại; không xác minh token trực tuyến.
+
+Lệnh ngắn hỗ trợ Windows PowerShell và PowerShell 7. Terminal dùng `-NoProfile` cần nạp bằng **Sao chép lệnh**. CMD, Git Bash và WSL chưa hỗ trợ cách chọn tại chỗ này. Nếu PowerShell chặn script, xử lý theo chính sách máy; ứng dụng không bỏ qua execution policy.
+
+`padkaggle off` bỏ chọn trong terminal và khôi phục các biến Kaggle trước lần chọn đầu tiên. Nó không dừng notebook đã gửi hoặc tiến trình đã chạy. Có thể gỡ lệnh trong mục **Tùy chọn nâng cao** của **Lệnh padkaggle**.
+
+Token được mã hóa trên máy. Xóa hoặc cập nhật token trong PADSwitcher không thay đổi token của terminal đã mở. Muốn ngắt truy cập hoàn toàn, đóng các terminal đó và thu hồi token trên Kaggle. Đóng PADSwitcher không dừng terminal hoặc notebook đã gửi.
+
+PADSwitcher quản lý tài khoản và đọc trạng thái. Công việc được gửi bằng Kaggle CLI; ứng dụng không chia job, lên lịch hay tự đổi tài khoản.
+
+</details>
+
+<details>
+<summary>Technical reference and verification</summary>
 
 ## Storage and implementation
 
@@ -94,3 +111,5 @@ This offline suite uses real SDK model types and fixture clients; it makes no Ka
 Live acceptance checks use two authorized real Kaggle accounts to verify token creation/revocation, account-specific CLI submissions, parallel jobs, quota and private notebook status. These workflows have not been executed by the automated checks; they require real tokens and consume Kaggle compute when jobs run.
 
 Primary references: [official Kaggle CLI](https://github.com/Kaggle/kaggle-cli), [Kaggle API documentation](https://www.kaggle.com/docs/api), [Kaggle Settings](https://www.kaggle.com/settings). The implementation was checked against locally installed `kaggle 2.2.4` and `kagglesdk 0.1.37`.
+
+</details>

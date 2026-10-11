@@ -54,16 +54,16 @@ Cài đặt chung chứa giao diện/ngôn ngữ. Cấu hình Codex và khôi ph
 
 ### Kaggle: nhiều tài khoản và terminal song song
 
-Bản **1.15.0** gom các dịch vụ vào một cửa vào chung. Mở **Dịch vụ → Kaggle** để lưu API token một lần, chọn tài khoản trong terminal đang mở hoặc mở terminal mới, xem quota GPU/TPU và trạng thái notebook. Bạn tiếp tục viết code trong VS Code rồi gửi lên Kaggle bằng CLI chính thức; PADSwitcher quản lý tài khoản và theo dõi, không chia job hay tự đổi tài khoản.
+Mở **Dịch vụ → Kaggle** để chọn tài khoản và theo dõi notebook. Bấm **Cách dùng** nếu cần xem hướng dẫn 3 bước.
 
 1. Mở **Dịch vụ → Kaggle → Thiết lập**, cài Python 3.11+ và các công cụ bằng lệnh được cung cấp; bấm **Lưu & kiểm tra**.
-2. Tạo **API token** tại [Kaggle Settings](https://www.kaggle.com/settings), chọn **Thêm tài khoản**, nhập token và chọn thư mục làm việc. Lặp lại cho các tài khoản bạn có quyền sử dụng, theo điều khoản Kaggle.
-3. Chọn tài khoản → **Dùng ở terminal**, dán lệnh vào PowerShell trong VS Code hoặc cửa sổ PowerShell của bạn. Muốn gọi lệnh ngắn, bật **Thiết lập lệnh** một lần; terminal mới dùng `padkaggle list`, `padkaggle use username`, `padkaggle status` và `padkaggle off`. Bạn vẫn có thể **Mở terminal mới** từ ứng dụng.
+2. Tạo **API token** tại [Kaggle Settings](https://www.kaggle.com/settings), bấm **Thêm tài khoản** và dán token. Làm một lần cho mỗi tài khoản bạn có quyền sử dụng.
+3. Chọn tài khoản → **Sao chép lệnh** → dán vào PowerShell, kể cả terminal VS Code. Hoặc bấm **Mở terminal mới**. Muốn dùng `padkaggle use username`, bật **Thiết lập → Thiết lập padkaggle** một lần rồi mở terminal mới.
 4. Dùng **Làm mới** hoặc cập nhật tự động mỗi hai phút để đọc quota và lượt chạy. **Ghim notebook** nếu muốn theo dõi notebook cụ thể.
 
-Bản **1.16.0** tách **Đã ghim** và **Gần đây** thành hai vùng cuộn. Cuộn Gần đây xuống cuối để tải thêm 12 notebook mỗi lần, hoặc bấm **Tải thêm**. Các notebook đã tải và vị trí cuộn được giữ khi làm mới quota; trạng thái của trang tải thêm là dữ liệu tại lúc tải.
+**Đã ghim** và **Gần đây** cuộn riêng. Cuộn Gần đây xuống cuối hoặc bấm **Tải thêm** để xem tiếp notebook.
 
-Bản **1.17.0** mở rộng bố cục theo kích thước cửa sổ. Kéo vạch giữa hai cột để đổi chiều rộng, kéo vạch dưới danh sách tài khoản / Đã ghim / Gần đây để đổi chiều cao. App nhớ kích thước bạn chọn; bấm **Bố cục mặc định** để về kích thước tự động.
+Kéo vạch giữa hai cột hoặc dưới danh sách để đổi kích thước. App nhớ bố cục; **Bố cục mặc định** đặt lại.
 
 Mỗi PowerShell giữ lựa chọn riêng và giữ tài khoản khi đổi thư mục bằng `cd`. Terminal thứ nhất có thể dùng A, terminal thứ hai dùng B để gửi công việc song song trong giới hạn Kaggle. `python train.py` vẫn chạy local; GPU Kaggle chạy notebook bạn gửi bằng `kaggle kernels push`. Xem [hướng dẫn và giới hạn Kaggle](docs/KAGGLE.md).
 

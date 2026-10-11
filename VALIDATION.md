@@ -1,4 +1,30 @@
-# PADSwitcher 1.17.1 — validation
+# PADSwitcher 1.18.0 — validation
+
+## Simplified Kaggle interface and account sidebar — 1.18.0
+
+Validated on Windows x64 on 2026-10-11 using synthetic accounts and disposable
+app data. No live Kaggle credentials or jobs were used.
+
+- Account cards use compact identity and quota rows, with a clear selected state.
+  Repeated usernames, decorative avatars and idle status filler are removed.
+  Running/queued counts, expired tokens, refresh errors and stale data remain
+  visible. Long names wrap without hiding quota values.
+- A shared three-step guide appears in **How to use** and the Kaggle Help page.
+  Notebook submission and monitoring details are collapsed. Account, terminal and
+  tool dialogs show short instructions first; Python versions, paths and profile
+  controls remain available in optional sections. VI/EN documentation matches the
+  **Copy command** action.
+- Syntax checks and all 42 renderer checks pass. Full Node suite: 187 tests,
+  186 pass locally and one PowerShell 7 check is skipped because it is not
+  installed. Windows DPAPI/ACL, isolated native Codex and protocol smoke pass.
+- Real Chromium checks cover light/dark, VI/EN, 1920×900, 1260×900 and 1000×680
+  quiet account lists, compact dialogs and dense notebook lists. No horizontal
+  overflow or clipped account names/quotas. Pagination, independent scrolling,
+  native mouse resizing and persisted sizes pass. The resize release position is
+  applied even if the final pointer move was coalesced.
+- Portable packaging and packaged smoke verify the final renderer and isolated
+  Python/Codex bridge. The active user's processes and stored credentials remain
+  untouched; the Desktop shortcut points at the new portable build.
 
 ## Responsive and user-resizable Kaggle layout — 1.17.0
 

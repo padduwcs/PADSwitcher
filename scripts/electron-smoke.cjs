@@ -155,6 +155,13 @@ let timeout;
           await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#kg-terminal-setup').click();await new Promise(r=>setTimeout(r,100));return true;})()");
           const shellModal=await preview.webContents.executeJavaScript("({commands:document.querySelector('#modal-body').textContent.includes('padkaggle off'),overflow:document.querySelector('#modal').getBoundingClientRect().bottom>innerHeight})");assert(shellModal.commands);assert.equal(shellModal.overflow,false);
           const shellFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-shell-'+variant+'.png'),shellFrame);
+          await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click();document.querySelector('#kg-help').click()");
+          const guide=await preview.webContents.executeJavaScript("({steps:document.querySelectorAll('#modal-body .kg-instructions>li').length,expanded:document.querySelectorAll('#modal-body details[open]').length,overflow:document.querySelector('#modal').getBoundingClientRect().bottom>innerHeight})");assert.equal(guide.steps,3);assert.equal(guide.expanded,0);assert.equal(guide.overflow,false);
+          await new Promise(resolve=>setTimeout(resolve,100));
+          const guideFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-guide-'+variant+'.png'),guideFrame);
+          await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click();document.querySelector('#kg-setup').click()");
+          await new Promise(resolve=>setTimeout(resolve,100));
+          const setupFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-setup-'+variant+'.png'),setupFrame);
           await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
         }
         for(const variant of ['light-vi','dark-en']){
@@ -189,13 +196,13 @@ let timeout;
           const paging=await preview.webContents.executeJavaScript("(async()=>{const recent=document.querySelector('#kg-notebooks-recent');recent.scrollTop=recent.scrollHeight;await new Promise(r=>setTimeout(r,180));const expanded=document.querySelector('#kg-notebooks-recent');const top=expanded.scrollTop;document.querySelector('#kg-refresh-one').click();await new Promise(r=>setTimeout(r,60));return {calls:window.kgPageCalls,recent:document.querySelectorAll('#kg-notebooks-recent .kg-notebook').length,pinned:document.querySelectorAll('#kg-notebooks-pinned .kg-notebook').length,pinnedTop:document.querySelector('#kg-notebooks-pinned').scrollTop,top,after:document.querySelector('#kg-notebooks-recent').scrollTop};})()");
           assert.equal(paging.calls,1);assert.equal(paging.recent,24);assert.equal(paging.pinned,20);assert.equal(paging.pinnedTop,40);assert.equal(paging.after,paging.top);
           // Send real Chromium mouse input, including pointer capture across a refresh.
-          const handle=await preview.webContents.executeJavaScript("(()=>{const el=document.querySelector('[data-kg-resize=recent]');el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),height:document.querySelector('#kg-notebooks-recent').clientHeight};})()");
+          const handle=await preview.webContents.executeJavaScript("(()=>{const el=document.querySelector('[data-kg-resize=recent]');el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect(),y=Math.round(r.y+r.height/2);return {x:Math.round(r.x+r.width/2),y,delta:y+140<innerHeight?140:-140,height:document.querySelector('#kg-notebooks-recent').clientHeight};})()");
           preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y});preview.webContents.sendInputEvent({type:'mouseDown',x:handle.x,y:handle.y,button:'left',clickCount:1});
-          preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+120,button:'left'});
+          preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+handle.delta/140*120,button:'left'});
           await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#kg-refresh-one').click();await new Promise(r=>setTimeout(r,60));return true;})()");
-          preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+140,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:handle.x,y:handle.y+140,button:'left',clickCount:1});
+          preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+handle.delta,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:handle.x,y:handle.y+handle.delta,button:'left',clickCount:1});
           const resized=await preview.webContents.executeJavaScript("({height:document.querySelector('#kg-notebooks-recent').clientHeight,saved:JSON.parse(localStorage.getItem('pad-kaggle-layout')),cursor:document.body.classList.contains('kg-resizing-height')})");
-          assert.equal(resized.height,handle.height+140);assert(Math.abs(resized.saved.recent-resized.height)<=1);assert.equal(resized.cursor,false);
+          assert.equal(resized.height,handle.height+handle.delta);assert(Math.abs(resized.saved.recent-resized.height)<=1);assert.equal(resized.cursor,false);
           const column=await preview.webContents.executeJavaScript("(()=>{window.scrollTo(0,0);const r=document.querySelector('[data-kg-resize=width]').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),width:document.querySelector('#kg-list').clientWidth};})()");
           preview.webContents.sendInputEvent({type:'mouseMove',x:column.x,y:column.y});preview.webContents.sendInputEvent({type:'mouseDown',x:column.x,y:column.y,button:'left',clickCount:1});preview.webContents.sendInputEvent({type:'mouseMove',x:column.x+80,y:column.y,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:column.x+80,y:column.y,button:'left',clickCount:1});
           const columnWidth=await preview.webContents.executeJavaScript("document.querySelector('#kg-list').clientWidth");assert(Math.abs(columnWidth-column.width-80)<=1);
@@ -215,7 +222,26 @@ let timeout;
           await preview.webContents.executeJavaScript("document.querySelector('#kg-layout-reset').click()");
           preview.setSize(1260,900);
         }
-        preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1920/1260/1000px; scrolling, pagination, native drag resizing and persisted layout: passed.');
+        // Quiet accounts match the long-name sidebar case without using real user data.
+        for(const variant of ['light-vi','dark-en']){
+          await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1&kgquiet=1'});
+          await preview.webContents.executeJavaScript("document.fonts.ready.then(()=>true)");
+          await preview.webContents.executeJavaScript("window.padUI.setTheme('"+(variant.startsWith('dark')?'dark':'light')+"');window.padUI.setLanguage('"+(variant.endsWith('en')?'en':'vi')+"');render();navigate('kaggle');document.querySelectorAll('.kg-account')[2].click();");
+          for(const width of [1920,1260,1000]){
+            preview.setSize(width,width===1000?680:900);
+            const metrics=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,idleHints:document.querySelectorAll('.kg-account-hint').length,heights:[...document.querySelectorAll('.kg-account')].map(el=>el.getBoundingClientRect().height),clipped:[...document.querySelectorAll('.kg-account-name,.kg-account-quota')].some(el=>el.scrollWidth>el.clientWidth),selection:document.querySelector('.kg-account.selected strong').textContent};})()");
+            assert.equal(metrics.overflow,false);assert.equal(metrics.idleHints,0);assert.equal(metrics.clipped,false);assert(metrics.heights.every(h=>h<160));assert.equal(metrics.selection,'notebookacademy');
+            await new Promise(resolve=>setTimeout(resolve,100));
+            const frame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});await fs.writeFile(path.join(root,'kaggle-quiet-'+variant+'-'+width+'.png'),frame);
+          }
+          preview.setSize(1000,680);
+          for(const action of ['kg-help','kg-add','kg-setup','kg-terminal-setup']){
+            await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#"+action+"').click();await new Promise(r=>setTimeout(r,60));return true;})()");
+            const fits=await preview.webContents.executeJavaScript("document.querySelector('#modal').getBoundingClientRect().bottom<=innerHeight");assert(fits,action+' fits a compact viewport');
+            await preview.webContents.executeJavaScript("document.querySelector('#modal-cancel').click()");
+          }
+        }
+        preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1920/1260/1000px; quiet account cards, concise guides, compact dialogs, scrolling, pagination, native drag resizing and persisted layout: passed.');
         clearTimeout(timeout); app.exit(0);
       } catch(error) { clearTimeout(timeout); console.error('Electron UI verification failed:',error.stack); app.exit(1); }
     });

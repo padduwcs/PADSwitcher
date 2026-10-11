@@ -93,6 +93,11 @@ independent scroll geometry, end-scroll loading and position preservation in bot
 themes/languages and window sizes. Additional notebook pages are account-specific
 memory caches; persisted first-page/pinned snapshots keep their existing bounds.
 
+`?demo=1&kgquiet=1` shows three idle accounts with long display names, including
+one matching its username. This checks the compact sidebar without using real
+user identities. The shared `padKaggleUI.instructions()` content powers the
+in-page guide and Help, with technical steps in closed disclosures by default.
+
 Kaggle layout preferences live in renderer localStorage under `pad-kaggle-layout`.
 Window-relative defaults apply until a size is chosen. Native Chromium mouse
 checks cover drag capture through state updates, column/list resizing, reloading

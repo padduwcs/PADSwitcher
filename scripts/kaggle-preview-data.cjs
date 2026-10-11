@@ -9,6 +9,14 @@ module.exports=String.raw`
   ];
   state.kaggle={accounts:new URLSearchParams(location.search).has('demo')?clone(kgAccounts):[],settings:{pythonPath:'',autoRefresh:true},tool:{python:'3.12.10',kaggle:'2.2.4',kagglesdk:'0.1.37',executable:'C:\Python312\python.exe',supported:true},editing:false};
   for(const p of state.kaggle.accounts)p.notebookList={hasMore:false,loading:false,error:null};
+  if(new URLSearchParams(location.search).has('kgquiet')&&state.kaggle.accounts.length){
+    for(const [i,p] of state.kaggle.accounts.entries()){
+      p.label=['researchteam07062006','vision766','notebookacademy'][i];
+      if(i===2)p.username=p.label;
+      p.watch=[];p.notebooks=[];p.status='ready';p.lastError=null;p.quotaAt=p.notebooksAt=kgStamp;
+      p.quota=[{resource:'GPU',remaining:30,total:30,used:0,reserved:0},{resource:'TPU',remaining:20,total:20,used:0,reserved:0}];
+    }
+  }
   if(new URLSearchParams(location.search).has('kgmany')&&state.kaggle.accounts.length){
     const p=state.kaggle.accounts[0];
     p.watch=Array.from({length:20},(_,i)=>p.username+'/pinned-'+i);

@@ -50,12 +50,44 @@ test('Kaggle reveals optional details on demand and preserves them during refres
   d.querySelector('#kg-refresh-one').click();await settle();assert(d.querySelector('#kg-management').open);assert(d.querySelector('#kg-quota-info').open);
   d.querySelectorAll('.kg-account')[1].click();assert.equal(d.querySelector('#kg-management').open,false);
 });
+test('Kaggle account cards omit idle filler and duplicate names but keep activity and warnings',async t=>{
+  const w=dom(t,true,s=>{
+    const [idle,active]=s.kaggle.accounts;
+    idle.label=idle.username;idle.notebooks.forEach(n=>n.status='complete');
+    active.notebooks.push({ref:'padvision/waiting',status:'queued'});
+  });await settle();const d=w.document;d.querySelector('[data-service=kaggle]').click();
+  const [idle,active,expired]=d.querySelectorAll('.kg-account');
+  assert.equal(idle.querySelector('.avatar'),null);assert.equal(idle.querySelector('small'),null);assert.equal(idle.querySelector('.kg-account-hint'),null);
+  assert(idle.querySelector('.kg-account-quota').textContent.includes('18,5 h'));assert.equal(idle.getAttribute('aria-pressed'),'true');
+  assert.equal(active.querySelector('.kg-account-hint').textContent,'1 đang chạy · 1 đang chờ');
+  assert.equal(expired.querySelector('.kg-account-hint').textContent,'Cần token mới');assert(expired.querySelector('.kg-account-quota').classList.contains('kg-stale'));
+  active.click();assert.equal(d.querySelector('.kg-account.selected').getAttribute('aria-pressed'),'true');assert.equal(d.querySelectorAll('.kg-account[aria-pressed=true]').length,1);
+});
+test('Kaggle offers the same three-step guide in help and keeps technical instructions collapsed',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-service=kaggle]').click();
+  assert.equal(d.querySelector('#kg-layout-hint'),null);assert.equal(d.querySelector('#kg-scope-info'),null);
+  assert.equal(d.querySelector('#kg-terminal-copy').textContent,'Sao chép lệnh');d.querySelector('#kg-help').click();
+  assert.equal(d.querySelectorAll('#modal-body .kg-instructions>li').length,3);
+  const guide=d.querySelector('#modal-body .kg-help').textContent;
+  assert.equal(d.querySelectorAll('#modal-body details').length,2);assert.equal(d.querySelector('#modal-body details[open]'),null);
+  assert(guide.includes('python'));assert(guide.includes('kaggle kernels push'));d.querySelector('#modal-cancel').click();
+  d.querySelector('.nav[data-page=help]').click();d.querySelector('[data-help-service=kaggle]').click();
+  assert.equal(d.querySelector('#help-kaggle .kg-help').textContent,guide);
+  d.querySelector('#language-toggle').click();assert(d.querySelector('#help-kaggle').textContent.includes('Copy command'));
+});
+test('Kaggle setup puts a ready user first and keeps Python configuration available on demand',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('[data-service=kaggle]').click();d.querySelector('#kg-setup').click();await settle();
+  assert(d.querySelector('.kg-tool-state.ready'));assert.equal(d.querySelector('#modal-body details').open,false);
+  assert(d.querySelector('#kg-copy-setup').closest('details'));assert(d.querySelector('#kg-python').closest('details'));
+  assert(d.querySelector('#kg-tools-terminal'));d.querySelector('#modal-cancel').click();d.querySelector('#kg-add').click();await settle();
+  assert.equal(d.querySelector('#kg-folder').closest('details').open,false);assert(d.querySelector('#kg-token-input').required);
+});
 test('Kaggle supports independent account terminals, search, quota and notebook monitoring in both languages',async t=>{
   const w=dom(t);await settle();const d=w.document,commands=[],action=w.pad.action;
   w.pad.action=async(command,args)=>{commands.push({command,args});return action(command,args);};
   d.querySelector('[data-page=kaggle]').click();assert.equal(d.querySelector('#kaggle-page').classList.contains('hidden'),false);
   assert.equal(d.querySelectorAll('.kg-account').length,3);assert(d.querySelector('#kg-detail').textContent.includes('18,5 h'));
-  assert(d.querySelector('#kg-scope-info'));d.querySelector('#kg-scope-info').click();assert(d.querySelector('#modal-body').textContent.includes('12 notebook'));d.querySelector('#modal-cancel').click();assert(d.querySelector('#kg-detail').textContent.includes('Đang chạy'));
+  d.querySelector('#kg-help').click();assert(d.querySelector('#modal-body').textContent.includes('12 notebook'));d.querySelector('#modal-cancel').click();assert(d.querySelector('#kg-detail').textContent.includes('Đang chạy'));
   d.querySelector('#kg-launch').click();await settle();d.querySelectorAll('.kg-account')[1].click();d.querySelector('#kg-launch').click();await settle();
   const launches=commands.filter(c=>c.command==='kaggleLaunch');assert.equal(launches.length,2);assert.notEqual(launches[0].args.id,launches[1].args.id);assert(!commands.some(c=>c.command==='gateway'||c.command==='switch'));
   const search=d.querySelector('#kg-search');search.value='archive';search.dispatchEvent(new w.Event('input'));assert.equal(d.querySelectorAll('.kg-account').length,1);assert(d.querySelector('#kg-detail').textContent.includes('Dữ liệu cũ'));
@@ -123,7 +155,8 @@ test('Kaggle drag resizing survives a state update and cancellation restores the
   d.querySelector('#kaggle-content').dispatchEvent(pointer('pointermove',360));assert.equal(d.querySelector('#kaggle-content').style.getPropertyValue('--kg-pinned-height'),'400px');
   d.querySelector('#kg-refresh-one').click();await settle();d.querySelector('#kaggle-content').dispatchEvent(pointer('pointermove',380));assert.equal(d.querySelector('#kaggle-content').style.getPropertyValue('--kg-pinned-height'),'420px');
   d.querySelector('#kaggle-content').dispatchEvent(pointer('pointercancel',380));assert.equal(d.querySelector('#kaggle-content').style.getPropertyValue('--kg-pinned-height'),'');assert.equal(w.localStorage.getItem('pad-kaggle-layout'),null);assert(!d.body.classList.contains('kg-resizing-height'));
-  d.querySelector('#kg-notebooks-pinned').getBoundingClientRect=()=>({height:240});d.querySelector('[data-kg-resize=pinned]').dispatchEvent(pointer('pointerdown',200));d.querySelector('#kaggle-content').dispatchEvent(pointer('pointermove',300));d.querySelector('#kaggle-content').dispatchEvent(pointer('pointerup',300));assert.equal(JSON.parse(w.localStorage.getItem('pad-kaggle-layout')).pinned,340);
+  // The release position is authoritative when the browser coalesces the last move.
+  d.querySelector('#kg-notebooks-pinned').getBoundingClientRect=()=>({height:240});d.querySelector('[data-kg-resize=pinned]').dispatchEvent(pointer('pointerdown',200));d.querySelector('#kaggle-content').dispatchEvent(pointer('pointermove',300));d.querySelector('#kaggle-content').dispatchEvent(pointer('pointerup',320));assert.equal(JSON.parse(w.localStorage.getItem('pad-kaggle-layout')).pinned,360);
 });
 test('Kaggle loads one page on downward end scroll, waits while busy and leaves errors for explicit retry',async t=>{
   const w=dom(t);await settle();const d=w.document,action=w.pad.action,calls=[];

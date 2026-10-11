@@ -54,16 +54,16 @@ Global Settings contains appearance and language. Codex configuration and data r
 
 ### Kaggle: multiple accounts and parallel terminals
 
-Version **1.15.0** brings services into a shared entry page. Open **Services → Kaggle** to save API tokens once, select an account in an existing terminal or open a new one, and monitor GPU/TPU quota and notebook runs. Keep writing code in VS Code and submit it using the official Kaggle CLI. PADSwitcher manages accounts and reads status; it does not split jobs or rotate accounts.
+Open **Services → Kaggle** to select accounts and monitor notebooks. **How to use** shows a three-step guide.
 
 1. Open **Services → Kaggle → Setup**, install Python 3.11+ and the tools using the provided command, then **Save & check**.
-2. Create an **API token** in [Kaggle Settings](https://www.kaggle.com/settings), choose **Add account**, paste the token and choose a workspace. Repeat for accounts you are authorized to use, under Kaggle’s terms.
-3. Select an account → **Use in terminal**, then paste the command into your PowerShell terminal, including VS Code. For shorter commands, enable **Set up command** once; new terminals support `padkaggle list`, `padkaggle use username`, `padkaggle status` and `padkaggle off`. You can also **Open new terminal** from the app.
+2. Create an **API token** in [Kaggle Settings](https://www.kaggle.com/settings), click **Add account** and paste the token. Do this once for each account you are authorized to use.
+3. Select an account → **Copy command** → paste into PowerShell, including the VS Code terminal. Or choose **Open new terminal**. To use `padkaggle use username`, enable **Setup → Set up padkaggle** once, then open a new terminal.
 4. **Refresh** manually or enable two-minute refresh to read quota and latest runs. **Pin notebook** to monitor a particular notebook.
 
-Version **1.16.0** separates **Pinned** and **Recent** into independent scroll areas. Scroll Recent to its end to load 12 more notebooks, or choose **Load more**. Loaded rows and scroll positions survive quota refresh; additional pages show their snapshot from the time they were loaded.
+**Pinned** and **Recent** scroll separately. Scroll Recent to its end or choose **Load more** to see more notebooks.
 
-Version **1.17.0** adapts the layout to the window. Drag between columns to adjust width, or below Accounts / Pinned / Recent to adjust that list's height. The app remembers your sizes; **Reset layout** restores automatic sizing.
+Drag between columns or below a list to resize. The app remembers your layout; **Reset layout** restores automatic sizing.
 
 Each PowerShell keeps its own selection when changing directories with `cd`. Use A in one terminal and B in another to submit jobs in parallel within Kaggle's limits. `python train.py` still runs locally; Kaggle GPUs run the notebooks submitted with `kaggle kernels push`. See [Kaggle usage and limits](docs/KAGGLE.md).
 
