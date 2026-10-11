@@ -207,6 +207,12 @@ let timeout;
           const tallList=await preview.webContents.executeJavaScript("(async()=>{window.scrollTo(0,0);const grip=document.querySelector('[data-kg-resize=recent]');grip.dispatchEvent(new KeyboardEvent('keydown',{key:'End',bubbles:true}));const recent=document.querySelector('#kg-notebooks-recent');const fits=recent.scrollHeight<=recent.clientHeight;window.scrollTo(0,recent.getBoundingClientRect().bottom+scrollY-innerHeight+20);await new Promise(r=>setTimeout(r,160));return {fits,rows:document.querySelectorAll('#kg-notebooks-recent .kg-notebook').length};})()");
           assert(tallList.fits);assert.equal(tallList.rows,24,'Page scrolling also loads more when the list is tall enough to fit its current rows');
           await preview.webContents.executeJavaScript("document.querySelector('#kg-layout-reset').click()");
+          preview.setSize(1920,1080);
+          const minimumWidth=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));document.querySelector('[data-kg-resize=width]').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));return {pixels:Math.round(document.querySelector('#kg-list').getBoundingClientRect().width),fraction:JSON.parse(localStorage.getItem('pad-kaggle-layout')).width};})()");
+          assert.equal(minimumWidth.pixels,240);assert(minimumWidth.fraction<.15);
+          await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1&kgmany=1'});await preview.webContents.executeJavaScript("navigate('kaggle')");
+          assert.equal(await preview.webContents.executeJavaScript("Math.round(document.querySelector('#kg-list').getBoundingClientRect().width)"),minimumWidth.pixels,'Minimum column width persists even on wide screens');
+          await preview.webContents.executeJavaScript("document.querySelector('#kg-layout-reset').click()");
           preview.setSize(1260,900);
         }
         preview.destroy(); console.log('Sample UI: services, Codex, Kaggle, settings and help; light/dark, VI/EN at 1920/1260/1000px; scrolling, pagination, native drag resizing and persisted layout: passed.');

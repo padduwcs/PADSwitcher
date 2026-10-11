@@ -16,7 +16,7 @@ window.padKaggleUI = (() => {
   const literal=body=>`<div data-literal>${body}</div>`;
   const layoutKey='pad-kaggle-layout';
   let sizes={},resize=null,loadNext=null;
-  try{const saved=JSON.parse(localStorage.getItem(layoutKey));if(saved?.version===1)for(const key of ['width','accounts','pinned','recent'])if(Number.isFinite(saved[key])&&(key==='width'?saved[key]>=.15&&saved[key]<=.7:saved[key]>=80&&saved[key]<=10000))sizes[key]=saved[key];}catch{}
+  try{const saved=JSON.parse(localStorage.getItem(layoutKey));if(saved?.version===1)for(const key of ['width','accounts','pinned','recent'])if(Number.isFinite(saved[key])&&(key==='width'?saved[key]>0&&saved[key]<1:saved[key]>=80&&saved[key]<=10000))sizes[key]=saved[key];}catch{}
   const grip=(key,label,vertical=false)=>`<div class="kg-resizer ${vertical?'kg-column-resizer':'kg-row-resizer'}" data-kg-resize="${key}" role="separator" tabindex="0" aria-orientation="${vertical?'vertical':'horizontal'}" aria-label="${label}" title="${label}"><span aria-hidden="true"></span></div>`;
   function bounds(key){
     if(key!=='width')return [key==='accounts'?160:80,Math.max(480,window.innerHeight*2)];

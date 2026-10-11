@@ -1,4 +1,4 @@
-# PADSwitcher 1.17.0 — validation
+# PADSwitcher 1.17.1 — validation
 
 ## Responsive and user-resizable Kaggle layout — 1.17.0
 
@@ -14,6 +14,8 @@ Validated on Windows x64 on 2026-10-11 using disposable app data and synthetic a
   refresh/reload and cursor cleanup. Light/dark, VI/EN screenshots cover 1920×1080,
   1260×900 and 1000×680, with no horizontal overflow. Pagination still works when
   a tall custom list fits all loaded rows and the user scrolls the page to its end.
+- Patch 1.17.1 also verifies that the minimum 240px column width survives reload
+  on a wide viewport, where its saved fraction is smaller than 15%.
 - Changes are limited to the renderer, version/docs and QA. The running user's
   PADSwitcher processes, Codex gateway, live credentials and shell profiles are
   untouched. Portable packaging and packaged smoke pass, including service

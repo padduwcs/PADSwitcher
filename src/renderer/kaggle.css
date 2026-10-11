@@ -27,7 +27,7 @@ body:has(#kaggle-page:not(.hidden)) .service-context{max-width:none}
 .kg-account:nth-child(3n) .avatar{background:var(--amber-soft);color:var(--amber)}
 .kg-account-name{display:flex;flex-direction:column;gap:2px;min-width:0}
 .kg-account-name strong{overflow-wrap:anywhere;font-size:14px;font-weight:600;letter-spacing:-.25px}
-.kg-account-name small{font-size:11px;color:var(--muted)}
+.kg-account-name small{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
 .kg-account-quota{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .kg-account-quota>span{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted)}
 .kg-account-quota b{font-size:15px;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
@@ -39,7 +39,7 @@ body:has(#kaggle-page:not(.hidden)) .service-context{max-width:none}
 .kg-detail-heading .avatar{width:46px;height:46px;flex-shrink:0;background:#ffffff1a;color:var(--hero-ink);border-color:#ffffff20;font-size:13px}
 .kg-detail-identity{min-width:0;flex:1;position:relative}
 .kg-detail-heading h2{margin:0 0 3px;font-size:21px;font-weight:600;overflow-wrap:anywhere;letter-spacing:-.6px}
-.kg-detail-identity>span{font-size:11px;color:var(--hero-muted)}
+.kg-detail-identity>span{font-size:11px;color:var(--hero-muted);overflow-wrap:anywhere}
 .kg-detail-heading .badge{color:var(--hero-ink);background:#ffffff18;border:1px solid #ffffff20;position:relative}
 .kg-detail-body{padding:22px 24px}
 .kg-section-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
