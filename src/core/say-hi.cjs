@@ -177,7 +177,8 @@ class SayHiService {
       try { await this.activeClose?.(); } finally { this.activeClose = null; }
       if (home) {
         if (path.dirname(home) !== service.root || !path.basename(home).startsWith('sayhi-rpc-')) throw new Error('Unsafe Say hi cleanup');
-        await assertDirectory(home); await fs.rm(home,{recursive:true,force:true});
+        // Windows can keep a stopped backend's folder locked briefly (EBUSY/EPERM).
+        await assertDirectory(home); await fs.rm(home,{recursive:true,force:true,maxRetries:10,retryDelay:100});
       }
     }
   }
