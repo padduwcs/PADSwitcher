@@ -7,7 +7,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
   for(const dir of dirs){const candidate=process.platform==='darwin'?path.join(dir,'PADSwitcher Unix.app','Contents','Resources','app.asar'):path.join(dir,'resources','app.asar');if(await fs.stat(candidate).then(s=>s.isFile(),()=>false)){asar=candidate;binary=process.platform==='darwin'?path.join(dir,'PADSwitcher Unix.app','Contents','MacOS','PADSwitcher Unix'):path.join(dir,'padswitcher-unix');break;}}
   if(!asar)throw Error('Packaged application was not found. Run npm run dist first.');
   for(const file of ['src/assets/PADCodex','src/core/padkaggle.sh','src/core/kaggle-reader.py']){const stat=await fs.stat(path.join(asar+'.unpacked',file));assert(stat.isFile());if(file.endsWith('/PADCodex'))assert(stat.mode&0o111,'Packaged helper is not executable');}
-  const root=await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-packaged-'));await fs.chmod(root,0o700);
+  const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-packaged-')));await fs.chmod(root,0o700);
   const server=net.createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;await new Promise(r=>server.close(r));
   const env={...process.env,PADSWITCHER_APPDATA_DIR:root};delete env.ELECTRON_RUN_AS_NODE;delete env.NODE_OPTIONS;
   const child=spawn(binary,[`--remote-debugging-port=${port}`],{env,stdio:'ignore',detached:true});let launchError;child.on('error',e=>launchError=e);let socket;

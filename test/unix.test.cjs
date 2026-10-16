@@ -7,7 +7,7 @@ const {WebSocketServer}=require('ws');
 const {CodexRpc}=require('../src/core/rpc.cjs');
 const native=process.platform!=='win32';
 const helper=path.resolve(__dirname,'../src/assets/PADCodex');
-async function temporary(t){const dir=await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-unix-test-'));await fs.chmod(dir,0o700);t.after(()=>fs.rm(dir,{recursive:true,force:true}));return dir;}
+async function temporary(t){const dir=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-unix-test-')));await fs.chmod(dir,0o700);t.after(()=>fs.rm(dir,{recursive:true,force:true}));return dir;}
 async function until(fn){for(let i=0;i<100;i++){const v=await fn();if(v)return v;await new Promise(r=>setTimeout(r,50));}throw Error('Timed out waiting for isolated process');}
 
 test('Unix command quoting treats paths and shell metacharacters as data',()=>{

@@ -47,6 +47,8 @@ Không chỉnh sửa trực tiếp bản sao này.
 `verify` dùng một D-Bus session và kho khóa tạm riêng, chỉ dùng dữ liệu giả.
 Nó chạy unit test, helper test, mã hóa/guardian/shell/terminal, Electron, build và
 kiểm tra executable đã đóng gói. Không đăng nhập, gửi inference hay dùng reset thật.
+Các gói được lưu trong `dist-unix` của bản sao Linux và sao chép về `dist-unix`
+trong worktree Unix để có thể lấy file ngay từ Windows.
 
 Các dependency kiểm thử trên Ubuntu:
 

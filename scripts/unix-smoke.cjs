@@ -6,7 +6,7 @@ const {KaggleService}=require('../src/core/kaggle.cjs');
 const {auth}=require('../test/helpers.cjs');
 (async()=>{
   if(!['linux','darwin'].includes(process.platform))throw Error('Run the Unix smoke check in Linux/macOS.');
-  const root=await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-smoke-'));await fs.chmod(root,0o700);
+  const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-smoke-')));await fs.chmod(root,0o700);
   try {
     const platform=createUnixPlatform(root),check=JSON.parse(await platform.run(platform.helperSource,['--selftest'],{timeout:60000}));
     assert.deepEqual(check,{encryption:true,keyring:true,tamperRejected:true});

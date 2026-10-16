@@ -3,7 +3,7 @@ const {app,BrowserWindow}=require('electron');
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 let root,window;
 app.whenReady().then(async()=>{
-  root=await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-electron-'));await fs.chmod(root,0o700);
+  root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-electron-')));await fs.chmod(root,0o700);
   app.setPath('appData',root);app.setPath('userData',path.join(root,'browser'));
   // The entry point keeps its normal isolated data namespace. This script uses
   // no existing Codex homes, IDE settings, accounts or inference.

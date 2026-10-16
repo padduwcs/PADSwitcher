@@ -53,6 +53,12 @@ jobs:
       - run: npm run test:kaggle
       - run: npm run smoke:protocol
       - run: npm run smoke:say-hi
+      - name: Prepare Linux Chromium sandbox
+        if: runner.os == 'Linux'
+        run: |
+          node -e "require('electron')"
+          sudo chown root:root node_modules/electron/dist/chrome-sandbox
+          sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
       - name: Linux system keyring and Electron smoke
         if: runner.os == 'Linux'
         run: xvfb-run -a dbus-run-session -- sh scripts/linux-test-session.sh sh -c 'npm run smoke && npm run smoke:ui'
@@ -61,6 +67,13 @@ jobs:
         run: npm run smoke && npm run smoke:ui
       - run: npm run dist
       - run: node scripts/checksums.cjs
+      - name: Prepare packaged Linux Chromium sandbox
+        if: runner.os == 'Linux'
+        run: |
+          for sandbox in dist-unix/linux*-unpacked/chrome-sandbox; do
+            sudo chown root:root "$sandbox"
+            sudo chmod 4755 "$sandbox"
+          done
       - name: Verify packaged application
         shell: bash
         run: |

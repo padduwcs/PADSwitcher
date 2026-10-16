@@ -41,6 +41,13 @@ jobs:
       - run: npm run test:helper
       - run: npm run dist
       - run: node scripts/checksums.cjs
+      - name: Prepare packaged Linux Chromium sandbox
+        if: runner.os == 'Linux'
+        run: |
+          for sandbox in dist-unix/linux*-unpacked/chrome-sandbox; do
+            sudo chown root:root "$sandbox"
+            sudo chmod 4755 "$sandbox"
+          done
       - name: Verify packaged application
         shell: bash
         run: |
