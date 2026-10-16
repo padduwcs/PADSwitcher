@@ -134,6 +134,10 @@ Artifact tải được trong Actions sau khi job tương ứng thành công.
 
 Chỉ phát hành khi các kiểm tra đã qua và chủ động tạo tag:
 
+Tag phải trỏ vào commit đã kiểm tra và không chứa `[skip ci]` trong commit message.
+GitHub có thể bỏ qua cả workflow push tag khi commit mang nhãn này. Với commit
+tài liệu có `[skip ci]` ở đầu nhánh, hãy chỉ định SHA của commit đã qua CI khi tạo tag.
+
 ```bash
 git tag unix-v1.19.1-unix.1
 git push origin unix-v1.19.1-unix.1
