@@ -69,6 +69,10 @@ or release publication was performed during that initial implementation.
 
 ## Public preview release checks
 
+All five jobs passed again in [run 38883346230](https://github.com/padduwcs/PADSwitcher/actions/runs/38883346230)
+for source commit `c0d75d7c87892fa4957cbb8785bdbae08e58818c`, including the newly
+added installed-deb and copied-DMG tests on all four native Unix runners.
+
 The release-readiness update adds five tests for complete architecture coverage,
 corrupt downloads, accidental Windows assets, tag/version isolation and GitHub's
 uploaded-asset SHA-256 digests. The local Windows suite now has 212 tests:

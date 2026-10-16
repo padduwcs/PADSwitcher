@@ -88,7 +88,9 @@ Keep the bundle intact. You do not need to disable Gatekeeper system-wide.
 ## 3. First launch
 
 1. Open PADSwitcher Unix. Vietnamese/English and light/dark themes are available.
-2. **Codex:** install a compatible native Codex CLI for Linux/macOS or the Codex
+2. **Codex:** install a compatible native Codex CLI using
+   [OpenAI's instructions](https://github.com/openai/codex#installing-and-running-codex-cli)
+   for Linux/macOS or the Codex
    VS Code extension. Protocol checks use Codex `0.160.0`. If discovery fails,
    open **Codex settings → Advanced Codex settings → Codex CLI → Browse** and
    select the native executable `codex`. A JavaScript wrapper or Windows `.exe`

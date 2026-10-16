@@ -89,7 +89,9 @@ Giữ nguyên tên và nội dung của bundle. Không cần tắt Gatekeeper to
 ## 3. Thiết lập lần đầu
 
 1. Mở PADSwitcher Unix; có thể chọn tiếng Việt/English và giao diện sáng/tối.
-2. **Codex:** cài Codex CLI native tương thích cho Linux/macOS hoặc extension
+2. **Codex:** cài Codex CLI native tương thích theo
+   [hướng dẫn từ OpenAI](https://github.com/openai/codex#installing-and-running-codex-cli)
+   cho Linux/macOS hoặc extension
    Codex trong VS Code. Giao thức đã được kiểm tra với Codex `0.160.0`.
    Nếu app chưa tự tìm thấy, vào **Cài đặt Codex → Cấu hình Codex nâng cao →
    Codex CLI → Chọn**, chọn binary native `codex` có quyền thực thi.
