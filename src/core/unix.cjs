@@ -58,7 +58,7 @@ async function protectDirectory(root) {
   await fs.chmod(root,0o700);
 }
 async function processes() {
-  const output=await run('/bin/ps',['-u',String(process.getuid()),'-o','pid=,ppid=,comm=']);
+  const output=await run('/bin/ps',['-ww','-U',String(process.getuid()),'-o','pid=,ppid=,comm=']);
   return output.split('\n').filter(Boolean).map(line=>{
     const match=line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/);if(!match)throw new UserError('Không đọc được danh sách tiến trình.','PROCESS_CHECK_FAILED');
     return {ProcessId:Number(match[1]),ParentProcessId:Number(match[2]),Name:path.basename(match[3]),ExecutablePath:match[3]};
