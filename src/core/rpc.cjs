@@ -1,6 +1,7 @@
 'use strict';
 const { spawn } = require('node:child_process');
 const readline = require('node:readline');
+const path = require('node:path');
 const { UserError } = require('./errors.cjs');
 class CodexRpc {
   constructor(executable, home, options = {}) {
@@ -10,7 +11,10 @@ class CodexRpc {
     if (options.isolated) for (const name of Object.keys(env)) {
       if ((name.startsWith('CODEX_') && name !== 'CODEX_HOME') || ['OPENAI_BASE_URL','NODE_OPTIONS'].includes(name)) delete env[name];
     }
-    this.child = (options.spawn || spawn)(executable, ['app-server', '--listen', 'stdio://', ...(options.ephemeralStore ? ['-c','cli_auth_credentials_store="ephemeral"'] : options.fileStore ? ['-c', 'cli_auth_credentials_store="file"'] : [])], { env, cwd: home, stdio: ['pipe','pipe','pipe'], windowsHide: true });
+    const args=['app-server', '--listen', 'stdio://', ...(options.ephemeralStore ? ['-c','cli_auth_credentials_store="ephemeral"'] : options.fileStore ? ['-c', 'cli_auth_credentials_store="file"'] : [])];
+    const unix=process.platform!=='win32';
+    const host=path.join(__dirname,'../assets/PADCodex').replace(/app\.asar([\\/])/,'app.asar.unpacked$1');
+    this.child = (options.spawn || spawn)(unix?host:executable,unix?['--host',String(process.pid),executable,...args]:args, { env, cwd: home, stdio: ['pipe','pipe','pipe'], windowsHide: true });
     this.pending = new Map(); this.listeners = new Set(); this.sequence = 0; this.closed = false;
     this.child.stderr.resume(); this.child.stdin.on('error', () => {});
     this.lines = readline.createInterface({ input: this.child.stdout });

@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-unix/
 artifacts/
 *.log
 .env*
@@ -7,6 +8,7 @@ auth.json
 *.dpapi
 .preview/
 src/assets/PADCodex.exe
+src/assets/PADCodex
 __pycache__/
 *.pyc
 .vscode/

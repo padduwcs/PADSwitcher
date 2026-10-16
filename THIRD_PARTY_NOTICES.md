@@ -2,6 +2,11 @@
 
 PADSwitcher source is licensed under [MIT](LICENSE).
 
+The Unix edition includes a standalone Go helper. Its Go runtime, Gorilla
+WebSocket, go-keyring, godbus and x/sys notices are included in
+[UNIX-THIRD-PARTY-NOTICES.txt](UNIX-THIRD-PARTY-NOTICES.txt).
+`src/helper/unix/go.mod` and `go.sum` pin its dependency versions.
+
 - **Be Vietnam Pro**: distributed under the SIL Open Font License 1.1.
   The font license and attribution are included in [src/assets/fonts](src/assets/fonts).
 - **Electron**, **electron-builder**, **jsonc-parser**, **ws** and the development

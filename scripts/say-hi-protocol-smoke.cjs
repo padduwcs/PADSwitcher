@@ -6,7 +6,7 @@ const {spawn}=require('node:child_process');
 const {SayHiService}=require('../src/core/say-hi.cjs');
 const {CodexRpc}=require('../src/core/rpc.cjs');
 const {decodeRequest}=require('../src/core/model-router.cjs');
-const windows=require('../src/core/windows.cjs');
+const platform=require('../src/core/platform.cjs').createPlatform(path.resolve('artifacts/protocol-platform'));
 const event=(type,value)=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
 (async()=>{
   const parent=path.resolve('artifacts/say-hi-protocol');await fs.mkdir(parent,{recursive:true});
@@ -24,8 +24,8 @@ const event=(type,value)=>'event: '+type+'\ndata: '+JSON.stringify({type,...valu
   });
   upstream.on('upgrade',(_req,socket)=>socket.end('HTTP/1.1 426 Upgrade Required\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'));
   await new Promise(r=>upstream.listen(0,'127.0.0.1',r));
-  const executable=await windows.findGatewayCodex();
-  const service={root,busy:false,state:{profiles:[{id:'a',label:'A',status:'ready'},{id:'b',label:'B',status:'ready'}],quotaCooldowns:{},gatewayProfileId:'kept'},platform:{protectDirectory:windows.protectDirectory},
+  const executable=await platform.findGatewayCodex();
+  const service={root,busy:false,state:{profiles:[{id:'a',label:'A',status:'ready'},{id:'b',label:'B',status:'ready'}],quotaCooldowns:{},gatewayProfileId:'kept'},platform:{protectDirectory:platform.protectDirectory},
     changed:()=>{},save:async()=>{},executable:async()=>executable,get(id){return this.state.profiles.find(p=>p.id===id);},exclusive:async operation=>operation(),
     accessBundle:async id=>({accessToken:Buffer.from('{"alg":"RS256"}').toString('base64url')+'.'+Buffer.from(JSON.stringify({sub:'fixture-user-'+id,exp:Math.floor(Date.now()/1000)+3600,'https://api.openai.com/auth':{chatgpt_account_id:'fixture-'+id,chatgpt_plan_type:'plus',chatgpt_user_id:'fixture-user-'+id}})).toString('base64url')+'.Zml4dHVyZQ',chatgptAccountId:'fixture-'+id,chatgptPlanType:'plus'}),
     rpcFactory:(exe,home,options)=>{

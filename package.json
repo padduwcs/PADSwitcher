@@ -1,8 +1,9 @@
 {
-  "name": "padswitcher",
-  "version": "1.19.1",
-  "description": "Profile Account Directory Switcher — Codex and Kaggle account manager for Windows",
+  "name": "padswitcher-unix",
+  "version": "1.19.1-unix.1",
+  "description": "Profile Account Directory Switcher — isolated Linux and macOS edition",
   "private": true,
+  "desktopName": "padswitcher-unix.desktop",
   "main": "src/main.cjs",
   "author": "Anh-Duc Phan",
   "license": "MIT",
@@ -22,7 +23,8 @@
     "kaggle",
     "account-manager",
     "electron",
-    "windows"
+    "linux",
+    "macos"
   ],
   "scripts": {
     "prestart": "node scripts/build-helper.cjs",
@@ -32,17 +34,18 @@
     "check": "node scripts/check.cjs",
     "icons": "node scripts/run-electron.cjs scripts/create-icon.cjs",
     "preview": "node scripts/preview.cjs",
-    "smoke": "node scripts/smoke.cjs",
-    "smoke:ui": "node scripts/run-electron.cjs scripts/electron-smoke.cjs",
+    "smoke": "node scripts/unix-smoke.cjs",
+    "smoke:ui": "node scripts/run-electron.cjs scripts/unix-electron-smoke.cjs",
+    "smoke:packaged": "node scripts/packaged-unix-smoke.cjs",
+    "test:helper": "node scripts/test-helper.cjs",
+    "test:kaggle": "node scripts/kaggle-contract.cjs",
     "helper": "node scripts/build-helper.cjs",
-    "smoke:gateway": "node scripts/gateway-smoke.cjs --live --inference",
-    "smoke:recovery": "node scripts/recovery-native-smoke.cjs --live",
     "smoke:protocol": "node scripts/router-protocol-smoke.cjs",
     "smoke:say-hi": "node scripts/say-hi-protocol-smoke.cjs",
     "prebuild": "node scripts/build-helper.cjs",
     "predist": "node scripts/build-helper.cjs",
-    "build": "electron-builder --win dir",
-    "dist": "electron-builder --win portable"
+    "build": "node scripts/package-unix.cjs --dir",
+    "dist": "node scripts/package-unix.cjs"
   },
   "devDependencies": {
     "electron": "44.5.1",
@@ -53,37 +56,51 @@
     "@electron/get": "5.1.0"
   },
   "build": {
-    "appId": "personal.pad.padswitcher",
-    "productName": "PADSwitcher",
+    "appId": "personal.pad.padswitcher.unix",
+    "productName": "PADSwitcher Unix",
+    "executableName": "padswitcher-unix",
     "directories": {
-      "output": "dist"
+      "output": "dist-unix"
     },
     "files": [
       "src/**/*",
+      "!src/helper/**/*",
+      "!src/assets/PADCodex.exe",
+      "!src/core/padkaggle.ps1",
       "package.json",
       "LICENSE",
-      "THIRD_PARTY_NOTICES.md"
+      "THIRD_PARTY_NOTICES.md",
+      "UNIX-THIRD-PARTY-NOTICES.txt"
     ],
     "asar": true,
     "asarUnpack": [
-      "src/assets/PADCodex.exe",
+      "src/assets/PADCodex",
       "src/core/kaggle-reader.py",
-      "src/core/padkaggle.ps1"
+      "src/core/padkaggle.sh"
     ],
     "electronFuses": {
       "runAsNode": false,
       "enableNodeOptionsEnvironmentVariable": false,
       "enableNodeCliInspectArguments": false,
       "onlyLoadAppFromAsar": true,
-      "enableEmbeddedAsarIntegrityValidation": true
+      "enableEmbeddedAsarIntegrityValidation": false
     },
-    "win": {
-      "target": "portable",
-      "icon": "src/assets/padswitcher.ico",
-      "signExecutable": false
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "src/assets/padswitcher-emblem.png",
+      "category": "Development",
+      "syncDesktopName": true,
+      "artifactName": "PADSwitcher-${version}-Linux-${arch}.${ext}",
+      "maintainer": "Anh-Duc Phan"
     },
-    "portable": {
-      "artifactName": "PADSwitcher-${version}-Windows.exe"
+    "mac": {
+      "icon": "src/assets/padswitcher-emblem.png",
+      "target": ["dmg", "zip"],
+      "category": "public.app-category.developer-tools",
+      "artifactName": "PADSwitcher-${version}-macOS-${arch}.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "binaries": ["Contents/Resources/app.asar.unpacked/src/assets/PADCodex"]
     }
   },
   "dependencies": {

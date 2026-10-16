@@ -1,0 +1,82 @@
+name: Unix builds and Windows regression checks
+on:
+  push:
+    branches: [feature/cross-platform]
+  pull_request:
+    branches: [feature/cross-platform]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
+          cache: npm
+      - run: npm ci
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:kaggle
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
+          cache: npm
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: src/helper/unix/go.mod
+          cache-dependency-path: src/helper/unix/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install Linux desktop test dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y gnome-keyring dbus-x11 xvfb xterm zsh libfuse2t64
+      - run: npm ci
+      - run: npm install --global @openai/codex@0.160.0
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:helper
+      - run: npm run test:kaggle
+      - run: npm run smoke:protocol
+      - run: npm run smoke:say-hi
+      - name: Linux system keyring and Electron smoke
+        if: runner.os == 'Linux'
+        run: xvfb-run -a dbus-run-session -- sh scripts/linux-test-session.sh sh -c 'npm run smoke && npm run smoke:ui'
+      - name: macOS system keyring and Electron smoke
+        if: runner.os == 'macOS'
+        run: npm run smoke && npm run smoke:ui
+      - run: npm run dist
+      - run: node scripts/checksums.cjs
+      - name: Verify packaged application
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a dbus-run-session -- sh scripts/linux-test-session.sh npm run smoke:packaged
+          else
+            npm run smoke:packaged
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: PADSwitcher-Unix-${{ matrix.os }}
+          path: |
+            dist-unix/*.AppImage
+            dist-unix/*.deb
+            dist-unix/*.dmg
+            dist-unix/*.zip
+            dist-unix/*.sha256
+            artifacts/unix-ui.png
+          if-no-files-found: error

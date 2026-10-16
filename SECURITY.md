@@ -1,5 +1,14 @@
 # Security and privacy
 
+On `feature/cross-platform`, the Unix edition uses AES-256-GCM with random
+nonces and a per-data-root key stored in macOS Keychain or Linux Secret Service.
+It refuses unavailable/locked keyrings and has no plaintext-key fallback.
+Private directories use mode 0700 and secret files mode 0600; the native helper
+rejects symlinks, hardlinks and broadly readable credential files. This edition
+has a separate app ID, user-data directory, Codex home and release namespace.
+See [docs/UNIX.md](docs/UNIX.md) for Unix-specific boundaries. Windows details
+below describe the original edition on `main`.
+
 ## Supported versions
 
 Security fixes are shipped in the latest GitHub release. Older portable builds and

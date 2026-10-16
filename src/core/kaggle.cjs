@@ -5,6 +5,8 @@ const crypto = require('node:crypto');
 const { EventEmitter } = require('node:events');
 const { spawn } = require('node:child_process');
 const windows = require('./windows.cjs');
+const {createPlatform} = require('./platform.cjs');
+const {UnixKaggleShell} = require('./kaggle-shell-unix.cjs');
 const { UserError } = require('./errors.cjs');
 const { KaggleShell } = require('./kaggle-shell.cjs');
 const { exists, atomicWrite, readLimited, assertDirectory, profilePath } = require('./files.cjs');
@@ -99,8 +101,12 @@ async function launchTerminal(options) {
 class KaggleService extends EventEmitter {
   constructor(root, adapters={}) {
     super();this.root=path.join(path.resolve(root),'kaggle');this.file=path.join(this.root,'accounts.json');
-    this.shell=new KaggleShell(this.root,adapters);this.terminal={scriptPath:this.shell.script,configured:null};
-    this.platform={...windows,...adapters};this.bridge=adapters.bridge||runBridge;this.launcher=adapters.launchTerminal||launchTerminal;
+    this.platform=createPlatform(path.resolve(root),adapters);
+    this.shell=this.platform.kind==='unix'?new UnixKaggleShell(this.root,adapters):new KaggleShell(this.root,adapters);this.terminal={scriptPath:this.shell.script,configured:null};
+    this.bridge=adapters.bridge||runBridge;this.launcher=adapters.launchTerminal||(this.platform.kind==='unix'?async options=>{
+      const child=this.platform.terminal('/bin/bash',['--noprofile','--rcfile',this.shell.bootstrap,'-i'],{cwd:options.workspace,env:{PADSWITCHER_KAGGLE_ROOT:this.root,PADSWITCHER_KAGGLE_START:options.username,PADSWITCHER_KAGGLE_HELPER:this.platform.helperSource}});
+      await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();
+    }:launchTerminal);
     this.state={version:1,accounts:[],settings:{pythonPath:'',autoRefresh:true}};
     this.tool=null;this.flights=new Map();this.notebookPages=new Map();this.editing=false;this.controllers=new Set();this.stopping=false;
   }
@@ -138,11 +144,12 @@ class KaggleService extends EventEmitter {
     if(!force&&this.tool?.supported)return this.tool;
     if(this.toolFlight)return this.toolFlight;
     this.toolFlight=(async()=>{
-      const candidates=this.state.settings.pythonPath?[this.state.settings.pythonPath]:['python.exe','python3.exe'];
+      const candidates=this.state.settings.pythonPath?[this.state.settings.pythonPath]:(this.platform.kind==='unix'?[path.join(this.root,'venv','bin','python'),...this.platform.pythonCandidates]:['python.exe','python3.exe']);
       let found;
       for(const candidate of candidates){if(this.stopping)throw fail('KAGGLE_CANCELLED');try{const info=await this.executeBridge(candidate,{action:'probe'},15000);if(info.ok&&typeof info.executable==='string'&&path.isAbsolute(info.executable)){found||=info;if(info.supported===true&&typeof info.scriptsPath==='string'&&path.isAbsolute(info.scriptsPath)){found=info;break;}}}catch{}}
       if(this.stopping)throw fail('KAGGLE_CANCELLED');
       this.tool=found?{python:clean(found.python,40),kaggle:clean(found.kaggle,40)||null,kagglesdk:clean(found.kagglesdk,40)||null,executable:found.executable,scriptsPath:found.scriptsPath,supported:found.supported===true&&typeof found.scriptsPath==='string'&&path.isAbsolute(found.scriptsPath)}:{supported:false,code:'KAGGLE_PYTHON'};
+      if(this.platform.kind==='unix'&&this.tool.supported)await atomicWrite(this.shell.toolsFile,JSON.stringify({python:this.tool.executable,scriptsPath:this.tool.scriptsPath}));
       this.changed();return this.tool;
     })().finally(()=>{this.toolFlight=null;});return this.toolFlight;
   }
@@ -161,8 +168,8 @@ class KaggleService extends EventEmitter {
     if(!previous&&this.state.accounts.some(p=>p.username.toLowerCase()===identity.username.toLowerCase()))throw new UserError('Tài khoản Kaggle này đã được thêm. Dùng Cập nhật token.', 'KAGGLE_DUPLICATE');
     if(!previous&&this.state.accounts.length>=100)throw new UserError('Đã đạt giới hạn 100 tài khoản đã lưu.', 'KAGGLE_LIMIT');
     const p=previous||{id:crypto.randomUUID(),username:identity.username,watch:[],quota:[],notebooks:[]};
-    const folder=profilePath(this.root,p.id);await fs.mkdir(folder,{recursive:true});await assertDirectory(folder);
-    await fs.mkdir(path.join(folder,'cli'),{recursive:true});await assertDirectory(path.join(folder,'cli'));
+    const folder=profilePath(this.root,p.id);await fs.mkdir(folder,{recursive:true,mode:0o700});await assertDirectory(folder);
+    await fs.mkdir(path.join(folder,'cli'),{recursive:true,mode:0o700});await assertDirectory(path.join(folder,'cli'));
     const backup=previous?await readLimited(this.vault(p.id),32768).catch(error=>{if(error.code==='ENOENT')return null;throw error;}):null,old=previous?{...p}:null;
     const plaintext=Buffer.from(token);let encrypted;try{encrypted=await this.platform.dpapi(plaintext);}finally{plaintext.fill(0);}
     try{await atomicWrite(this.vault(p.id),encrypted);}finally{encrypted.fill(0);}
@@ -173,7 +180,7 @@ class KaggleService extends EventEmitter {
   });}
   async edit({id,label,workspace}){return this.exclusive(async()=>{const p=this.get(id);if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');await assertDirectory(workspace);if(!path.isAbsolute(workspace))throw new UserError('Chọn thư mục làm việc tuyệt đối.', 'KAGGLE_WORKSPACE');const old={label:p.label,workspace:p.workspace};p.label=clean(label,80)||p.username;p.workspace=path.resolve(workspace);try{await this.save();}catch(error){Object.assign(p,old);throw error;}});}
   async remove(id){return this.exclusive(async()=>{const p=this.get(id),index=this.state.accounts.indexOf(p);if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');this.state.accounts.splice(index,1);try{await this.save();}catch(error){this.state.accounts.splice(index,0,p);throw error;}try{await fs.unlink(this.vault(id));}catch(error){if(error.code!=='ENOENT'){this.state.accounts.splice(index,0,p);await this.save();throw error;}}this.notebookPages.delete(id);});}
-  async settings({pythonPath,autoRefresh}){return this.exclusive(async()=>{if(typeof pythonPath!=='string'||(pythonPath&&(!path.isAbsolute(pythonPath)||path.basename(pythonPath).toLowerCase()!=='python.exe'))||typeof autoRefresh!=='boolean')throw new UserError('Cấu hình Kaggle không hợp lệ.', 'KAGGLE_SETTINGS');if(this.toolFlight)throw new UserError('Một thao tác Kaggle khác đang chạy.','BUSY');const old=this.state.settings;this.state.settings={pythonPath,autoRefresh};try{await this.save();this.tool=null;}catch(error){this.state.settings=old;throw error;}});}
+  async settings({pythonPath,autoRefresh}){return this.exclusive(async()=>{if(typeof pythonPath!=='string'||(pythonPath&&(!path.isAbsolute(pythonPath)||!(this.platform.validPython?this.platform.validPython(pythonPath):path.basename(pythonPath).toLowerCase()==='python.exe')))||typeof autoRefresh!=='boolean')throw new UserError('Cấu hình Kaggle không hợp lệ.', 'KAGGLE_SETTINGS');if(this.toolFlight)throw new UserError('Một thao tác Kaggle khác đang chạy.','BUSY');const old=this.state.settings;this.state.settings={pythonPath,autoRefresh};try{await this.save();this.tool=null;}catch(error){this.state.settings=old;throw error;}});}
   async watch(id,value,remove=false){return this.exclusive(async()=>{const p=this.get(id),ref=notebookRef(value),old=[...p.watch];if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');if(remove)p.watch=p.watch.filter(r=>r!==ref);else if(!p.watch.includes(ref)){if(p.watch.length>=20)throw new UserError('Theo dõi tối đa 20 notebook ghim cho mỗi tài khoản.', 'KAGGLE_LIMIT');p.watch.push(ref);}try{await this.save();}catch(error){p.watch=old;throw error;}});}
   refresh(id) {
     const p=this.get(id);if(this.flights.has(id))return this.flights.get(id);if(this.editing||this.stopping)return Promise.resolve();
@@ -215,7 +222,7 @@ class KaggleService extends EventEmitter {
   }
   async launch(id,locale='vi') {
     return this.exclusive(async()=>{const p=this.get(id);await assertDirectory(p.workspace);try{const token=await this.loadToken(id);const identity=await this.request({action:'verify',token,username:p.username});if(identity.username?.toLowerCase()!==p.username.toLowerCase())throw fail('KAGGLE_IDENTITY');}catch(error){if(['KAGGLE_AUTH','KAGGLE_IDENTITY','KAGGLE_TOKEN'].includes(error.code)){p.status='reauth';p.lastError=MESSAGES[error.code];await this.save();}throw error;}
-      const tool=this.tool;const cli=path.join(tool.scriptsPath,'kaggle.exe');if(!await exists(cli))throw fail('KAGGLE_DEPENDENCIES');
+      const tool=this.tool;const cli=path.join(tool.scriptsPath,this.platform.kaggleExecutable||'kaggle.exe');if(!await exists(cli))throw fail('KAGGLE_DEPENDENCIES');
       const configPath=path.join(profilePath(this.root,id),'cli');await assertDirectory(configPath);
       await this.shell.ensure();
       await this.launcher({vault:this.vault(id),username:p.username,workspace:p.workspace,python:tool.executable,scriptsPath:tool.scriptsPath,configPath,helperPath:this.shell.script,locale});

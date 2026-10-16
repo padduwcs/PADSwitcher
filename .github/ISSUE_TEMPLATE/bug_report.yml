@@ -17,10 +17,10 @@ body:
     validations:
       required: true
   - type: input
-    id: windows
+    id: operating_system
     attributes:
-      label: Windows version
-      placeholder: Windows 11 24H2 x64
+      label: Operating system and architecture
+      placeholder: Ubuntu 24.04 x64 / macOS 15 arm64 / Ubuntu WSL2
     validations:
       required: true
   - type: dropdown

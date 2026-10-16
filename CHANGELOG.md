@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.19.1-unix.1 — 2026-10-16
+
+- Add an isolated Linux/macOS edition on `feature/cross-platform` with a separate
+  app identity, data store, Codex home, build output and prerelease namespace.
+- Add a standalone Go transport/guardian, authenticated keyring-backed vaults,
+  Unix Codex discovery, native terminal supervision and Bash/Zsh Kaggle selection.
+- Add Linux AppImage/deb and macOS dmg/zip packaging, Windows regression checks,
+  four Unix build targets, WSL development commands and packaged executable tests.
+- Keep the Windows `main` branch and existing release artifacts unchanged.
+
 Notable changes to PADSwitcher are documented here. The project follows [Semantic Versioning](https://semver.org/); detailed test evidence and known limits are in [VALIDATION.md](VALIDATION.md).
 
 ## 1.19.1 — 2026-10-11

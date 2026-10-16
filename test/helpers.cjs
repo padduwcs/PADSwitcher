@@ -15,7 +15,9 @@ async function fixture(t) {
   await fs.writeFile(path.join(desktop,'config.toml'),'model = "fixture-model"\n');
   await fs.writeFile(path.join(desktop,'history.jsonl'),'KEEP HISTORY\n');
   const key = crypto.randomBytes(32);
+  const helperSource=path.join(directory,'fixture-helper');await fs.writeFile(helperSource,'offline helper fixture');
   const adapter = {
+    kind:'windows',helperSource,
     protectDirectory:async () => {}, processes:async () => [], findCodex:async () => 'fixture-codex.exe', findGatewayCodex:async () => 'fixture-codex.exe', run:async () => 'codex-cli 0.159.2',
     dpapi:async (bytes,decrypt) => {
       if (decrypt) { const decipher = crypto.createDecipheriv('aes-256-gcm',key,bytes.subarray(0,12)); decipher.setAuthTag(bytes.subarray(12,28)); return Buffer.concat([decipher.update(bytes.subarray(28)),decipher.final()]); }

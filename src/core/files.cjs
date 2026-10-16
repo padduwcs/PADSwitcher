@@ -26,7 +26,8 @@ async function atomicWrite(file, data) {
 function profilePath(root, id) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) throw new UserError('Mã hồ sơ không hợp lệ.', 'INVALID_PROFILE');
   const result = path.resolve(root, id);
-  if (path.dirname(result).toLowerCase() !== path.resolve(root).toLowerCase()) throw new UserError('Đường dẫn hồ sơ không hợp lệ.', 'UNSAFE_PATH');
+  const parent=path.dirname(result),base=path.resolve(root);
+  if ((process.platform==='win32'?parent.toLowerCase():parent) !== (process.platform==='win32'?base.toLowerCase():base)) throw new UserError('Đường dẫn hồ sơ không hợp lệ.', 'UNSAFE_PATH');
   return result;
 }
 async function readLimited(file, max = 1024 * 1024) {

@@ -1,4 +1,5 @@
 'use strict';
+throw Error('Legacy Windows live checks are disabled in the Unix edition. Use the isolated protocol checks.');
 // Native Codex + a local Responses service. Only read-only account policy
 // discovery uses real credentials; no real model inference and no reset consume.
 const fs=require('node:fs/promises'),path=require('node:path'),http=require('node:http'),crypto=require('node:crypto'),assert=require('node:assert/strict');

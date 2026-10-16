@@ -9,6 +9,11 @@ const { GatewayHub } = require('./core/gateway-hub.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { JetBrainsIntegration } = require('./core/jetbrains.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
+const unix=process.platform!=='win32';
+if(unix)process.umask(0o077);
+if(process.env.PADSWITCHER_APPDATA_DIR){if(!path.isAbsolute(process.env.PADSWITCHER_APPDATA_DIR))throw Error('PADSWITCHER_APPDATA_DIR must be absolute.');app.setPath('appData',process.env.PADSWITCHER_APPDATA_DIR);}
+app.setName('PADSwitcher Unix');
+app.setPath('userData',path.join(app.getPath('appData'),'PADSwitcher-Unix'));
 let window, service, kaggle, gateway, integration, jetbrains, tray, timer, kaggleTimer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
 let uiLocale='vi';
 const text=(vi,en)=>uiLocale==='en'?en:vi;
@@ -22,7 +27,7 @@ const rendererUrl = pathToFileURL(rendererFile).href;
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance',() => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
-  app.whenReady().then(start).catch(() => { dialog.showErrorBox('PADSwitcher','Không thể khởi động an toàn. Giữ nguyên thư mục dữ liệu và kiểm tra quyền truy cập Windows.'); app.quit(); });
+  app.whenReady().then(start).catch(() => { dialog.showErrorBox('PADSwitcher Unix','Không thể khởi động. Kiểm tra quyền thư mục dữ liệu và kho khóa hệ thống. Bản này dành cho Linux/macOS; trên Windows hãy chạy trong Ubuntu/WSL.'); app.quit(); });
 }
 async function openAuth(url) {
   let parsed; try { parsed = new URL(url); } catch { throw new UserError('Đường dẫn đăng nhập không hợp lệ.', 'LOGIN_URL'); }
@@ -30,7 +35,8 @@ async function openAuth(url) {
   await shell.openExternal(parsed.href);
 }
 async function start() {
-  service = new ProfileService(path.join(app.getPath('appData'),'PADSwitcher','data'));
+  if(!unix)throw new UserError('Bản Unix chỉ chạy trên Linux/macOS. Dùng Ubuntu/WSL để thử nghiệm.','UNIX_REQUIRED');
+  service = new ProfileService(path.join(app.getPath('appData'),'PADSwitcher-Unix','data'));
   await service.init();
   kaggle = new KaggleService(service.root);
   try{await kaggle.init();}catch(error){kaggle.initError=publicError(error);}
@@ -39,7 +45,7 @@ async function start() {
   gateway=new GatewayHub(service);integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);
   const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const [next,jb]=await Promise.all([integration.status(),jetbrains.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)){service.vscode=next;service.jetbrains=jb;service.changed();}})().finally(()=>{integrationFlight=null;}));
   await checkIntegration();
-  window = new BrowserWindow({ width: 1260, height: 840, minWidth: 1000, minHeight: 680, title: 'PADSwitcher', icon:path.join(__dirname,'assets','padswitcher.ico'), backgroundColor:'#F6F8FB', autoHideMenuBar:true, show:false, webPreferences: { preload:path.join(__dirname,'preload.cjs'), nodeIntegration:false, contextIsolation:true, sandbox:true, webSecurity:true, devTools:!app.isPackaged } });
+  window = new BrowserWindow({ width: 1260, height: 840, minWidth: 1000, minHeight: 680, title: 'PADSwitcher Unix', icon:path.join(__dirname,'assets','padswitcher-emblem.png'), backgroundColor:'#F6F8FB', autoHideMenuBar:true, show:false, webPreferences: { preload:path.join(__dirname,'preload.cjs'), nodeIntegration:false, contextIsolation:true, sandbox:true, webSecurity:true, devTools:!app.isPackaged } });
   window.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
   window.webContents.on('will-navigate',(event,url) => { if (url !== rendererUrl) event.preventDefault(); });
   window.webContents.session.setPermissionRequestHandler((_webContents,_permission,callback) => callback(false));
@@ -70,10 +76,12 @@ async function start() {
         case 'kaggleSetupCopy': {
           const tool=await kaggle.checkTools();
           const python=tool.executable||kaggle.state.settings.pythonPath;
-          clipboard.writeText((python?"& '"+python.replaceAll("'","''")+"'":"py -3")+" -m pip install 'kaggle>=2.2.4,<3' 'kagglesdk>=0.1.37,<1'");break;
+          const quote=service.platform.quote,venv=path.join(kaggle.root,'venv');
+          const install=" -m pip install 'kaggle>=2.2.4,<3' 'kagglesdk>=0.1.37,<1'";
+          clipboard.writeText(kaggle.state.settings.pythonPath?quote(kaggle.state.settings.pythonPath)+install:(python?quote(python):'python3')+' -m venv '+quote(venv)+' && '+quote(path.join(venv,'bin','python'))+install);break;
         }
         case 'kaggleOpen': {
-          const urls={settings:'https://www.kaggle.com/settings',docs:'https://github.com/Kaggle/kaggle-cli',python:'https://www.python.org/downloads/windows/'};
+          const urls={settings:'https://www.kaggle.com/settings',docs:'https://github.com/Kaggle/kaggle-cli',python:'https://www.python.org/downloads/'};
           const url=args.ref?'https://www.kaggle.com/code/'+notebookRef(args.ref):urls[args.kind];
           if(!url)throw new UserError('Đường dẫn Kaggle không hợp lệ.','KAGGLE_REF');
           await shell.openExternal(url);break;
@@ -109,10 +117,11 @@ async function start() {
         case 'restoreJetBrains': await service.exclusive(()=>jetbrains.restore());await checkIntegration();break;
         case 'copyCLI': {
           if(gateway.status!=='ready')throw new UserError('Bật gateway trước.', 'GATEWAY_STOPPED');
-          clipboard.writeText('& "'+gateway.helper.replace(/"/g,'""')+'"');break;
+          clipboard.writeText(service.platform.quote(gateway.helper));break;
         }
         case 'launchGateway': {
           if(gateway.status!=='ready')throw new UserError('Bật gateway trước.', 'GATEWAY_STOPPED');
+          if(unix){const child=service.platform.terminal(gateway.helper,[],{cwd:service.state.settings.workspace});await new Promise((r,j)=>{child.once('spawn',r);child.once('error',j);});child.unref();break;}
           const {spawn}=require('node:child_process');
           const script='Set-Location -LiteralPath $env:PADSWITCHER_WORKSPACE; & $env:PADSWITCHER_HELPER';
           const env={...process.env,PADSWITCHER_HELPER:gateway.helper,PADSWITCHER_WORKSPACE:service.state.settings.workspace};
@@ -130,7 +139,7 @@ async function start() {
         case 'pick': {
           if (!['codexPath','workspace','desktopHome','kaggleWorkspace','kagglePython'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
           const executable=['codexPath','kagglePython'].includes(args.kind);
-          const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'kagglePython' ? text('Chọn Python 3.11+ (python.exe)','Choose Python 3.11+ (python.exe)') : executable ? text('Chọn codex.exe chính thức','Choose official codex.exe') : text('Chọn thư mục','Choose folder'), properties: executable ? ['openFile'] : ['openDirectory'], ...(executable ? { filters:[{name:'Executable',extensions:['exe']}] } : {}) });
+          const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'kagglePython' ? text('Chọn Python 3.11+','Choose Python 3.11+') : executable ? text('Chọn executable Codex chính thức','Choose official Codex executable') : text('Chọn thư mục','Choose folder'), properties: executable ? ['openFile'] : ['openDirectory'] });
           result = selected.canceled ? null : selected.filePaths[0]; break;
         }
         case 'openData': await shell.openPath(service.root); break;
@@ -147,9 +156,10 @@ async function start() {
     } catch(error) { return { ok:false,error:publicError(error),state:service.view() }; }
   });
   await window.loadFile(rendererFile); window.show();
-  tray=new Tray(path.join(__dirname,'assets','padswitcher.ico'));tray.setToolTip('PADSwitcher — quản lý phiên Codex');
+  try{tray=new Tray(path.join(__dirname,'assets','padswitcher-symbol.png'));tray.setToolTip('PADSwitcher — quản lý phiên Codex');}catch{tray=null;}
   const showWindow=()=>{if(window.isMinimized())window.restore();window.show();window.focus();};
-  tray.on('double-click',showWindow);
+  tray?.on('double-click',showWindow);
+  app.on('activate',showWindow);
   updateTray();
   if(service.state.gatewayEnabled&&service.state.profiles.some(p=>p.id===service.state.gatewayProfileId)){
     await gateway.start(service.state.gatewayProfileId).catch(error=>{if(!window.isDestroyed())window.webContents.send('pad:refresh-error',publicError(error));});
@@ -167,7 +177,7 @@ async function start() {
   refreshKaggle(); kaggleTimer=setInterval(refreshKaggle,120000);
   window.on('close',event => {
     if (quitting) return;
-    if(['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}
+    if(tray&&['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}
     if ((service.busy && !service.login)||kaggle.editing) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:text('Thao tác đang hoàn tất','Operation in progress'),detail:text('Hãy chờ lưu tài khoản xong trước khi đóng PADSwitcher.','Wait for the account operation to finish before closing PADSwitcher.')}); return; }
     if (service.running.size) {
       const response = dialog.showMessageBoxSync(window,{type:'question',buttons:['Giữ PADSwitcher mở','Đóng trình quản lý'],defaultId:0,cancelId:0,message:'CLI vẫn đang chạy',detail:'Nếu đóng trình quản lý, các cửa sổ CLI tiếp tục chạy. Phiên riêng sẽ được mã hóa lại khi đóng CLI bình thường; mở PADSwitcher lại để kiểm tra trạng thái sau đó.'});

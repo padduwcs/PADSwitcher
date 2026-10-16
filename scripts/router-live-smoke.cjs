@@ -1,4 +1,5 @@
 'use strict';
+throw Error('Legacy Windows live checks are disabled in the Unix edition. Use the isolated protocol checks.');
 // Two short real model replies. Quota rejection is injected locally, never
 // forced on an account. Read-only sandbox; no reset consume or project edits.
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');

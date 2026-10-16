@@ -9,7 +9,7 @@ const { UserError, publicError } = require('./errors.cjs');
 const { exists, atomicWrite, profilePath, readLimited, assertDirectory } = require('./files.cjs');
 const { parseAuth, normalizeLimits } = require('./auth.cjs');
 const { normalizeResets, availableCredit } = require('./resets.cjs');
-const windows = require('./windows.cjs');
+const {createPlatform} = require('./platform.cjs');
 const { CodexRpc } = require('./rpc.cjs');
 const { SEAL_SESSION } = require('./guardian.cjs');
 const {defaults:routeDefaults,validate:validateRoutes,SCOPES}=require('./client-routes.cjs');
@@ -20,17 +20,18 @@ class ProfileService extends EventEmitter {
     super(); this.root = path.resolve(root); this.profilesRoot = path.join(this.root, 'profiles');
     this.metadataFile = path.join(this.root, 'accounts.json'); this.rollbackFile = path.join(this.root, 'desktop-rollback.dpapi');
     this.journalFile = path.join(this.root, 'desktop-journal.json');
-    this.platform = { ...windows, ...adapters };
+    this.platform = createPlatform(this.root,adapters);
     this.rpcFactory = adapters.rpcFactory || ((exe,home,opts) => new CodexRpc(exe,home,opts));
     this.running = new Map(); this.busy = false; this.login = null;
     this.sayHi = new SayHiService(this, adapters.sayHiOptions);
-    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), workspace: process.cwd(), autoRefresh: true }, activeDesktopId: null, rollback: null };
+    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: this.platform.kind==='unix'?path.join(this.root,'codex-home'):(process.env.CODEX_HOME || path.join(os.homedir(), '.codex')), workspace: process.cwd(), autoRefresh: true }, activeDesktopId: null, rollback: null };
     this.state.autoSwitch={enabled:false,order:[]};this.state.quotaCooldowns={};
     this.state.clientRoutes=routeDefaults();
   }
   async init() {
     await fs.mkdir(this.root, { recursive: true }); await assertDirectory(this.root); await this.platform.protectDirectory(this.root);
-    await fs.mkdir(this.profilesRoot, { recursive: true }); await assertDirectory(this.profilesRoot);
+    await fs.mkdir(this.profilesRoot, { recursive: true, mode:0o700 }); await assertDirectory(this.profilesRoot);
+    if(this.platform.kind==='unix'){await fs.mkdir(this.state.settings.desktopHome,{recursive:true,mode:0o700});await this.platform.protectDirectory(this.state.settings.desktopHome);}
     if (await exists(this.metadataFile)) {
       let parsed;
       try { parsed = JSON.parse((await readLimited(this.metadataFile, 4 * 1024 * 1024)).toString('utf8')); } catch { throw new UserError('Danh sách hồ sơ bị lỗi. Hãy giữ nguyên thư mục dữ liệu để phục hồi.', 'STORE_INVALID'); }
@@ -104,7 +105,7 @@ class ProfileService extends EventEmitter {
     const created = !p;
     if (!p) {
       p = { id: crypto.randomUUID(), ...identity, label: cleanText(label || identity.email || `Tài khoản ${this.state.profiles.length+1}`,80), notes: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), quota: [], quotaAt: null, status: 'ready', lastError: null };
-      await fs.mkdir(this.home(p.id)); this.state.profiles.push(p);
+      await fs.mkdir(this.home(p.id),{mode:0o700}); this.state.profiles.push(p);
     }
     try {
       await this.storeAuth(p.id,bytes);
@@ -190,7 +191,7 @@ class ProfileService extends EventEmitter {
       const marker = path.join(this.home(p.id),'runtime.json');
       if (await exists(marker)) {
         let lease; try { lease = JSON.parse((await readLimited(marker)).toString('utf8')); } catch { throw new UserError('Trạng thái phiên CLI bị lỗi. Không xóa dữ liệu đang dùng.', 'LEASE_INVALID'); }
-        if (list.some(x => x.ProcessId === lease.pid && /^powershell\.exe$/i.test(x.Name))) { this.running.set(p.id,{ pid: lease.pid, recovered: true, desktop: lease.desktop === true }); continue; }
+        if (list.some(x => x.ProcessId === lease.pid && (this.platform.isSessionProcess?.(x) ?? /^powershell\.exe$/i.test(x.Name)))) { this.running.set(p.id,{ pid: lease.pid, recovered: true, desktop: lease.desktop === true }); continue; }
       }
       await this.seal(p.id);
       if (await exists(marker)) await fs.unlink(marker);
@@ -200,7 +201,7 @@ class ProfileService extends EventEmitter {
     const recovered = [...this.running.entries()].filter(([,v]) => v.recovered);
     if (!recovered.length) return;
     const list = await this.platform.processes();
-    for (const [id, lease] of recovered) if (!list.some(x => x.ProcessId === lease.pid && /^powershell\.exe$/i.test(x.Name))) {
+    for (const [id, lease] of recovered) if (!list.some(x => x.ProcessId === lease.pid && (this.platform.isSessionProcess?.(x) ?? /^powershell\.exe$/i.test(x.Name)))) {
       await this.seal(id); await fs.unlink(path.join(this.home(id),'runtime.json')).catch(() => {}); this.running.delete(id);
     }
   }
@@ -466,6 +467,16 @@ class ProfileService extends EventEmitter {
       const desktop = current?.identity === this.get(id).identity;
       await assertDirectory(this.state.settings.workspace);
       const executable = await this.executable(); const home = desktop ? this.state.settings.desktopHome : await this.runtime(id);
+      if(this.platform.kind==='unix') {
+        const child=this.platform.launchCli({executable,home,workspace:this.state.settings.workspace,identity:this.get(id).identity,desktop,resume});
+        try {
+          await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});
+          this.running.set(id,{pid:child.pid,child,desktop});
+          child.once('close',()=>this.finishCli(id).catch(e=>{this.get(id).lastError=publicError(e).message;this.changed();}));
+          await atomicWrite(path.join(this.home(id),'runtime.json'),JSON.stringify({pid:child.pid,desktop,createdAt:new Date().toISOString()}));
+          return child.pid;
+        }catch(error){if(!child.pid&&!desktop)await this.seal(id);throw error;}
+      }
       const inner = "$ErrorActionPreference='Stop'; $Host.UI.RawUI.WindowTitle='PADSwitcher — Codex'; Set-Location -LiteralPath $env:PADSWITCHER_WORKSPACE; if ($env:PADSWITCHER_RESUME -eq '1') { & $env:PADSWITCHER_CODEX --no-daemon -C $env:PADSWITCHER_WORKSPACE resume } else { & $env:PADSWITCHER_CODEX --no-daemon -C $env:PADSWITCHER_WORKSPACE }; Write-Host ''; Read-Host 'Nhan Enter de dong cua so va khoa lai phien'";
       const encoded = Buffer.from(inner,'utf16le').toString('base64');
       const outer = `$ErrorActionPreference='Stop'; $p=Start-Process -FilePath $env:PADSWITCHER_POWERSHELL -ArgumentList @('-NoLogo','-NoProfile','-EncodedCommand','${encoded}') -PassThru -Wait; ${SEAL_SESSION}; exit $p.ExitCode`;

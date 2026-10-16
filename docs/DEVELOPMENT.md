@@ -1,5 +1,9 @@
 # Development
 
+**Unix branch:** use [UNIX.md](UNIX.md) for Linux/macOS development, WSL testing,
+packaging and the independent GitHub workflow. The Windows build instructions
+below are retained as architecture history and apply to `main`.
+
 Use Windows 10/11 x64, Node.js 24 LTS, Git and .NET Framework 4.8. The native helper
 is compiled with the Windows .NET Framework C# compiler; it is generated, not tracked.
 

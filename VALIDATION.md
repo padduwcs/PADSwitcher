@@ -1,5 +1,9 @@
 # PADSwitcher 1.19.1 — validation
 
+The Unix branch has its own [validation record](docs/UNIX-VALIDATION.md).
+The historical Windows results below describe the baseline on `main`; they
+must not be read as Linux/macOS validation.
+
 ## Aligned Codex toolbar and Say hi presentation — 1.19.1
 
 Validated on Windows x64 on 2026-10-11 with disposable app data and synthetic

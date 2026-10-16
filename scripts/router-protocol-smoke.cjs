@@ -5,7 +5,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),http=require('nod
 const {spawn}=require('node:child_process');
 const {ModelRouter,decodeRequest}=require('../src/core/model-router.cjs');
 const {CodexRpc}=require('../src/core/rpc.cjs');
-const windows=require('../src/core/windows.cjs');
+const platform=require('../src/core/platform.cjs').createPlatform(path.resolve('artifacts/protocol-platform'));
 const event=(type,value={})=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
 function respond(res,output,token){
   const id='resp_fixture';res.writeHead(200,{'Content-Type':'text/event-stream','x-codex-turn-state':token});
@@ -35,7 +35,7 @@ function respond(res,output,token){
     router=new ModelRouter({profileId:'a',service:{state,running:new Map(),save:async()=>{}},changed:()=>{},recovery:{note:()=>{}},bundle:async id=>({accessToken:'fixture-'+id,chatgptAccountId:id,chatgptPlanType:'plus'})},{upstream:'http://127.0.0.1:'+upstream.address().port+'/v1/',allowTestUpstream:true});
     await router.start();router.select('a');
     await fs.writeFile(path.join(home,'config.toml'),'model = "gpt-5.4"\nmodel_provider = "fixture"\nmodel_reasoning_effort = "low"\n[analytics]\nenabled = false\n[model_providers.fixture]\nname = "Loopback protocol fixture"\nbase_url = '+JSON.stringify(router.baseUrl)+'\nwire_api = "responses"\nrequires_openai_auth = false\nhttp_headers = { Authorization = "Bearer native-fixture" }\n');
-    const executable=await windows.findGatewayCodex();
+    const executable=await platform.findGatewayCodex();
     rpc=new CodexRpc(executable,home,{spawn:(exe,args,options)=>{
       for(const key of ['OPENAI_BASE_URL','CODEX_INTERNAL_ORIGINATOR_OVERRIDE','NODE_OPTIONS'])delete options.env[key];
       return spawn(exe,args,options);

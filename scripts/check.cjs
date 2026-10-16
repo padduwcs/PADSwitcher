@@ -10,4 +10,9 @@ if(process.platform==='win32'){
   const result=spawnSync(require('../src/core/windows.cjs').powershell,['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',windowsHide:true,env:{...process.env,PADSWITCHER_SYNTAX_FILE:path.resolve('src/core/padkaggle.ps1')}});
   if(result.status!==0){process.stderr.write(result.stderr||'PowerShell syntax check failed.');failures++;}
 }
+if(process.platform!=='win32'){
+  for(const file of ['src/core/padkaggle.sh','scripts/wsl-dev.sh','scripts/linux-test-session.sh']){
+    const result=spawnSync('/bin/bash',['-n',file],{encoding:'utf8'});if(result.status!==0){process.stderr.write(result.stderr||'Shell syntax check failed.');failures++;}
+  }
+}
 if (failures) process.exitCode = 1; else console.log('Syntax checks passed.');

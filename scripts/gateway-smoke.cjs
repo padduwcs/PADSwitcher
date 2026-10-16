@@ -1,4 +1,5 @@
 'use strict';
+throw Error('Legacy Windows live checks are disabled in the Unix edition. Use npm run smoke and the isolated protocol checks.');
 // Opt-in live verification: credentials are read in memory; only the isolated fixture is written.
 const fs=require('node:fs/promises');
 const path=require('node:path');

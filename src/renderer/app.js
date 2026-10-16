@@ -333,7 +333,7 @@ $('#restore-jetbrains').onclick = () => call('restoreJetBrains',{},'Đã gỡ ag
 $('#restore-vscode').onclick=()=>call('restoreVSCode',{},'Đã khôi phục đường dẫn Codex trước. Reload Window để áp dụng.');
 document.querySelectorAll('[data-route]').forEach(button=>button.onclick=()=>routeModal(button.dataset.route));
 $('#account-scope').onchange=()=>{accountScope=$('#account-scope').value;localStorage.setItem('pad-account-scope',accountScope);render();};
-$('#copy-cli').onclick=()=>call('copyCLI',{},'Đã sao chép. Dán lệnh vào terminal PowerShell của VS Code.');
+$('#copy-cli').onclick=()=>call('copyCLI',{},'Đã sao chép. Dán lệnh vào terminal Bash/Zsh của VS Code.');
 $('#open-gateway-cli').onclick=()=>call('launchGateway',{},'Đã mở Codex CLI qua PADSwitcher.');
 $('#configure-auto').onclick=()=>{
   const policy=policyForScope()||{enabled:false,order:[]},order=policy.order.length?policy.order:state.profiles.map(p=>p.id);

@@ -1,5 +1,9 @@
 # Releasing PADSwitcher
 
+**Unix branch:** follow [UNIX.md](UNIX.md#github-và-phát-hành). Use only
+`unix-v<package-version>` tags. Unix releases are prereleases with `latest=false`.
+The Windows procedure below applies only to `main` and must not be used here.
+
 Releases are portable Windows executables published from a version tag. The tag, `package.json`, and `package-lock.json` versions must match.
 
 ## Prepare

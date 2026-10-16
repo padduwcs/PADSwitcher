@@ -1,4 +1,5 @@
 'use strict';
+throw Error('Legacy Windows live checks are disabled in the Unix edition. Use npm run smoke and the isolated protocol checks.');
 // Official Codex + isolated local Responses fixture. Real account policy discovery,
 // but every model request is served locally; no real model inference or forced quota exhaustion.
 const fs=require('node:fs/promises'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');

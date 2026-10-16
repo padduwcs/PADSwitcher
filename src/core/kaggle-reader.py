@@ -27,8 +27,7 @@ def versions():
     result["supported"] = (sys.version_info >= (3, 11)
                            and version_ok(result["kaggle"], (2, 2, 4), (3, 0, 0))
                            and version_ok(result["kagglesdk"], (0, 1, 37), (1, 0, 0)))
-    if os.name == "nt":
-        result["supported"] = result["supported"] and os.path.isfile(os.path.join(scripts, "kaggle.exe"))
+    result["supported"] = result["supported"] and os.path.isfile(os.path.join(scripts, "kaggle.exe" if os.name == "nt" else "kaggle"))
     return result
 
 

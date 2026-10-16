@@ -1,4 +1,5 @@
 'use strict';
+throw Error('Legacy Windows IDE checks are disabled in the Unix edition. Use the isolated integration tests.');
 // Real installed ACP adapter + native Codex, with local model replies.
 // --live allows read-only native workspace policy discovery using saved sessions.
 // No model inference/reset consumption or actual IDE configuration changes.

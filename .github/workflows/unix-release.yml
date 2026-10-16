@@ -1,0 +1,82 @@
+name: Publish Unix prerelease
+on:
+  push:
+    tags: [unix-v*]
+permissions:
+  contents: read
+concurrency:
+  group: unix-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
+          cache: npm
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: src/helper/unix/go.mod
+          cache-dependency-path: src/helper/unix/go.sum
+      - name: Validate isolated tag and branch
+        shell: bash
+        run: |
+          expected="unix-v$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "$expected"
+          git merge-base --is-ancestor HEAD origin/feature/cross-platform
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y gnome-keyring dbus-x11 xvfb xterm libfuse2t64
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:helper
+      - run: npm run dist
+      - run: node scripts/checksums.cjs
+      - name: Verify packaged application
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a dbus-run-session -- sh scripts/linux-test-session.sh npm run smoke:packaged
+          else
+            npm run smoke:packaged
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: unix-release-${{ matrix.os }}
+          path: |
+            dist-unix/*.AppImage
+            dist-unix/*.deb
+            dist-unix/*.dmg
+            dist-unix/*.zip
+            dist-unix/*.sha256
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: unix-release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish separately from stable Windows releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --prerelease --latest=false \
+            --title "PADSwitcher Unix ${GITHUB_REF_NAME#unix-v}" \
+            --notes "Linux and macOS preview. Separate data and release channel from Windows. See docs/UNIX.md on feature/cross-platform for setup and validation limits." \
+            release-assets/*
