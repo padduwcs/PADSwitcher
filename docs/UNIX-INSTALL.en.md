@@ -1,7 +1,7 @@
 # Install PADSwitcher Unix
 
 [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md)
-· [Download Unix 1.19.1-unix.1](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)
+· [Download Unix 1.19.1-unix.2](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
 · [Report a problem](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix manages Codex/Kaggle accounts on Linux and macOS. This is a
@@ -14,12 +14,12 @@ Electron and the native helper are included.
 
 | Computer | Download |
 | --- | --- |
-| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.1-Linux-amd64.deb` (recommended) |
-| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.1-Linux-arm64.deb` (recommended) |
-| Linux Intel/AMD, portable format | `PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage` |
-| Linux ARM64, portable format | `PADSwitcher-1.19.1-unix.1-Linux-arm64.AppImage` |
-| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.1-macOS-arm64.dmg` |
-| Intel Mac | `PADSwitcher-1.19.1-unix.1-macOS-x64.dmg` |
+| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.2-Linux-amd64.deb` (recommended) |
+| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.2-Linux-arm64.deb` (recommended) |
+| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage` |
+| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-arm64.AppImage` |
+| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg` |
+| Intel Mac | `PADSwitcher-1.19.1-unix.2-macOS-x64.dmg` |
 
 Mac `.zip` files are alternatives to the DMG for the same architecture.
 On Linux, `uname -m` shows `x86_64` (Intel/AMD) or `aarch64` (ARM64).
@@ -28,7 +28,11 @@ an Intel **Processor**.
 
 Automated checks target Ubuntu 24.04 x64/ARM64 and macOS 15 Intel/Apple Silicon.
 Other OS versions are not certified. Linux requires a desktop session providing
-an unlocked Secret Service, such as GNOME Keyring. For testing from Windows,
+an unlocked Secret Service, such as GNOME Keyring, and a terminal app for CLI and
+Kaggle sessions: GNOME Terminal, Ptyxis, GNOME Console, Konsole, Xfce Terminal,
+MATE Terminal, Terminator, kitty, Alacritty, WezTerm, foot or xterm. To prefer
+another terminal, set the `TERMINAL` variable to its command name (it must
+accept `-e <program>`). For testing from Windows,
 see the [WSL development guide](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX.md).
 
 ## 2. Install
@@ -38,7 +42,7 @@ see the [WSL development guide](https://github.com/padduwcs/PADSwitcher/blob/fea
 Open a terminal in the download folder. For Intel/AMD:
 
 ```bash
-sudo apt install ./PADSwitcher-1.19.1-unix.1-Linux-amd64.deb
+sudo apt install ./PADSwitcher-1.19.1-unix.2-Linux-amd64.deb
 ```
 
 On ARM64, use the `Linux-arm64.deb` filename instead. Launch **PADSwitcher Unix**
@@ -52,8 +56,8 @@ own Python environment.
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
 ```
 
 On ARM64, use the `Linux-arm64.AppImage` filename. Data is stored in your user
@@ -62,8 +66,9 @@ profile, not beside the AppImage. This build uses FUSE 2; on Ubuntu 24.04 instal
 ([AppImage documentation](https://docs.appimage.org/user-guide/troubleshooting/fuse.html)).
 
 The AppImage requires unprivileged user namespaces for Chromium sandboxing.
-If Ubuntu 24.04+ blocks its sandbox, use the `.deb`, whose installation configures
-the sandbox/AppArmor integration. On other distributions, ask your administrator
+**Ubuntu 24.04 and newer block this by default, so the AppImage does not start
+there: use the `.deb`**, whose installation configures the sandbox/AppArmor
+integration. On other distributions, ask your administrator
 to check the desktop policy. Do not run the app with `sudo`, add `--no-sandbox`,
 or disable AppArmor system-wide. See the
 [AppImage sandbox explanation](https://docs.appimage.org/user-guide/troubleshooting/electron-sandboxing.html).
@@ -78,9 +83,14 @@ or disable AppArmor system-wide. See the
    → Open Anyway** after the blocked launch. Follow
    [Apple's instructions](https://support.apple.com/en-us/102445).
    Organization-managed Macs may prevent this exception.
-4. Allow Keychain access when asked, so the app can store its account-encryption
-   key. Opening CLI sessions may also request permission to control Terminal;
-   allow this if you want to use that feature.
+4. The account-encryption key is stored in your login Keychain. If the Keychain
+   is locked, macOS asks you to unlock it. Like other desktop apps, this protects
+   data at the level of your macOS user account: programs running as you can use
+   the same Keychain item, so only run software you trust.
+5. The first time you open a CLI or Kaggle terminal, macOS asks whether
+   PADSwitcher Unix may control **Terminal**. Choose **Allow** within two minutes.
+   If you chose Don't Allow, enable it in **System Settings → Privacy & Security →
+   Automation**, then try again.
 
 For `.zip`, extract it and move the `.app` into Applications before launching.
 Keep the bundle intact. You do not need to disable Gatekeeper system-wide.
@@ -91,7 +101,10 @@ Keep the bundle intact. You do not need to disable Gatekeeper system-wide.
 2. **Codex:** install a compatible native Codex CLI using
    [OpenAI's instructions](https://github.com/openai/codex#installing-and-running-codex-cli)
    for Linux/macOS or the Codex
-   VS Code extension. Protocol checks use Codex `0.160.0`. If discovery fails,
+   VS Code extension. Protocol checks use Codex `0.160.0`. The app looks in
+   PATH, Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), `~/.local/bin`, npm
+   global folders including nvm, and the VS Code/Cursor/Windsurf extension.
+   If discovery fails,
    open **Codex settings → Advanced Codex settings → Codex CLI → Browse** and
    select the native executable `codex`. A JavaScript wrapper or Windows `.exe`
    is not a compatible selection.
@@ -103,6 +116,12 @@ Keep the bundle intact. You do not need to disable Gatekeeper system-wide.
 5. **Kaggle (optional):** open Kaggle settings, select Python 3.11+, install the
    SDKs using the in-app setup, and add your Kaggle API token. The managed Python
    environment is stored in the Unix application's own data folder.
+   Enabling `padkaggle` adds one line only to the startup files your shells read
+   (`~/.bashrc`, `~/.zshrc`, and `~/.bash_profile` on a Mac when it exists).
+   Profiles managed as dotfile links are never replaced; the dialog shows the line
+   to add yourself.
+6. **CLI folder:** CLI sessions start in your home folder. Change it in
+   **Codex settings → Workspace** to the project you want Codex to work in.
 
 Keep PADSwitcher running while using its Codex connections. Closing the window
 may minimize it to the tray; use **Quit PADSwitcher** in the tray menu to exit.
@@ -114,10 +133,10 @@ Download the installer's matching `.sha256` file into the same folder:
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.1-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.2-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.1-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg.sha256
 ```
 
 Continue only if it reports `OK`. A combined `SHA256SUMS.txt` is also provided.
@@ -151,10 +170,11 @@ saved accounts or keyring keys.
 | Symptom | Action |
 | --- | --- |
 | Keyring cannot be opened | Unlock the login Keychain/GNOME Keyring and use your own desktop session. KDE needs a compatible Secret Service. |
-| Codex not found | Install the correct native architecture and select its binary in Codex settings. Menu launches may have a different PATH from your terminal. |
+| Codex not found | Install the correct native architecture. If it is in an unusual folder, select its binary in Codex settings (`command -v codex` in a terminal shows where it is). |
+| CLI/Kaggle terminal does not open | Install one of the terminals listed in section 1, or set `TERMINAL`, then reopen PADSwitcher. On a Mac, allow Terminal control under Privacy & Security → Automation. |
 | VS Code/JetBrains disconnected | Configure it from Connections; save work and reload the IDE as instructed. |
 | Kaggle Python/SDK missing | Install Python 3.11+ and venv, run the in-app SDK setup, then check again. |
-| AppImage sandbox/FUSE error | Prefer the deb on Ubuntu; see the AppImage instructions above. |
+| AppImage sandbox/FUSE error | On Ubuntu use the deb; elsewhere see the AppImage instructions above. |
 | First Mac launch blocked | Verify the source and follow the Open Anyway instructions above. |
 
 [Report a problem in GitHub Issues](https://github.com/padduwcs/PADSwitcher/issues),

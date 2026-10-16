@@ -149,6 +149,37 @@ func TestTerminalDescriptorCannotPersistTokens(t *testing.T) {
 		t.Fatal("token allowed in launch descriptor")
 	}
 }
+func TestLinuxTerminalSelection(t *testing.T) {
+	bin := t.TempDir()
+	for _, name := range []string{"ptyxis", "xterm", "custom-term"} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("TERMINAL", "")
+	binary, args, err := linuxTerminal()
+	if err != nil || filepath.Base(binary) != "ptyxis" || strings.Join(args, " ") != "--new-window --" {
+		t.Fatal("desktop terminal not preferred over xterm", binary, args, err)
+	}
+	t.Setenv("TERMINAL", "xterm")
+	if binary, args, _ = linuxTerminal(); filepath.Base(binary) != "xterm" || strings.Join(args, " ") != "-e" {
+		t.Fatal("TERMINAL preference ignored", binary, args)
+	}
+	t.Setenv("TERMINAL", "custom-term")
+	if binary, args, _ = linuxTerminal(); filepath.Base(binary) != "custom-term" || strings.Join(args, " ") != "-e" {
+		t.Fatal("unknown TERMINAL should use -e", binary, args)
+	}
+	t.Setenv("TERMINAL", "custom-term --unsafe-shell-string")
+	if binary, _, _ = linuxTerminal(); filepath.Base(binary) != "ptyxis" {
+		t.Fatal("TERMINAL with arguments must not be split", binary)
+	}
+	t.Setenv("TERMINAL", "")
+	t.Setenv("PATH", t.TempDir())
+	if _, _, err = linuxTerminal(); err == nil {
+		t.Fatal("missing terminal accepted")
+	}
+}
 func TestRestorePathKeepsLaterAdditions(t *testing.T) {
 	if got := restorePath("/tools:/usr/bin:/custom", "/usr/bin", "/tools"); got != "/usr/bin:/custom" {
 		t.Fatal(got)

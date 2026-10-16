@@ -20,6 +20,8 @@ type terminalSpec struct {
 	Socket  string            `json:"socket"`
 }
 
+const terminalAcceptTimeout = 2 * time.Minute
+
 var terminalEnv = map[string]bool{"PATH": true, "CODEX_HOME": true, "PADSWITCHER_CONNECTION_FILE": true, "PADSWITCHER_VAULT_ROOT": true, "PADSWITCHER_PRIVATE_SESSION": true, "PADSWITCHER_SESSION_IDENTITY": true, "PADSWITCHER_KAGGLE_ROOT": true, "PADSWITCHER_KAGGLE_START": true, "PADSWITCHER_KAGGLE_HELPER": true}
 
 func validateSpec(s terminalSpec) error {
@@ -35,23 +37,59 @@ func validateSpec(s terminalSpec) error {
 }
 func terminalTempDir() (string, error) { return os.MkdirTemp("/tmp", "padswitcher-terminal-") }
 func shellQuote(value string) string   { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
+
+// Each entry passes the program and its arguments as separate argv items; none
+// of these launchers joins them into a shell string.
+var linuxTerminals = []struct {
+	name string
+	args []string
+}{
+	{"x-terminal-emulator", []string{"-e"}}, {"ptyxis", []string{"--new-window", "--"}}, {"gnome-terminal", []string{"--"}}, {"kgx", []string{"--"}},
+	{"konsole", []string{"-e"}}, {"xfce4-terminal", []string{"--disable-server", "-x"}}, {"mate-terminal", []string{"-x"}}, {"terminator", []string{"-x"}},
+	{"kitty", nil}, {"alacritty", []string{"-e"}}, {"wezterm", []string{"start", "--"}}, {"foot", nil}, {"xterm", []string{"-e"}},
+}
+
+// A preferred terminal from $TERMINAL is used first. Known launchers keep their
+// documented syntax; any other terminal is called with the common "-e".
+func linuxTerminal() (string, []string, error) {
+	if preferred := os.Getenv("TERMINAL"); preferred != "" && !strings.ContainsAny(preferred, " \t") {
+		if binary, err := exec.LookPath(preferred); err == nil {
+			for _, candidate := range linuxTerminals {
+				if filepath.Base(binary) == candidate.name {
+					return binary, candidate.args, nil
+				}
+			}
+			return binary, []string{"-e"}, nil
+		}
+	}
+	for _, candidate := range linuxTerminals {
+		if binary, err := exec.LookPath(candidate.name); err == nil {
+			return binary, candidate.args, nil
+		}
+	}
+	return "", nil, errPrivate
+}
 func terminalCommand(helper, descriptor string) (string, []string, error) {
 	if runtime.GOOS == "darwin" {
 		// argv carries the shell command as data; paths never enter AppleScript code.
 		return "/usr/bin/osascript", []string{"-e", "on run argv\ntell application \"Terminal\"\nactivate\ndo script (item 1 of argv)\nend tell\nend run", shellQuote(helper) + " --terminal-child " + shellQuote(descriptor)}, nil
 	}
-	candidates := []struct {
-		name string
-		args []string
-	}{
-		{"x-terminal-emulator", []string{"-e"}}, {"gnome-terminal", []string{"--"}}, {"konsole", []string{"-e"}}, {"xfce4-terminal", []string{"--disable-server", "-x"}}, {"xterm", []string{"-e"}}, {"kitty", nil}, {"alacritty", []string{"-e"}},
+	binary, args, err := linuxTerminal()
+	if err != nil {
+		return "", nil, err
 	}
-	for _, candidate := range candidates {
-		if binary, err := exec.LookPath(candidate.name); err == nil {
-			return binary, append(candidate.args, helper, "--terminal-child", descriptor), nil
-		}
+	return binary, append(append([]string(nil), args...), helper, "--terminal-child", descriptor), nil
+}
+
+// terminalCheck lets the manager report a missing terminal before it decrypts
+// a session or starts a background launcher.
+func terminalCheck() error {
+	if runtime.GOOS == "darwin" {
+		_, err := os.Stat("/usr/bin/osascript")
+		return err
 	}
-	return "", nil, errPrivate
+	_, _, err := linuxTerminal()
+	return err
 }
 func launchTerminal() error {
 	data, err := input(1024 * 1024)
@@ -79,7 +117,8 @@ func launchTerminal() error {
 		return err
 	}
 	defer listener.Close()
-	listener.SetDeadline(time.Now().Add(20 * time.Second))
+	// The first macOS launch waits for the user to approve Terminal automation.
+	listener.SetDeadline(time.Now().Add(terminalAcceptTimeout))
 	spec.Socket = socket
 	data, err = json.Marshal(spec)
 	if err != nil {

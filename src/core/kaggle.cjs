@@ -104,6 +104,7 @@ class KaggleService extends EventEmitter {
     this.platform=createPlatform(path.resolve(root),adapters);
     this.shell=this.platform.kind==='unix'?new UnixKaggleShell(this.root,adapters):new KaggleShell(this.root,adapters);this.terminal={scriptPath:this.shell.script,configured:null};
     this.bridge=adapters.bridge||runBridge;this.launcher=adapters.launchTerminal||(this.platform.kind==='unix'?async options=>{
+      await this.platform.checkTerminal();
       const child=this.platform.terminal('/bin/bash',['--noprofile','--rcfile',this.shell.bootstrap,'-i'],{cwd:options.workspace,env:{PADSWITCHER_KAGGLE_ROOT:this.root,PADSWITCHER_KAGGLE_START:options.username,PADSWITCHER_KAGGLE_HELPER:this.platform.helperSource}});
       await new Promise((resolve,reject)=>{child.once('spawn',resolve);child.once('error',reject);});child.unref();
     }:launchTerminal);

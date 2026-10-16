@@ -24,7 +24,7 @@ class ProfileService extends EventEmitter {
     this.rpcFactory = adapters.rpcFactory || ((exe,home,opts) => new CodexRpc(exe,home,opts));
     this.running = new Map(); this.busy = false; this.login = null;
     this.sayHi = new SayHiService(this, adapters.sayHiOptions);
-    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: this.platform.kind==='unix'?path.join(this.root,'codex-home'):(process.env.CODEX_HOME || path.join(os.homedir(), '.codex')), workspace: process.cwd(), autoRefresh: true }, activeDesktopId: null, rollback: null };
+    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: this.platform.kind==='unix'?path.join(this.root,'codex-home'):(process.env.CODEX_HOME || path.join(os.homedir(), '.codex')), workspace: this.platform.kind==='unix'?os.homedir():process.cwd(), autoRefresh: true }, activeDesktopId: null, rollback: null };
     this.state.autoSwitch={enabled:false,order:[]};this.state.quotaCooldowns={};
     this.state.clientRoutes=routeDefaults();
   }
@@ -45,6 +45,8 @@ class ProfileService extends EventEmitter {
       }
       if (typeof parsed.settings.desktopHome !== 'string' || !path.isAbsolute(parsed.settings.desktopHome) || typeof parsed.settings.workspace !== 'string' || typeof parsed.settings.codexPath !== 'string') throw new UserError('Cài đặt đường dẫn không hợp lệ.', 'STORE_INVALID');
       this.state = { ...this.state, ...parsed, settings: { ...this.state.settings, ...parsed.settings } };
+      // Unix 1.19.1-unix.1 saved the launch folder; apps opened from Finder start in "/".
+      if(this.platform.kind==='unix'&&path.resolve(this.state.settings.workspace)==='/')this.state.settings.workspace=os.homedir();
       validateRoutes(this.state.clientRoutes,ids);
       if(!this.state.autoSwitch||typeof this.state.autoSwitch.enabled!=='boolean'||!Array.isArray(this.state.autoSwitch.order)||this.state.autoSwitch.order.length>200||new Set(this.state.autoSwitch.order).size!==this.state.autoSwitch.order.length||this.state.autoSwitch.order.some(id=>!ids.has(id)))throw new UserError('Cấu hình tự đổi tài khoản không hợp lệ.', 'STORE_INVALID');
       if(!this.state.quotaCooldowns||Array.isArray(this.state.quotaCooldowns)||typeof this.state.quotaCooldowns!=='object'||Object.entries(this.state.quotaCooldowns).some(([id,v])=>!ids.has(id)||!Number.isFinite(v)||v<0))throw new UserError('Thời gian chờ quota không hợp lệ.', 'STORE_INVALID');
@@ -380,7 +382,7 @@ class ProfileService extends EventEmitter {
   async checkDesktopOffline() {
     await this.checkRecovered();
     if (this.running.size) throw new UserError('Hãy đóng các phiên CLI do PADSwitcher mở trước khi chuyển desktop.', 'PROFILE_RUNNING');
-    const blocked = this.platform.blockers(await this.platform.processes());
+    const blocked = await this.desktopBlockers();
     if (blocked.length) {
       const names = [...new Set(blocked.map(p => p.Name))].join(', ');
       throw new UserError(`Hãy thoát Codex/ChatGPT và các ứng dụng có thể dùng Codex (${names}), rồi thử lại. PADSwitcher không tự đóng tác vụ của bạn.`, 'DESKTOP_RUNNING');
@@ -466,6 +468,8 @@ class ProfileService extends EventEmitter {
       const current = await this.desktopIdentity();
       const desktop = current?.identity === this.get(id).identity;
       await assertDirectory(this.state.settings.workspace);
+      // Report a missing terminal before the private session is decrypted.
+      await this.platform.checkTerminal?.();
       const executable = await this.executable(); const home = desktop ? this.state.settings.desktopHome : await this.runtime(id);
       if(this.platform.kind==='unix') {
         const child=this.platform.launchCli({executable,home,workspace:this.state.settings.workspace,identity:this.get(id).identity,desktop,resume});
@@ -584,9 +588,16 @@ class ProfileService extends EventEmitter {
       try{await this.save();}catch(e){target.autoSwitch=old;throw e;}
     });
   }
+  async desktopBlockers() {
+    // The Unix default desktop home is private to PADSwitcher: IDEs and other
+    // Codex apps never read it, so only PADSwitcher's own CLI sessions matter.
+    const relative=path.relative(this.root,path.resolve(this.state.settings.desktopHome));
+    if(this.platform.kind==='unix'&&relative&&!relative.startsWith('..')&&!path.isAbsolute(relative))return [];
+    return this.platform.blockers(await this.platform.processes());
+  }
   async diagnostics() {
     const executable = await this.executable(); const version = await this.platform.run(executable,['--version']);
-    const blocked = this.platform.blockers(await this.platform.processes());
+    const blocked = await this.desktopBlockers();
     const view=this.gateway?.view?.(),routes=[['shared',view],...Object.entries(view?.scopes||{}).filter(([,v])=>v.mode==='private')];
     const modelUsage=routes.filter(([,v])=>v?.usage).map(([scope,v])=>({scope,...v.usage}));
     return { codex: executable, version: /^codex-cli [\w.+-]+$/.test(version) ? version : 'Codex CLI', blockers: [...new Set(blocked.map(p => p.Name))], storage: this.root, loginRecovery: await exists(path.join(this.root,'login','auth.json')),modelUsage };

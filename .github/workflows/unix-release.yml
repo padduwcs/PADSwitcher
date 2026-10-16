@@ -8,7 +8,7 @@ concurrency:
   group: unix-release-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  windows-regression:
+  windows-shared-core:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -100,7 +100,7 @@ jobs:
             dist-unix/*.sha256
           if-no-files-found: error
   publish:
-    needs: [windows-regression, build]
+    needs: [windows-shared-core, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

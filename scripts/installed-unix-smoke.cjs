@@ -54,6 +54,16 @@ function smoke(root){run(process.execPath,[path.join(__dirname,'packaged-unix-sm
       run('/usr/bin/codesign',['--verify','--deep','--strict',installed]);
       smoke(install);
       console.log('DMG mounted, app copied, ad-hoc signature verified and installed bundle launched.');
+      // The ZIP is the alternative download. Extract it the way Finder does and
+      // require the same intact bundle signature (framework symlinks included).
+      const zip=(await fs.readdir('dist-unix')).find(file=>file.endsWith('.zip'));
+      assert(zip,'ZIP was not built');
+      const unpacked=path.join(temp,'zip');await fs.mkdir(unpacked);
+      run('/usr/bin/ditto',['-x','-k',path.resolve('dist-unix',zip),unpacked]);
+      const zipped=(await fs.readdir(unpacked,{withFileTypes:true})).find(entry=>entry.isDirectory()&&entry.name.endsWith('.app'));
+      assert(zipped,'ZIP must contain an app bundle');
+      run('/usr/bin/codesign',['--verify','--deep','--strict',path.join(unpacked,zipped.name)]);
+      console.log('ZIP extracted and its ad-hoc signature verified.');
     }finally{
       if(mounted)run('/usr/bin/hdiutil',['detach',mount,'-force']);
       await fs.rm(temp,{recursive:true,force:true});

@@ -526,6 +526,11 @@ func session(args []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = cleanCodexEnv(os.Environ())
+	// Keep catching hangup/interrupts until the session is sealed again: a late
+	// signal after Codex exits must not stop the helper before encryption.
+	guard := make(chan os.Signal, 1)
+	signal.Notify(guard, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	defer signal.Stop(guard)
 	// The terminal owns foreground signals. Keep its process group for interactive TUI.
 	err = interactive(cmd)
 	sealErr := sealSession()
@@ -548,7 +553,12 @@ func interactive(cmd *exec.Cmd) error {
 		case err := <-done:
 			return err
 		case sig := <-signals:
-			cmd.Process.Signal(sig)
+			// Ctrl+C already reaches the whole foreground process group, so a
+			// forwarded SIGINT would arrive twice. A hangup may reach only the
+			// session leader (this helper on Linux), so it is still forwarded.
+			if sig != syscall.SIGINT {
+				cmd.Process.Signal(sig)
+			}
 		}
 	}
 }
@@ -585,6 +595,12 @@ func main() {
 			err = session(args[1:])
 		case "--terminal":
 			err = launchTerminal()
+		case "--terminal-check":
+			if len(args) != 1 {
+				err = errPrivate
+			} else {
+				err = terminalCheck()
+			}
 		case "--terminal-child":
 			if len(args) != 2 {
 				err = errPrivate

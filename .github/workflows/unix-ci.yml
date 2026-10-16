@@ -1,4 +1,4 @@
-name: Unix builds and Windows regression checks
+name: Unix builds and shared-core Windows tests
 on:
   push:
     branches: [feature/cross-platform]
@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 jobs:
-  windows-regression:
+  windows-shared-core:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7

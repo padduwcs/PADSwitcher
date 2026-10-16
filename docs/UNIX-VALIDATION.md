@@ -4,6 +4,25 @@ Baseline: Windows `main` commit `5444e11e577753181604f06572cd75cb092bbeef`.
 Implementation is confined to `feature/cross-platform` in a separate worktree.
 The baseline worktree remained clean and its commit did not change during development.
 
+## 1.19.1-unix.2 local evidence — 2026-10-16
+
+Review fixes for the first public preview, verified before tagging:
+
+- Windows 11 x64 (PowerShell): 207 offline tests passed, 9 Unix-only tests skipped.
+  `src/core/windows.cjs` and the Windows helper are unchanged.
+- Ubuntu WSL2/WSLg, `scripts/wsl-dev.ps1 -Task verify`: syntax checks, 212 Node
+  tests (4 skipped), Go helper tests, official Kaggle SDK contracts, native Codex
+  protocol and Say hi checks, real Secret Service vault/guardian, Bash/Zsh
+  selection, the native terminal supervisor, source Electron, AppImage/deb build
+  and the packaged executable all passed.
+- New coverage: terminal selection order, `TERMINAL` preference and missing
+  terminal; Codex discovery in `~/.local/bin`, Homebrew and nvm folders with a
+  minimal GUI PATH; shell profile selection and preserved dotfile links; home
+  folder default and migration of a stored `/`; IDE checks skipped for the
+  isolated desktop folder.
+- Still requires the macOS CI runners: DMG and ZIP signature verification and
+  the Keychain smoke checks.
+
 ## Local evidence — 2026-10-16
 
 - Windows 11 Home x64: JavaScript/PowerShell syntax and the inherited offline

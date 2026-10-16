@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.19.1-unix.2 — 2026-10-16
+
+- Start CLI sessions in the home folder instead of the process folder (`/` after
+  a Finder launch), and move an existing `/` setting to the home folder.
+- Support Ptyxis, GNOME Console, MATE Terminal, Terminator, WezTerm, foot and a
+  `TERMINAL` preference; report a missing terminal before decrypting a session.
+- Wait up to two minutes for the first macOS Terminal automation approval.
+- Discover Codex in Homebrew, `~/.local/bin` and nvm folders that GUI apps do not
+  have in PATH.
+- Configure `padkaggle` only in the shell profiles the user's shells read, keep
+  linked dotfiles untouched and show the line to add manually; the Kaggle
+  terminal now loads the user's `~/.bashrc`.
+- Keep the private-session guardian alive until it re-seals after a late hangup,
+  and stop delivering Ctrl+C twice to Codex.
+- Skip IDE shutdown checks when the desktop folder is PADSwitcher's own isolated
+  Codex home.
+- Verify the macOS ZIP signature in CI and mark the AppImage as unsuitable for
+  Ubuntu 24.04+ in the release notes.
+
 ## 1.19.1-unix.1 — 2026-10-16
 
 - Add an isolated Linux/macOS edition on `feature/cross-platform` with a separate

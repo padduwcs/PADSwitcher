@@ -29,15 +29,24 @@ async function nativeExecutable(file) {
     return real;
   }catch{return null;}
 }
-function discoveryCandidates({env=process.env,home=os.homedir(),platform=process.platform,arch=process.arch}={}) {
-  const dirs=(env.PATH||'').split(path.delimiter).filter(Boolean),cpu=arch==='arm64'?'aarch64':'x86_64';
+function discoveryCandidates({env=process.env,home=os.homedir(),platform=process.platform,arch=process.arch,extraRoots=[]}={}) {
+  // Apps opened from Finder or a desktop menu get a minimal PATH, so common
+  // user/Homebrew install folders are searched even when PATH omits them.
+  const dirs=[...new Set([...(env.PATH||'').split(path.delimiter).filter(Boolean),path.join(home,'.local/bin'),'/opt/homebrew/bin','/usr/local/bin'])],cpu=arch==='arm64'?'aarch64':'x86_64';
   const triples=platform==='darwin'?[`${cpu}-apple-darwin`]:[`${cpu}-unknown-linux-musl`,`${cpu}-unknown-linux-gnu`];
   const pkg=`codex-${platform==='darwin'?'darwin':'linux'}-${arch==='arm64'?'arm64':'x64'}`;
-  const roots=[...dirs.map(d=>path.resolve(d,'../lib/node_modules')),path.join(home,'.npm-global/lib/node_modules'),'/usr/local/lib/node_modules','/usr/lib/node_modules','/opt/homebrew/lib/node_modules'];
+  const roots=[...new Set([...dirs.map(d=>path.resolve(d,'../lib/node_modules')),path.join(home,'.npm-global/lib/node_modules'),'/usr/local/lib/node_modules','/usr/lib/node_modules','/opt/homebrew/lib/node_modules',...extraRoots])];
   return [...dirs.map(d=>path.join(d,'codex')),...roots.flatMap(r=>[path.join(r,'@openai/codex'),path.join(r,'@openai',pkg),path.join(r,'@openai/codex/node_modules/@openai',pkg)].flatMap(p=>triples.flatMap(t=>['bin','codex'].map(b=>path.join(p,'vendor',t,b,'codex')))))];
 }
-async function findCodex(custom,options) {
-  for(const candidate of custom?[custom]:discoveryCandidates(options)){if(!path.isAbsolute(candidate))continue;const real=await nativeExecutable(candidate);if(real)return real;}
+async function nvmRoots(home=os.homedir()) {
+  // nvm only extends PATH inside interactive shells; newest Node first.
+  const base=path.join(home,'.nvm','versions','node');
+  const versions=await fs.readdir(base).catch(()=>[]);
+  return versions.filter(v=>/^v\d+\./.test(v)).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true})).map(v=>path.join(base,v,'lib','node_modules'));
+}
+async function findCodex(custom,options={}) {
+  const candidates=custom?[custom]:discoveryCandidates({...options,extraRoots:[...(options.extraRoots||[]),...await nvmRoots(options.home)]});
+  for(const candidate of candidates){if(!path.isAbsolute(candidate))continue;const real=await nativeExecutable(candidate);if(real)return real;}
   throw new UserError('Chưa tìm thấy Codex CLI native. Cài Codex hoặc chọn executable codex trong Cài đặt.','CODEX_MISSING');
 }
 async function findGatewayCodex(custom) {
@@ -77,6 +86,10 @@ function terminal(command,args=[],{cwd=os.homedir(),env={}}={}) {
   child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify({command,args,cwd,env:selected}));
   return child;
 }
+async function checkTerminal(file=helper()) {
+  try{await run(file,['--terminal-check'],{timeout:10000});}
+  catch{throw new UserError('Không tìm thấy ứng dụng terminal được hỗ trợ. Cài GNOME Terminal, Ptyxis, Konsole hoặc đặt biến TERMINAL rồi mở lại PADSwitcher.','TERMINAL_MISSING');}
+}
 function createUnixPlatform(root) {
   return {kind:'unix',helperName:'PADCodex',jetbrainsHelperName:'PADJetBrains',run,protectDirectory,processes,blockers,findCodex,findGatewayCodex,
     helperSource:helper(),pythonCandidates:['python3','python'],kaggleExecutable:'kaggle',
@@ -85,7 +98,7 @@ function createUnixPlatform(root) {
     vscodeSettings:()=>path.join(process.platform==='darwin'?path.join(os.homedir(),'Library/Application Support'):(process.env.XDG_CONFIG_HOME||path.join(os.homedir(),'.config')),'Code','User','settings.json'),
     dpapi:(bytes,decrypt=false)=>run(helper(),['--vault',decrypt?'decrypt':'encrypt'],{input:bytes,binary:true,env:{...process.env,PADSWITCHER_VAULT_ROOT:root},timeout:60000}),
     launchCli:({executable,home,workspace,identity,desktop,resume})=>terminal(helper(),['--session',executable,...(resume?['resume']:[])],{cwd:workspace,env:{CODEX_HOME:home,PADSWITCHER_VAULT_ROOT:root,PADSWITCHER_PRIVATE_SESSION:desktop?'0':'1',PADSWITCHER_SESSION_IDENTITY:identity}}),
-    terminal,quote,
+    terminal,checkTerminal:()=>checkTerminal(),quote,
   };
 }
-module.exports={createUnixPlatform,run,quote,nativeExecutable,discoveryCandidates,findCodex,findGatewayCodex,protectDirectory,processes,blockers,terminal};
+module.exports={createUnixPlatform,run,quote,nativeExecutable,discoveryCandidates,nvmRoots,findCodex,findGatewayCodex,protectDirectory,processes,blockers,terminal,checkTerminal};

@@ -62,3 +62,48 @@ test('Unix RPC shutdown terminates a stubborn backend and descendants holding it
   const rpc=new CodexRpc(backend,root);t.after(()=>rpc.child.kill('SIGKILL'));
   await until(()=>fs.stat(marker).then(()=>true,()=>false));await rpc.close();assert.equal(rpc.closed,true);assert.notEqual(rpc.child.exitCode,null);
 });
+test('Unix discovery finds Homebrew, ~/.local/bin and nvm installs when a GUI PATH omits them',{skip:!native},async t=>{
+  const root=await temporary(t),elf=Buffer.from([0x7f,0x45,0x4c,0x46]);
+  const local=path.join(root,'.local/bin/codex');await fs.mkdir(path.dirname(local),{recursive:true});await fs.writeFile(local,elf,{mode:0o755});
+  assert.equal(await unix.findCodex(undefined,{env:{PATH:'/usr/bin:/bin'},home:root,platform:'linux',arch:'x64'}),local);
+  await fs.unlink(local);
+  const nvm=path.join(root,'.nvm/versions/node/v24.18.1/lib/node_modules/@openai/codex/vendor/x86_64-unknown-linux-musl/codex/codex');
+  await fs.mkdir(path.dirname(nvm),{recursive:true});await fs.writeFile(nvm,elf,{mode:0o755});
+  assert.deepEqual(await unix.nvmRoots(root),[path.join(root,'.nvm/versions/node/v24.18.1/lib/node_modules')]);
+  assert.equal(await unix.findCodex(undefined,{env:{PATH:''},home:root,platform:'linux',arch:'x64'}),nvm);
+  const candidates=unix.discoveryCandidates({env:{PATH:''},home:root,platform:'darwin',arch:'arm64'});
+  assert(candidates.includes('/opt/homebrew/bin/codex')&&candidates.includes('/usr/local/bin/codex'));
+});
+test('Unix shell setup writes only profiles the user shell reads and never replaces dotfile links',{skip:!native},async t=>{
+  const root=await temporary(t),saved={HOME:process.env.HOME,SHELL:process.env.SHELL,ZDOTDIR:process.env.ZDOTDIR};
+  t.after(()=>{for(const [key,value] of Object.entries(saved)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
+  process.env.HOME=root;process.env.SHELL='/bin/zsh';delete process.env.ZDOTDIR;
+  const data=path.join(root,'data');await fs.mkdir(data,{mode:0o700});
+  const shell=new UnixKaggleShell(data);
+  assert.deepEqual(await shell.paths(),[path.join(root,'.zshrc')],'a zsh user without ~/.bashrc must not get one');
+  process.env.SHELL='/bin/bash';await fs.writeFile(path.join(root,'.zshrc'),`# >>> PADSwitcher Kaggle >>>\n${shell.line()}\n# <<< PADSwitcher Kaggle <<<\n`);
+  assert.deepEqual(await shell.paths(),[path.join(root,'.bashrc'),path.join(root,'.zshrc')],'a profile configured earlier stays covered');
+  const target=path.join(root,'dotfiles-bashrc');await fs.writeFile(target,'# managed elsewhere\n');await fs.symlink(target,path.join(root,'.bashrc'));
+  assert.equal((await shell.status()).configured,false);assert(String((await shell.status()).line).includes('padkaggle.sh'));
+  await assert.rejects(shell.configure(true),{code:'KAGGLE_SHELL_LINK'});
+  assert((await fs.lstat(path.join(root,'.bashrc'))).isSymbolicLink());assert.equal(await fs.readFile(target,'utf8'),'# managed elsewhere\n');
+  await shell.ensure();assert((await fs.readFile(shell.bootstrap,'utf8')).startsWith('[ ! -f "$HOME/.bashrc" ] || . "$HOME/.bashrc"\n'));
+});
+test('Unix desktop switching asks to close IDEs only when they can share the desktop folder',async t=>{
+  const {ProfileService}=require('../src/core/service.cjs');
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-blockers-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+  const service=new ProfileService(root,{kind:'unix',processes:async()=>[{ProcessId:4242,Name:'code',ExecutablePath:'code'}]});
+  assert.equal(service.state.settings.desktopHome,path.join(path.resolve(root),'codex-home'));
+  assert.equal(service.state.settings.workspace,os.homedir(),'Finder/menu launches must not default to the process folder');
+  assert.deepEqual(await service.desktopBlockers(),[]);
+  service.state.settings.desktopHome=path.join(os.homedir(),'.codex');
+  assert.deepEqual((await service.desktopBlockers()).map(p=>p.ProcessId),[4242]);
+});
+test('Unix store from 1.19.1-unix.1 moves a root launch folder to the home folder',{skip:!native},async t=>{
+  const {fixture}=require('./helpers.cjs');
+  const {data,adapter,service}=await fixture(t);await service.close();
+  const file=path.join(data,'accounts.json'),stored=JSON.parse(await fs.readFile(file,'utf8'));stored.settings.workspace='/';await fs.writeFile(file,JSON.stringify(stored));
+  const {ProfileService}=require('../src/core/service.cjs');
+  const migrated=new ProfileService(data,{...adapter,kind:'unix'});await migrated.init();t.after(()=>migrated.close());
+  assert.equal(migrated.state.settings.workspace,os.homedir());
+});

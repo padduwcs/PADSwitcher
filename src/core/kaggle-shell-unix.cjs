@@ -9,7 +9,7 @@ class UnixKaggleShell {
   constructor(root,adapters={}) {
     this.root=root;this.folder=path.join(root,'terminal');this.script=path.join(this.folder,'padkaggle.sh');
     this.bootstrap=path.join(this.folder,'bootstrap.sh');this.helper=path.join(this.folder,'PADCodex');this.toolsFile=path.join(this.folder,'tools.json');
-    this.profilePaths=adapters.shellProfilePaths||[path.join(os.homedir(),'.bashrc'),path.join(process.env.ZDOTDIR||os.homedir(),'.zshrc')];
+    this.profilePaths=adapters.shellProfilePaths||null;
     this.source=adapters.helperSource||path.join(__dirname,'../assets/PADCodex').replace(/app\.asar([\\/])/,'app.asar.unpacked$1');
   }
   async ensure() {
@@ -21,13 +21,39 @@ class UnixKaggleShell {
     await fs.chmod(this.helper,0o700);
     const body=await readLimited(path.join(__dirname,'padkaggle.sh').replace(/app\.asar([\\/])/,'app.asar.unpacked$1'));
     await atomicWrite(this.script,`_PAD_KAGGLE_HELPER=${quote(this.helper)}\n_PAD_KAGGLE_ROOT=${quote(this.root)}\n`+body.toString('utf8'));
-    await atomicWrite(this.bootstrap,`. ${quote(this.script)}\nif [ -n "\${PADSWITCHER_KAGGLE_START:-}" ]; then padkaggle use "$PADSWITCHER_KAGGLE_START"; fi\nunset PADSWITCHER_KAGGLE_START PADSWITCHER_KAGGLE_ROOT PADSWITCHER_KAGGLE_HELPER\n`);
+    // The separate Kaggle terminal replaces ~/.bashrc with this file, so load the
+    // user's own Bash setup (aliases, conda/pyenv PATH) before selecting an account.
+    await atomicWrite(this.bootstrap,`[ ! -f "$HOME/.bashrc" ] || . "$HOME/.bashrc"\n. ${quote(this.script)}\nif [ -n "\${PADSWITCHER_KAGGLE_START:-}" ]; then padkaggle use "$PADSWITCHER_KAGGLE_START"; fi\nunset PADSWITCHER_KAGGLE_START PADSWITCHER_KAGGLE_ROOT PADSWITCHER_KAGGLE_HELPER\n`);
   }
-  async paths(){return this.profilePaths;}
+  async paths() {
+    if(this.profilePaths)return this.profilePaths;
+    // Write only the startup files the user's shells actually read. Never create
+    // ~/.bash_profile: it would hide an existing ~/.profile from Bash login shells.
+    const home=os.homedir(),shell=path.basename(process.env.SHELL||''),mac=process.platform==='darwin';
+    const bashrc=path.join(home,'.bashrc'),bashProfile=path.join(home,'.bash_profile'),zshrc=path.join(process.env.ZDOTDIR||home,'.zshrc');
+    const chosen=[];
+    if(shell==='bash'||await exists(bashrc))chosen.push(bashrc);
+    if(mac&&await exists(bashProfile))chosen.push(bashProfile);
+    if(shell==='zsh'||await exists(zshrc))chosen.push(zshrc);
+    if(!chosen.length)chosen.push(mac?zshrc:bashrc);
+    // A file configured earlier stays listed so status and removal still cover it.
+    for(const file of [bashrc,bashProfile,zshrc])if(!chosen.includes(file)&&(await this.read(file))?.includes(START))chosen.push(file);
+    return chosen;
+  }
   line(){return `[ ! -f ${quote(this.script)} ] || . ${quote(this.script)}`;}
   command(username){return `. ${quote(this.script)}; padkaggle use ${quote(username)}`;}
-  async read(file){return await exists(file)?readLimited(file):null;}
-  async status(){const profiles=[];for(const file of await this.paths()){const bytes=await this.read(file),text=bytes?decode(bytes).text:'',block=profileBlock(text);profiles.push({path:file,configured:!!block&&text.slice(block.start,block.end).includes(this.line())});}return {scriptPath:this.script,configured:profiles.every(p=>p.configured),profiles};}
+  async read(file) {
+    // Reading may follow a dotfiles symlink; only writing requires a regular file.
+    let stat;try{stat=await fs.stat(file);}catch(error){if(error.code==='ENOENT')return null;throw error;}
+    if(!stat.isFile())throw new UserError('Profile shell không phải tệp thông thường. Giữ nguyên tệp hiện tại.','KAGGLE_SHELL');
+    if(stat.size>1024*1024)throw new UserError('Tệp lớn bất thường; không thể đọc an toàn.','FILE_TOO_LARGE');
+    return fs.readFile(file);
+  }
+  async assertWritable(file) {
+    const stat=await fs.lstat(file).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+    if(stat&&(stat.isSymbolicLink()||stat.nlink!==1))throw new UserError('Profile shell là liên kết do công cụ dotfiles quản lý. PADSwitcher giữ nguyên tệp; hãy dùng Sao chép lệnh hoặc tự thêm dòng nạp padkaggle vào dotfiles.','KAGGLE_SHELL_LINK');
+  }
+  async status(){const profiles=[];for(const file of await this.paths()){const bytes=await this.read(file),text=bytes?decode(bytes).text:'',block=profileBlock(text);profiles.push({path:file,configured:!!block&&text.slice(block.start,block.end).includes(this.line())});}return {scriptPath:this.script,line:this.line(),configured:profiles.every(p=>p.configured),profiles};}
   async configure(enabled) {
     if(typeof enabled!=='boolean')throw new UserError('Thiết lập terminal không hợp lệ.','KAGGLE_SHELL');
     await this.ensure();const plans=[],written=[];
@@ -36,7 +62,7 @@ class UnixKaggleShell {
       if(before&&(before.includes(0)||document.text.charCodeAt(0)===0xfeff))throw new UserError('Profile shell cần dùng UTF-8. Giữ nguyên tệp hiện tại.','KAGGLE_SHELL');
       const text=document.text,block=profileBlock(text),replacement=enabled?`${START}\n${this.line()}\n${END}\n`:'';
       const next=block?text.slice(0,block.start)+replacement+text.slice(block.end):text+(enabled?(text&&!text.endsWith('\n')?'\n':'')+replacement:'');
-      if(next!==text)plans.push({file,before,after:document.encode(next)});
+      if(next!==text){await this.assertWritable(file);plans.push({file,before,after:document.encode(next)});}
     }
     try {
       for(const plan of plans){await fs.mkdir(path.dirname(plan.file),{recursive:true});await assertDirectory(path.dirname(plan.file));const latest=await this.read(plan.file);if(!((!latest&&!plan.before)||(latest&&plan.before&&latest.equals(plan.before))))throw new UserError('Profile shell vừa thay đổi. Hãy thử lại.','KAGGLE_SHELL');await atomicWrite(plan.file,plan.after);written.push(plan);}

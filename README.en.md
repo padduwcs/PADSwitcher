@@ -1,3 +1,5 @@
+<p align="center"><img src="src/assets/padswitcher-emblem.png" width="220" alt="PADSwitcher"></p>
+
 # PADSwitcher Unix
 
 **Profile Account Directory Switcher — an isolated Linux and macOS edition.**
@@ -7,7 +9,7 @@ This is the `feature/cross-platform` branch. The stable Windows edition remains
 on [`main`](https://github.com/padduwcs/PADSwitcher/tree/main). The Unix worktree,
 app identity, data, default Codex home, build output and release channel are separate.
 
-**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)**
+**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)**
 · [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md).
 
 Download a deb (recommended on Ubuntu/Debian), AppImage (compatible Linux desktops)

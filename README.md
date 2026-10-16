@@ -1,4 +1,4 @@
-<p align="center"><img src="src/assets/padswitcher-emblem.png" width="100" alt="PADSwitcher"></p>
+<p align="center"><img src="src/assets/padswitcher-emblem.png" width="220" alt="PADSwitcher"></p>
 
 # PADSwitcher Unix
 
@@ -9,7 +9,7 @@ Nhánh này là `feature/cross-platform`. Bản Windows ổn định tiếp tụ
 [`main`](https://github.com/padduwcs/PADSwitcher/tree/main), với mã nguồn, dữ liệu
 và quy trình phát hành riêng. Worktree Unix không thay đổi thư mục Windows đang dùng.
 
-[Tải Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1) ·
+[Tải Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2) ·
 [Cài đặt và dùng lần đầu](docs/UNIX-INSTALL.md) · [English](README.en.md) ·
 [Hướng dẫn Unix/WSL](docs/UNIX.md) ·
 [Phạm vi kiểm chứng](docs/UNIX-VALIDATION.md) ·
@@ -17,7 +17,7 @@ và quy trình phát hành riêng. Worktree Unix không thay đổi thư mục W
 
 ## Tải và cài đặt
 
-Mở [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1),
+Mở [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2),
 chọn `.deb` cho Ubuntu/Debian, `.AppImage` cho Linux tương thích hoặc `.dmg` cho Mac.
 Có đủ Linux x64/ARM64 và Mac Intel/Apple Silicon. Bảng chọn file, hướng dẫn
 Keychain/GNOME Keyring, cập nhật và xử lý lỗi nằm trong

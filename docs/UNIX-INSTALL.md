@@ -1,7 +1,7 @@
 # Cài đặt PADSwitcher Unix
 
 [English](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md)
-· [Tải bản Unix 1.19.1-unix.1](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)
+· [Tải bản Unix 1.19.1-unix.2](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
 · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix quản lý tài khoản Codex/Kaggle trên Linux và macOS.
@@ -15,12 +15,12 @@ không cần Node.js hoặc Go để mở app.
 
 | Máy của bạn | File tải về |
 | --- | --- |
-| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.1-Linux-amd64.deb` (ưu tiên) |
-| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.1-Linux-arm64.deb` (ưu tiên) |
-| Linux Intel/AMD, muốn dùng AppImage | `PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage` |
-| Linux ARM64, muốn dùng AppImage | `PADSwitcher-1.19.1-unix.1-Linux-arm64.AppImage` |
-| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.1-macOS-arm64.dmg` |
-| Mac Intel | `PADSwitcher-1.19.1-unix.1-macOS-x64.dmg` |
+| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.2-Linux-amd64.deb` (ưu tiên) |
+| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.2-Linux-arm64.deb` (ưu tiên) |
+| Linux khác, Intel/AMD (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage` |
+| Linux khác, ARM64 (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-arm64.AppImage` |
+| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg` |
+| Mac Intel | `PADSwitcher-1.19.1-unix.2-macOS-x64.dmg` |
 
 File `.zip` cho Mac là lựa chọn thay thế cho `.dmg`, cùng kiến trúc.
 Trên Linux, `uname -m` cho biết `x86_64` (Intel/AMD) hoặc `aarch64` (ARM64).
@@ -29,7 +29,11 @@ Trên Mac, xem Apple menu → About This Mac: **Chip** là Apple Silicon,
 
 Các môi trường đã được tự động kiểm tra là Ubuntu 24.04 x64/ARM64 và
 macOS 15 Intel/Apple Silicon. Các bản Linux/macOS khác chưa được chứng nhận.
-Linux cần phiên desktop có Secret Service, chẳng hạn GNOME Keyring đã mở khóa.
+Linux cần phiên desktop có Secret Service, chẳng hạn GNOME Keyring đã mở khóa,
+và một ứng dụng terminal để mở CLI/Kaggle: GNOME Terminal, Ptyxis, GNOME Console,
+Konsole, Xfce Terminal, MATE Terminal, Terminator, kitty, Alacritty, WezTerm, foot
+hoặc xterm. Muốn ưu tiên terminal khác, đặt biến `TERMINAL` bằng tên lệnh của nó
+(terminal đó phải hỗ trợ `-e <chương trình>`).
 WSL là môi trường thử từ Windows, xem [hướng dẫn WSL](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX.md).
 
 ## 2. Cài ứng dụng
@@ -39,7 +43,7 @@ WSL là môi trường thử từ Windows, xem [hướng dẫn WSL](https://gith
 Mở terminal tại thư mục chứa file tải về. Ví dụ cho Intel/AMD:
 
 ```bash
-sudo apt install ./PADSwitcher-1.19.1-unix.1-Linux-amd64.deb
+sudo apt install ./PADSwitcher-1.19.1-unix.2-Linux-amd64.deb
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.deb`.
@@ -54,8 +58,8 @@ Kaggle cần thêm `python3` phiên bản 3.11+ và `python3-venv`.
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.AppImage`.
@@ -64,8 +68,9 @@ Gói này dùng FUSE 2; Ubuntu 24.04 dùng package `libfuse2t64` nếu báo thi�
 `libfuse.so.2` ([tài liệu AppImage](https://docs.appimage.org/user-guide/troubleshooting/fuse.html)).
 
 AppImage cần hệ thống cho phép unprivileged user namespaces để chạy Chromium
-sandbox. Nếu gặp lỗi sandbox trên Ubuntu 24.04+, hãy dùng gói `.deb`;
-gói này có bước cấu hình sandbox/AppArmor lúc cài đặt. Trên bản phân phối khác,
+sandbox. **Ubuntu 24.04 trở lên chặn tính năng này theo mặc định nên AppImage
+không mở được; hãy dùng gói `.deb`**, gói này có bước cấu hình sandbox/AppArmor
+lúc cài đặt. Trên bản phân phối khác,
 nhờ quản trị viên kiểm tra chính sách của desktop. Không chạy ứng dụng bằng
 `sudo`, không thêm `--no-sandbox` và không tắt AppArmor toàn hệ thống.
 Xem [giải thích của AppImage](https://docs.appimage.org/user-guide/troubleshooting/electron-sandboxing.html).
@@ -79,9 +84,14 @@ Xem [giải thích của AppImage](https://docs.appimage.org/user-guide/troubles
    nguồn tải, vào **System Settings → Privacy & Security → Open Anyway** sau
    lần mở bị chặn. Làm theo [hướng dẫn chính thức của Apple](https://support.apple.com/en-us/102445).
    Máy do tổ chức quản lý có thể không cho phép bước này.
-4. Cho phép ứng dụng dùng Keychain khi hệ thống hỏi để lưu khóa mã hóa tài khoản.
-   Khi mở CLI, macOS có thể hỏi quyền điều khiển Terminal; chấp thuận nếu bạn
-   muốn dùng chức năng đó.
+4. Khóa mã hóa tài khoản được lưu trong login Keychain. Nếu Keychain đang khóa,
+   macOS sẽ hỏi mở khóa. Giống các ứng dụng desktop khác, lớp bảo vệ này ở mức
+   tài khoản người dùng macOS: chương trình chạy dưới tài khoản của bạn có thể
+   dùng cùng mục Keychain, vì vậy chỉ chạy phần mềm bạn tin tưởng.
+5. Lần đầu mở CLI hoặc terminal Kaggle, macOS hỏi PADSwitcher Unix có được điều
+   khiển **Terminal** không. Chọn **Allow** trong vòng hai phút. Nếu đã chọn
+   Don't Allow, bật lại trong **System Settings → Privacy & Security →
+   Automation** rồi thử lại.
 
 Với `.zip`, giải nén rồi chuyển ứng dụng `.app` vào Applications trước khi mở.
 Giữ nguyên tên và nội dung của bundle. Không cần tắt Gatekeeper toàn hệ thống.
@@ -93,7 +103,9 @@ Giữ nguyên tên và nội dung của bundle. Không cần tắt Gatekeeper to
    [hướng dẫn từ OpenAI](https://github.com/openai/codex#installing-and-running-codex-cli)
    cho Linux/macOS hoặc extension
    Codex trong VS Code. Giao thức đã được kiểm tra với Codex `0.160.0`.
-   Nếu app chưa tự tìm thấy, vào **Cài đặt Codex → Cấu hình Codex nâng cao →
+   App tự tìm trong PATH, Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`),
+   `~/.local/bin`, thư mục npm global (kể cả nvm) và extension
+   VS Code/Cursor/Windsurf. Nếu app chưa tự tìm thấy, vào **Cài đặt Codex → Cấu hình Codex nâng cao →
    Codex CLI → Chọn**, chọn binary native `codex` có quyền thực thi.
    File wrapper JavaScript hoặc executable Windows `.exe` không phù hợp.
 3. Chọn **Thêm tài khoản**, hoàn tất đăng nhập trong trình duyệt, sau đó chọn
@@ -104,6 +116,12 @@ Giữ nguyên tên và nội dung của bundle. Không cần tắt Gatekeeper to
 5. **Kaggle (tùy nhu cầu):** mở phần Kaggle, thiết lập Python 3.11+ và cài SDK
    theo nút hướng dẫn trong app, sau đó thêm API token Kaggle của bạn.
    Môi trường Python do app quản lý nằm riêng trong dữ liệu Unix.
+   Bật `padkaggle` chỉ thêm một dòng vào tệp khởi động mà shell của bạn thực sự
+   đọc (`~/.bashrc`, `~/.zshrc`, và `~/.bash_profile` trên Mac nếu đã có).
+   Profile do công cụ dotfiles quản lý dạng liên kết sẽ không bị thay thế; hộp
+   thoại hiển thị dòng để bạn tự thêm.
+6. **Thư mục mở CLI:** phiên CLI mở ở thư mục người dùng (home). Đổi trong
+   **Cài đặt Codex → Không gian làm việc** sang dự án bạn muốn Codex làm việc.
 
 Giữ PADSwitcher mở khi dùng kết nối Codex. Nút đóng cửa sổ có thể thu app xuống
 khay; dùng **Quit/Thoát PADSwitcher** trong menu khay để thoát hẳn.
@@ -115,10 +133,10 @@ Tải file `.sha256` có cùng tên với bộ cài và đặt cạnh bộ cài.
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.1-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.2-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.1-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg.sha256
 ```
 
 Chỉ tiếp tục khi kết quả là `OK`. Release cũng có `SHA256SUMS.txt` tổng hợp.
@@ -151,10 +169,11 @@ dữ liệu tài khoản hoặc khóa trong keyring.
 | Triệu chứng | Cách xử lý |
 | --- | --- |
 | Không mở được kho khóa | Mở khóa login Keychain/GNOME Keyring; chạy app trong phiên desktop của chính bạn. KDE cần có Secret Service tương thích. |
-| Không tìm thấy Codex | Cài bản native đúng kiến trúc; chọn đường dẫn binary trong Cài đặt Codex. App mở từ menu có thể có PATH khác terminal. |
+| Không tìm thấy Codex | Cài bản native đúng kiến trúc. Nếu Codex ở thư mục khác thường, chọn binary trong Cài đặt Codex (chạy `command -v codex` trong terminal để xem vị trí). |
+| Không mở được terminal CLI/Kaggle | Cài một terminal trong danh sách ở mục 1 hoặc đặt biến `TERMINAL`, rồi mở lại PADSwitcher. Trên Mac, cho phép điều khiển Terminal trong Privacy & Security → Automation. |
 | VS Code/JetBrains chưa kết nối | Thực hiện thiết lập trong trang Kết nối; lưu công việc và reload IDE theo hướng dẫn. |
 | Python/SDK Kaggle chưa sẵn sàng | Cài Python 3.11+ và venv; chạy bước cài SDK trong app rồi kiểm tra lại. |
-| AppImage báo lỗi sandbox/FUSE | Ưu tiên `.deb` trên Ubuntu; xem hướng dẫn AppImage ở trên. |
+| AppImage báo lỗi sandbox/FUSE | Trên Ubuntu dùng `.deb`; distro khác xem hướng dẫn AppImage ở trên. |
 | Mac chặn lần mở đầu | Kiểm tra đúng nguồn tải, làm theo hướng dẫn Open Anyway ở trên. |
 
 [Báo lỗi tại GitHub Issues](https://github.com/padduwcs/PADSwitcher/issues):

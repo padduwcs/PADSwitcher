@@ -121,7 +121,7 @@ async function start() {
         }
         case 'launchGateway': {
           if(gateway.status!=='ready')throw new UserError('Bật gateway trước.', 'GATEWAY_STOPPED');
-          if(unix){const child=service.platform.terminal(gateway.helper,[],{cwd:service.state.settings.workspace});await new Promise((r,j)=>{child.once('spawn',r);child.once('error',j);});child.unref();break;}
+          if(unix){await service.platform.checkTerminal();const child=service.platform.terminal(gateway.helper,[],{cwd:service.state.settings.workspace});await new Promise((r,j)=>{child.once('spawn',r);child.once('error',j);});child.unref();break;}
           const {spawn}=require('node:child_process');
           const script='Set-Location -LiteralPath $env:PADSWITCHER_WORKSPACE; & $env:PADSWITCHER_HELPER';
           const env={...process.env,PADSWITCHER_HELPER:gateway.helper,PADSWITCHER_WORKSPACE:service.state.settings.workspace};

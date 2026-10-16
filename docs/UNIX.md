@@ -4,7 +4,7 @@ Nhánh `feature/cross-platform` là bản Unix độc lập trong cùng reposito
 `main` tiếp tục là bản Windows ổn định. Không merge nhánh Unix vào `main`
 và không dùng tag `v*` cho bản Unix.
 
-Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)
+Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
 và làm theo [hướng dẫn cài đặt](UNIX-INSTALL.md) ([English](UNIX-INSTALL.en.md)).
 Các phần bên dưới dành cho phát triển, kiểm thử và vận hành release.
 
@@ -128,7 +128,7 @@ vẫn luôn được thêm vào bên trong.
 
 ## GitHub và phát hành
 
-`unix-ci.yml` chạy trên push/PR vào `feature/cross-platform`: unit test Windows và
+`unix-ci.yml` chạy trên push/PR vào `feature/cross-platform`: unit test lõi dùng chung trên Windows và
 build/test Linux x64, Linux arm64, macOS Intel, macOS Apple Silicon.
 Artifact tải được trong Actions sau khi job tương ứng thành công.
 
@@ -139,13 +139,13 @@ GitHub có thể bỏ qua cả workflow push tag khi commit mang nhãn này. V�
 tài liệu có `[skip ci]` ở đầu nhánh, hãy chỉ định SHA của commit đã qua CI khi tạo tag.
 
 ```bash
-git tag unix-v1.19.1-unix.1
-git push origin unix-v1.19.1-unix.1
+git tag unix-v1.19.1-unix.2
+git push origin unix-v1.19.1-unix.2
 ```
 
 `unix-release.yml` kiểm tra tag khớp package version và commit thuộc nhánh Unix,
 build các kiến trúc rồi tạo **Pre-release**, đặt `latest=false`.
-Quy trình chạy cả Windows regression, cài thử deb và mở app được sao chép từ DMG.
+Quy trình chạy cả unit test lõi dùng chung trên Windows, cài thử deb, mở app sao chép từ DMG và kiểm chữ ký bản ZIP.
 AppImage giữ Chromium sandbox, không tự thêm `--no-sandbox`.
 Trước khi công khai, script xác nhận đủ tám bộ cài và checksum, thêm hướng dẫn
 Việt/Anh cùng SHA256SUMS, tải lên draft, đối chiếu tên/kích thước/digest SHA-256
