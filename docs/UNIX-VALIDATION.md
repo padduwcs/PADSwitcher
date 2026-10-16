@@ -97,3 +97,24 @@ must be present. Every uploaded asset's name, size, uploaded state and SHA-256
 digest is compared with the verified local file. The release remains a prerelease
 and explicitly uses `latest=false`. See the tag's **Publish Unix prerelease**
 Actions run for the release-specific results.
+
+## Published public preview — 2026-10-16
+
+[Unix 1.19.1-unix.1](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)
+was published from commit `9183431edb19b59dd9bfa096265f22550cf9b9a3`.
+All six jobs in [release run 38885833956](https://github.com/padduwcs/PADSwitcher/actions/runs/38885833956)
+passed, including the final draft-asset integrity check and publication. All five
+jobs in [CI run 38885826092](https://github.com/padduwcs/PADSwitcher/actions/runs/38885826092)
+also passed for that same commit. Draft metadata is read through its canonical
+release API URL, since the tag-based REST endpoint does not expose drafts.
+
+Post-publication checks downloaded all 19 assets back into the Unix worktree and
+compared every file's size and SHA-256 digest with GitHub's release metadata.
+Anonymous HTTP requests reached the public release page and all eight installer
+links, and downloaded the Vietnamese guide with a matching digest. No GitHub
+sign-in is required to obtain these release files.
+
+The release is public, marked prerelease, and is not Latest. The existing Windows
+release `v1.19.1` retains Latest; its original asset IDs, sizes, digests and update
+times are unchanged. Local and remote Windows `main` still point to the baseline
+`5444e11e577753181604f06572cd75cb092bbeef`, and its worktree remains clean.
