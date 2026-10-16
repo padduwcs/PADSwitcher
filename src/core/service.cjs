@@ -305,7 +305,8 @@ class ProfileService extends EventEmitter {
       } finally {
         try { await rpc?.close(); } finally {
           if (path.dirname(home) !== this.root || !path.basename(home).startsWith('reset-rpc-')) throw new Error('Unsafe reset cleanup');
-          await fs.rm(home,{recursive:true,force:true});
+          // Windows can keep a stopped backend's folder locked briefly (EBUSY/EPERM).
+          await fs.rm(home,{recursive:true,force:true,maxRetries:10,retryDelay:100});
         }
       }
     }); } finally { bundle.accessToken = null; }
