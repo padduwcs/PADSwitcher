@@ -205,6 +205,16 @@ func loadConnection() (connection, string, error) {
 	var c connection
 	file := os.Getenv("PADSWITCHER_CONNECTION_FILE")
 	if file == "" {
+		if executable, err := os.Executable(); err == nil {
+			candidate := filepath.Join(filepath.Dir(executable), "connection.json")
+			if _, err = os.Lstat(candidate); err == nil {
+				file = candidate
+			} else if !os.IsNotExist(err) {
+				return c, "", err
+			}
+		}
+	}
+	if file == "" {
 		root, err := os.UserConfigDir()
 		if err != nil {
 			return c, "", err

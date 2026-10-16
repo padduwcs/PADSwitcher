@@ -33,7 +33,8 @@ func validateSpec(s terminalSpec) error {
 	}
 	return nil
 }
-func shellQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
+func terminalTempDir() (string, error) { return os.MkdirTemp("/tmp", "padswitcher-terminal-") }
+func shellQuote(value string) string   { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
 func terminalCommand(helper, descriptor string) (string, []string, error) {
 	if runtime.GOOS == "darwin" {
 		// argv carries the shell command as data; paths never enter AppleScript code.
@@ -64,7 +65,9 @@ func launchTerminal() error {
 	if err = validateSpec(spec); err != nil {
 		return err
 	}
-	dir, err := os.MkdirTemp("", "padswitcher-terminal-")
+	// macOS TMPDIR commonly exceeds the Unix socket path limit once a socket
+	// filename is appended. A private directory under /tmp stays short on both OSes.
+	dir, err := terminalTempDir()
 	if err != nil {
 		return err
 	}

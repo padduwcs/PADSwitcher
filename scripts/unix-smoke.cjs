@@ -21,7 +21,7 @@ const {auth}=require('../test/helpers.cjs');
     assert.equal(await fs.stat(path.join(home,'auth.json')).then(()=>true,()=>false),false);assert.deepEqual(await service.loadAuth(profile.id),fixture);
     console.log('Independent native session guardian: passed.');
     const tools=path.join(root,'tools');await fs.mkdir(tools,{mode:0o700});await fs.writeFile(path.join(tools,'kaggle'),'#!/bin/sh\nexit 0\n',{mode:0o700});
-    const python=await platform.run('/usr/bin/python3',['-c','import sys; print(sys.executable)']);
+    const python=await platform.run('python3',['-c','import sys; print(sys.executable)']);
     const kaggle=new KaggleService(root,{bridge:async(_python,payload)=>payload.action==='probe'?{ok:true,supported:true,executable:python,scriptsPath:tools}:{ok:true,username:payload.token.endsWith('account-b')?'account-b':'account-a'}});await kaggle.init();
     for(const name of ['account-a','account-b'])await kaggle.add({token:'KGAT_fixture-only-'+name,label:name,workspace:root});
     await fs.writeFile(path.join(kaggle.shell.folder,'kaggle-reader.py'),'import json, os\nassert not os.environ.get("KAGGLE_API_TOKEN")\nassert not os.environ.get("PYTHONPATH")\nprint('+JSON.stringify(JSON.stringify({ok:true,supported:true,executable:python,scriptsPath:tools}))+')\n',{mode:0o600});

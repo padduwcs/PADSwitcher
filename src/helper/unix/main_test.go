@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/zalando/go-keyring"
@@ -154,4 +156,19 @@ func TestRestorePathKeepsLaterAdditions(t *testing.T) {
 	if got := restorePath("/tools:/usr/bin:/custom", "/usr/bin:/tools", "/tools"); got != "/usr/bin:/tools:/custom" {
 		t.Fatal(got)
 	}
+}
+func TestTerminalSocketWorksWithLongSystemTempPath(t *testing.T) {
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), strings.Repeat("long-system-temp-", 8)))
+	dir, err := terminalTempDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(dir)
+	socket := filepath.Join(dir, "session.sock")
+	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: socket, Net: "unix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener.Close()
+	os.Remove(socket)
 }

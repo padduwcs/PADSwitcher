@@ -43,7 +43,8 @@ test('native helper bridges authenticated JSON lines without using proxy environ
   let request;
   server.on('connection',(socket,req)=>{assert.equal(req.headers.authorization,'Bearer '+token);assert.equal(req.headers.origin,undefined);socket.on('message',line=>{request=JSON.parse(line);socket.send(JSON.stringify({id:request.id,result:{fixture:true}}));socket.close(1000);});});
   const connection=path.join(root,'connection.json');await fs.writeFile(connection,JSON.stringify({version:1,url:`ws://127.0.0.1:${server.address().port}`,tokenFile:path.join(root,'client-capability'),executable:'/bin/true',home:root}),{mode:0o600});
-  const child=spawn(helper,['app-server'],{env:{...process.env,PADSWITCHER_CONNECTION_FILE:connection,PADSWITCHER_CLIENT_KIND:'jetbrains',HTTP_PROXY:'http://127.0.0.1:1'},stdio:['pipe','pipe','pipe']});t.after(()=>child.kill('SIGKILL'));
+  const copied=path.join(root,'PADCodex');await fs.copyFile(helper,copied);await fs.chmod(copied,0o700);
+  const child=spawn(copied,['app-server'],{env:{...process.env,PADSWITCHER_CONNECTION_FILE:'',PADSWITCHER_CLIENT_KIND:'jetbrains',HTTP_PROXY:'http://127.0.0.1:1'},stdio:['pipe','pipe','pipe']});t.after(()=>child.kill('SIGKILL'));
   let output='',diagnostics='';child.stdout.on('data',b=>output+=b);child.stderr.on('data',b=>diagnostics+=b);const close=new Promise(r=>child.once('close',r));child.stdin.on('error',()=>{});child.stdin.write(JSON.stringify({id:1,method:'initialize',params:{clientInfo:{name:'fixture'}}})+'\n');
   assert.equal(await close,0);assert.equal(JSON.parse(output).result.fixture,true);assert.equal(request.params._padswitcherClient,'jetbrains');assert(!diagnostics.includes(token));
 });
