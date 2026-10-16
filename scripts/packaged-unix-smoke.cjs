@@ -1,10 +1,22 @@
 'use strict';
-const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),net=require('node:net'),assert=require('node:assert/strict'),{spawn}=require('node:child_process'),{WebSocket}=require('ws');
+const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),net=require('node:net'),assert=require('node:assert/strict'),{spawn,spawnSync}=require('node:child_process'),{WebSocket}=require('ws');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{
   const output=path.resolve(__dirname,'../dist-unix'),dirs=(await fs.readdir(output,{withFileTypes:true})).filter(d=>d.isDirectory()).map(d=>path.join(output,d.name));
   let asar,binary;
-  for(const dir of dirs){const candidate=process.platform==='darwin'?path.join(dir,'PADSwitcher Unix.app','Contents','Resources','app.asar'):path.join(dir,'resources','app.asar');if(await fs.stat(candidate).then(s=>s.isFile(),()=>false)){asar=candidate;binary=process.platform==='darwin'?path.join(dir,'PADSwitcher Unix.app','Contents','MacOS','PADSwitcher Unix'):path.join(dir,'padswitcher-unix');break;}}
+  for(const dir of dirs){
+    if(process.platform==='darwin'){
+      for(const entry of await fs.readdir(dir,{withFileTypes:true})){
+        if(!entry.isDirectory()||!entry.name.endsWith('.app'))continue;
+        const app=path.join(dir,entry.name),candidate=path.join(app,'Contents','Resources','app.asar');
+        if(!await fs.stat(candidate).then(s=>s.isFile(),()=>false))continue;
+        const plist=spawnSync('/usr/bin/plutil',['-extract','CFBundleExecutable','raw','-o','-',path.join(app,'Contents','Info.plist')],{encoding:'utf8'});
+        if(plist.status!==0)throw Error('Could not read packaged CFBundleExecutable');
+        asar=candidate;binary=path.join(app,'Contents','MacOS',plist.stdout.trim());break;
+      }
+    }else{const candidate=path.join(dir,'resources','app.asar');if(await fs.stat(candidate).then(s=>s.isFile(),()=>false)){asar=candidate;binary=path.join(dir,'padswitcher-unix');}}
+    if(asar)break;
+  }
   if(!asar)throw Error('Packaged application was not found. Run npm run dist first.');
   for(const file of ['src/assets/PADCodex','src/core/padkaggle.sh','src/core/kaggle-reader.py']){const stat=await fs.stat(path.join(asar+'.unpacked',file));assert(stat.isFile());if(file.endsWith('/PADCodex'))assert(stat.mode&0o111,'Packaged helper is not executable');}
   const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-packaged-')));await fs.chmod(root,0o700);
