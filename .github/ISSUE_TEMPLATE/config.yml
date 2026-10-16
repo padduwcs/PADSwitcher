@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/padduwcs/PADSwitcher/security/advisories/new
     about: Report vulnerabilities privately; do not post exploit or credential details in an issue.
   - name: Usage guides
-    url: https://github.com/padduwcs/PADSwitcher#bắt-đầu-trong-3-phút
+    url: https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md
     about: Read the setup, Codex, and Kaggle guides before opening an issue.

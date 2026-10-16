@@ -9,18 +9,27 @@ Nhánh này là `feature/cross-platform`. Bản Windows ổn định tiếp tụ
 [`main`](https://github.com/padduwcs/PADSwitcher/tree/main), với mã nguồn, dữ liệu
 và quy trình phát hành riêng. Worktree Unix không thay đổi thư mục Windows đang dùng.
 
-[English](README.en.md) · [Hướng dẫn Unix/WSL](docs/UNIX.md) ·
+[Tải Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1) ·
+[Cài đặt và dùng lần đầu](docs/UNIX-INSTALL.md) · [English](README.en.md) ·
+[Hướng dẫn Unix/WSL](docs/UNIX.md) ·
 [Phạm vi kiểm chứng](docs/UNIX-VALIDATION.md) ·
 [Build trên GitHub Actions](https://github.com/padduwcs/PADSwitcher/actions/workflows/unix-ci.yml?query=branch%3Afeature%2Fcross-platform)
 
-## Dùng thử
+## Tải và cài đặt
+
+Mở [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1),
+chọn `.deb` cho Ubuntu/Debian, `.AppImage` cho Linux tương thích hoặc `.dmg` cho Mac.
+Có đủ Linux x64/ARM64 và Mac Intel/Apple Silicon. Bảng chọn file, hướng dẫn
+Keychain/GNOME Keyring, cập nhật và xử lý lỗi nằm trong
+[hướng dẫn cài đặt tiếng Việt](docs/UNIX-INSTALL.md) và [English](docs/UNIX-INSTALL.en.md).
+Đây là **Pre-release** công khai; xem phạm vi kiểm chứng trước khi sử dụng.
 
 Linux cần desktop có Secret Service/GNOME Keyring đã mở khóa; macOS dùng Keychain.
 Codex CLI native tương thích được cài riêng. Kaggle cần Python 3.11+ và các SDK
 theo thiết lập trong app. Các gói đã build không cần Node.js hoặc Go.
 
-Artifact build có trong Actions: `.AppImage`/`.deb` cho Linux và `.dmg`/`.zip`
-cho macOS, với SHA-256 đi kèm. Bản Unix dùng tag `unix-v…`, được phát hành dưới
+Release có bộ cài, hướng dẫn Việt/Anh và SHA-256. Các build phát triển vẫn có
+trong Actions. Bản Unix dùng tag `unix-v…`, được phát hành dưới
 dạng **Pre-release** và không thay thế bản Windows ở đường dẫn tải Latest.
 Bản Mac preview ký ad-hoc, chưa có Developer ID/notarization.
 

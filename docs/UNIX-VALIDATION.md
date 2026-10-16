@@ -62,7 +62,34 @@ The Linux preview targets desktops exposing Secret Service. KDE setups without
 that interface and headless environments without an unlocked keyring are not
 claimed as supported. The app fails closed when the keyring is unavailable.
 
-At final verification, both local and remote Windows `main` still pointed to
+At the end of the initial port, both local and remote Windows `main` still pointed to
 `5444e11e577753181604f06572cd75cb092bbeef`, the Windows worktree was clean, and
 the repository's latest stable release was still `v1.19.1`. No merge, Unix tag
-or release publication was performed during this implementation.
+or release publication was performed during that initial implementation.
+
+## Public preview release checks
+
+The release-readiness update adds five tests for complete architecture coverage,
+corrupt downloads, accidental Windows assets, tag/version isolation and GitHub's
+uploaded-asset SHA-256 digests. The local Windows suite now has 212 tests:
+206 passed and six platform-dependent tests were skipped.
+
+Both Unix CI and the tag release workflow install the generated deb on disposable
+Linux runners and launch that installed executable. They also extract the actual
+AppImage and check its helper layout and desktop launcher. On macOS they mount
+the generated DMG read-only, copy its app into a temporary Applications folder,
+verify the ad-hoc signature and launch the copied bundle. These checks do not
+simulate a quarantined browser download or grant Gatekeeper/Terminal permissions.
+
+The AppImage launcher explicitly has no automatic `--no-sandbox` flag. It is
+supported on desktops permitting the required user namespaces; Ubuntu users
+should prefer the deb, which supplies the install-time sandbox/AppArmor setup.
+The source/unpacked and installed application smoke tests preserve sandboxing.
+
+Release publication waits for the Windows regression job and all four native
+Unix builds. Before a draft is made public, all eight installers, their eight
+individual checksums, two installation guides and one combined checksum catalog
+must be present. Every uploaded asset's name, size, uploaded state and SHA-256
+digest is compared with the verified local file. The release remains a prerelease
+and explicitly uses `latest=false`. See the tag's **Publish Unix prerelease**
+Actions run for the release-specific results.

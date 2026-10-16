@@ -4,6 +4,10 @@ Nhánh `feature/cross-platform` là bản Unix độc lập trong cùng reposito
 `main` tiếp tục là bản Windows ổn định. Không merge nhánh Unix vào `main`
 và không dùng tag `v*` cho bản Unix.
 
+Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)
+và làm theo [hướng dẫn cài đặt](UNIX-INSTALL.md) ([English](UNIX-INSTALL.en.md)).
+Các phần bên dưới dành cho phát triển, kiểm thử và vận hành release.
+
 ## Ranh giới với bản Windows
 
 | Thành phần | Windows ổn định | Bản Unix |
@@ -137,6 +141,12 @@ git push origin unix-v1.19.1-unix.1
 
 `unix-release.yml` kiểm tra tag khớp package version và commit thuộc nhánh Unix,
 build các kiến trúc rồi tạo **Pre-release**, đặt `latest=false`.
+Quy trình chạy cả Windows regression, cài thử deb và mở app được sao chép từ DMG.
+AppImage giữ Chromium sandbox, không tự thêm `--no-sandbox`.
+Trước khi công khai, script xác nhận đủ tám bộ cài và checksum, thêm hướng dẫn
+Việt/Anh cùng SHA256SUMS, tải lên draft, đối chiếu tên/kích thước/digest SHA-256
+do GitHub trả về cho toàn bộ 19 asset rồi mới bỏ trạng thái draft.
+Rerun có thể tiếp tục draft; không ghi đè release đã công khai.
 Nó không tải artifact lên release Windows. Quy trình Windows trên `main` giữ nguyên.
 
 Giới hạn kiểm chứng và kết quả thực tế được ghi tại [UNIX-VALIDATION.md](UNIX-VALIDATION.md).

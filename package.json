@@ -37,6 +37,8 @@
     "smoke": "node scripts/unix-smoke.cjs",
     "smoke:ui": "node scripts/run-electron.cjs scripts/unix-electron-smoke.cjs",
     "smoke:packaged": "node scripts/packaged-unix-smoke.cjs",
+    "smoke:installed": "node scripts/installed-unix-smoke.cjs",
+    "release:prepare": "node scripts/prepare-unix-release.cjs",
     "test:helper": "node scripts/test-helper.cjs",
     "test:kaggle": "node scripts/kaggle-contract.cjs",
     "helper": "node scripts/build-helper.cjs",
@@ -84,6 +86,9 @@
       "enableNodeCliInspectArguments": false,
       "onlyLoadAppFromAsar": true,
       "enableEmbeddedAsarIntegrityValidation": false
+    },
+    "appImage": {
+      "executableArgs": []
     },
     "linux": {
       "target": ["AppImage", "deb"],

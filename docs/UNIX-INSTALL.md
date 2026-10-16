@@ -1,0 +1,166 @@
+# Cài đặt PADSwitcher Unix
+
+[English](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md)
+· [Tải bản Unix 1.19.1-unix.1](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)
+· [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
+
+PADSwitcher Unix quản lý tài khoản Codex/Kaggle trên Linux và macOS.
+Đây là **bản thử nghiệm công khai (Pre-release)**. Bản Windows ổn định tiếp tục
+được phát hành riêng trong cùng repository và giữ nhãn Latest.
+Bạn cài ứng dụng từ mục **Assets** của release; không cần tải Source code,
+clone repo hoặc tự build. Ứng dụng đã chứa Electron và helper native;
+không cần Node.js hoặc Go để mở app.
+
+## 1. Chọn đúng file
+
+| Máy của bạn | File tải về |
+| --- | --- |
+| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.1-Linux-amd64.deb` (ưu tiên) |
+| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.1-Linux-arm64.deb` (ưu tiên) |
+| Linux Intel/AMD, muốn dùng AppImage | `PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage` |
+| Linux ARM64, muốn dùng AppImage | `PADSwitcher-1.19.1-unix.1-Linux-arm64.AppImage` |
+| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.1-macOS-arm64.dmg` |
+| Mac Intel | `PADSwitcher-1.19.1-unix.1-macOS-x64.dmg` |
+
+File `.zip` cho Mac là lựa chọn thay thế cho `.dmg`, cùng kiến trúc.
+Trên Linux, `uname -m` cho biết `x86_64` (Intel/AMD) hoặc `aarch64` (ARM64).
+Trên Mac, xem Apple menu → About This Mac: **Chip** là Apple Silicon,
+**Processor Intel** là Intel.
+
+Các môi trường đã được tự động kiểm tra là Ubuntu 24.04 x64/ARM64 và
+macOS 15 Intel/Apple Silicon. Các bản Linux/macOS khác chưa được chứng nhận.
+Linux cần phiên desktop có Secret Service, chẳng hạn GNOME Keyring đã mở khóa.
+WSL là môi trường thử từ Windows, xem [hướng dẫn WSL](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX.md).
+
+## 2. Cài ứng dụng
+
+### Ubuntu/Debian: dùng gói deb
+
+Mở terminal tại thư mục chứa file tải về. Ví dụ cho Intel/AMD:
+
+```bash
+sudo apt install ./PADSwitcher-1.19.1-unix.1-Linux-amd64.deb
+```
+
+Với ARM64, thay bằng tên file `Linux-arm64.deb`.
+Sau khi cài, tìm **PADSwitcher Unix** trong menu ứng dụng, hoặc chạy
+`padswitcher-unix` từ terminal bằng tài khoản người dùng bình thường.
+
+Trên Ubuntu/GNOME, kho khóa thường được mở khi đăng nhập desktop.
+Nếu máy chưa cài GNOME Keyring, cài `gnome-keyring`, đăng xuất và đăng nhập lại.
+Kaggle cần thêm `python3` phiên bản 3.11+ và `python3-venv`.
+Ứng dụng sẽ hướng dẫn cài các SDK trong môi trường Python riêng khi thiết lập Kaggle.
+
+### Linux: AppImage
+
+```bash
+chmod +x PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.1-Linux-x86_64.AppImage
+```
+
+Với ARM64, thay bằng tên file `Linux-arm64.AppImage`.
+AppImage vẫn lưu dữ liệu trong thư mục người dùng, không phải bên cạnh file tải về.
+Gói này dùng FUSE 2; Ubuntu 24.04 dùng package `libfuse2t64` nếu báo thiếu
+`libfuse.so.2` ([tài liệu AppImage](https://docs.appimage.org/user-guide/troubleshooting/fuse.html)).
+
+AppImage cần hệ thống cho phép unprivileged user namespaces để chạy Chromium
+sandbox. Nếu gặp lỗi sandbox trên Ubuntu 24.04+, hãy dùng gói `.deb`;
+gói này có bước cấu hình sandbox/AppArmor lúc cài đặt. Trên bản phân phối khác,
+nhờ quản trị viên kiểm tra chính sách của desktop. Không chạy ứng dụng bằng
+`sudo`, không thêm `--no-sandbox` và không tắt AppArmor toàn hệ thống.
+Xem [giải thích của AppImage](https://docs.appimage.org/user-guide/troubleshooting/electron-sandboxing.html).
+
+### macOS: dùng DMG
+
+1. Mở file `.dmg`, kéo ứng dụng `.app` vào **Applications**.
+2. Eject ổ đĩa DMG, mở ứng dụng vừa cài từ Applications.
+3. Bản này ký ad-hoc, **chưa có Developer ID/notarization của Apple**.
+   Nếu macOS chặn vì nhà phát triển chưa được xác minh, và bạn đã kiểm tra
+   nguồn tải, vào **System Settings → Privacy & Security → Open Anyway** sau
+   lần mở bị chặn. Làm theo [hướng dẫn chính thức của Apple](https://support.apple.com/en-us/102445).
+   Máy do tổ chức quản lý có thể không cho phép bước này.
+4. Cho phép ứng dụng dùng Keychain khi hệ thống hỏi để lưu khóa mã hóa tài khoản.
+   Khi mở CLI, macOS có thể hỏi quyền điều khiển Terminal; chấp thuận nếu bạn
+   muốn dùng chức năng đó.
+
+Với `.zip`, giải nén rồi chuyển ứng dụng `.app` vào Applications trước khi mở.
+Giữ nguyên tên và nội dung của bundle. Không cần tắt Gatekeeper toàn hệ thống.
+
+## 3. Thiết lập lần đầu
+
+1. Mở PADSwitcher Unix; có thể chọn tiếng Việt/English và giao diện sáng/tối.
+2. **Codex:** cài Codex CLI native tương thích cho Linux/macOS hoặc extension
+   Codex trong VS Code. Giao thức đã được kiểm tra với Codex `0.160.0`.
+   Nếu app chưa tự tìm thấy, vào **Cài đặt Codex → Cấu hình Codex nâng cao →
+   Codex CLI → Chọn**, chọn binary native `codex` có quyền thực thi.
+   File wrapper JavaScript hoặc executable Windows `.exe` không phù hợp.
+3. Chọn **Thêm tài khoản**, hoàn tất đăng nhập trong trình duyệt, sau đó chọn
+   tài khoản muốn dùng. App không yêu cầu bạn nhập mật khẩu OpenAI vào app.
+4. Vào **Kết nối**, làm theo hướng dẫn cho CLI hoặc IDE. Chỉ khi bạn chọn
+   thiết lập VS Code/JetBrains/shell, app mới sửa cấu hình kết nối tương ứng.
+   Các IDE phải chạy trong cùng môi trường Linux/macOS với app.
+5. **Kaggle (tùy nhu cầu):** mở phần Kaggle, thiết lập Python 3.11+ và cài SDK
+   theo nút hướng dẫn trong app, sau đó thêm API token Kaggle của bạn.
+   Môi trường Python do app quản lý nằm riêng trong dữ liệu Unix.
+
+Giữ PADSwitcher mở khi dùng kết nối Codex. Nút đóng cửa sổ có thể thu app xuống
+khay; dùng **Quit/Thoát PADSwitcher** trong menu khay để thoát hẳn.
+Nếu desktop không hiện khay hệ thống, có thể mở lại cửa sổ bằng cách chạy app lần nữa.
+
+## 4. Kiểm tra file tải về
+
+Tải file `.sha256` có cùng tên với bộ cài và đặt cạnh bộ cài. Ví dụ:
+
+```bash
+# Linux
+sha256sum -c PADSwitcher-1.19.1-unix.1-Linux-amd64.deb.sha256
+
+# macOS
+shasum -a 256 -c PADSwitcher-1.19.1-unix.1-macOS-arm64.dmg.sha256
+```
+
+Chỉ tiếp tục khi kết quả là `OK`. Release cũng có `SHA256SUMS.txt` tổng hợp.
+Checksum giúp phát hiện file tải thiếu hoặc hỏng; không thay thế notarization.
+
+## 5. Cập nhật, dữ liệu và gỡ cài đặt
+
+Chưa có tự cập nhật trong app hoặc kho APT. Để cập nhật, thoát app, tải bản
+**Unix** mới nhất từ Releases rồi cài đè `.deb`/`.app` hoặc thay file AppImage.
+Giữ nguyên tài khoản hệ điều hành và Keychain/Secret Service; dữ liệu nằm ở:
+
+| Hệ điều hành | Thư mục dữ liệu |
+| --- | --- |
+| Linux | `$XDG_CONFIG_HOME/PADSwitcher-Unix/data`, mặc định `~/.config/PADSwitcher-Unix/data` |
+| macOS | `~/Library/Application Support/PADSwitcher-Unix/data` |
+
+Kho tài khoản mã hóa gắn với khóa trong keyring của người dùng. Chép riêng thư
+mục dữ liệu sang máy khác không phải cách chuyển tài khoản được hỗ trợ.
+Đăng nhập/thêm lại tài khoản trên máy mới. Không chép kho DPAPI từ Windows.
+Thư mục Codex mặc định cũng nằm riêng bên trong dữ liệu Unix.
+
+Trước khi gỡ, dùng nút gỡ kết nối trong app cho những IDE/shell bạn đã thiết lập,
+đóng phiên Codex đang dùng qua PADSwitcher rồi thoát app.
+Gỡ `.deb` bằng `sudo apt remove padswitcher-unix`; với Mac chuyển app khỏi
+Applications; với AppImage xóa file chương trình. Thao tác gỡ không tự xóa
+dữ liệu tài khoản hoặc khóa trong keyring.
+
+## Khi gặp lỗi
+
+| Triệu chứng | Cách xử lý |
+| --- | --- |
+| Không mở được kho khóa | Mở khóa login Keychain/GNOME Keyring; chạy app trong phiên desktop của chính bạn. KDE cần có Secret Service tương thích. |
+| Không tìm thấy Codex | Cài bản native đúng kiến trúc; chọn đường dẫn binary trong Cài đặt Codex. App mở từ menu có thể có PATH khác terminal. |
+| VS Code/JetBrains chưa kết nối | Thực hiện thiết lập trong trang Kết nối; lưu công việc và reload IDE theo hướng dẫn. |
+| Python/SDK Kaggle chưa sẵn sàng | Cài Python 3.11+ và venv; chạy bước cài SDK trong app rồi kiểm tra lại. |
+| AppImage báo lỗi sandbox/FUSE | Ưu tiên `.deb` trên Ubuntu; xem hướng dẫn AppImage ở trên. |
+| Mac chặn lần mở đầu | Kiểm tra đúng nguồn tải, làm theo hướng dẫn Open Anyway ở trên. |
+
+[Báo lỗi tại GitHub Issues](https://github.com/padduwcs/PADSwitcher/issues):
+ghi rõ **Unix**, phiên bản app, hệ điều hành, kiến trúc, loại bộ cài và các bước
+tái hiện. Chỉ gửi lỗi/ảnh đã che thông tin riêng; không đính kèm auth.json,
+API token, thư mục dữ liệu hoặc kho keyring.
+
+Kiểm thử tự động bao gồm helper native, kho khóa hệ thống, shell, giao thức
+Codex, giao diện Electron và bộ cài. Đăng nhập trình duyệt bằng tài khoản thật,
+IDE thực tế và các biến thể desktop vẫn cần phản hồi kiểm thử thực tế.
+Xem [phạm vi kiểm chứng](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-VALIDATION.md).

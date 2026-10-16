@@ -8,6 +8,21 @@ concurrency:
   group: unix-release-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  windows-regression:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:kaggle
   build:
     strategy:
       fail-fast: false
@@ -26,6 +41,9 @@ jobs:
         with:
           go-version-file: src/helper/unix/go.mod
           cache-dependency-path: src/helper/unix/go.sum
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
       - name: Validate isolated tag and branch
         shell: bash
         run: |
@@ -34,11 +52,15 @@ jobs:
           git merge-base --is-ancestor HEAD origin/feature/cross-platform
       - name: Install Linux desktop dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y gnome-keyring dbus-x11 xvfb xterm libfuse2t64
+        run: sudo apt-get update -qq && sudo apt-get install -y gnome-keyring dbus-x11 xvfb xterm zsh libfuse2t64
       - run: npm ci
+      - run: npm install --global @openai/codex@0.160.0
       - run: npm run check
       - run: npm test
       - run: npm run test:helper
+      - run: npm run test:kaggle
+      - run: npm run smoke:protocol
+      - run: npm run smoke:say-hi
       - run: npm run dist
       - run: node scripts/checksums.cjs
       - name: Prepare packaged Linux Chromium sandbox
@@ -56,6 +78,17 @@ jobs:
           else
             npm run smoke:packaged
           fi
+      - name: Install deb on disposable runner
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y ./dist-unix/*.deb
+      - name: Verify installed application and installer layout
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a dbus-run-session -- sh scripts/linux-test-session.sh npm run smoke:installed
+          else
+            npm run smoke:installed
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: unix-release-${{ matrix.os }}
@@ -67,23 +100,43 @@ jobs:
             dist-unix/*.sha256
           if-no-files-found: error
   publish:
-    needs: build
+    needs: [windows-regression, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.1
       - uses: actions/download-artifact@v8
         with:
           pattern: unix-release-*
           path: release-assets
           merge-multiple: true
+      - name: Verify complete release and prepare bilingual instructions
+        run: npm run release:prepare
       - name: Publish separately from stable Windows releases
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --prerelease --latest=false \
-            --title "PADSwitcher Unix ${GITHUB_REF_NAME#unix-v}" \
-            --notes "Linux and macOS preview. Separate data and release channel from Windows. See docs/UNIX.md on feature/cross-platform for setup and validation limits." \
-            release-assets/*
+          # Keep partial uploads private. A rerun can resume a draft, but must
+          # never overwrite an already published release.
+          state=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq '.isDraft' 2>/dev/null || true)
+          if [ "$state" = false ]; then
+            echo 'Refusing to overwrite a published release.' >&2
+            exit 1
+          elif [ "$state" = true ]; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+            gh release edit "$GITHUB_REF_NAME" --prerelease --latest=false \
+              --title "PADSwitcher Unix ${GITHUB_REF_NAME#unix-v}" --notes-file unix-release-notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --prerelease --latest=false \
+              --title "PADSwitcher Unix ${GITHUB_REF_NAME#unix-v}" \
+              --notes-file unix-release-notes.md release-assets/*
+          fi
+          gh api "repos/$GH_REPO/releases/tags/$GITHUB_REF_NAME" > release-metadata.json
+          node scripts/prepare-unix-release.cjs --verify-metadata release-metadata.json
+          gh release edit "$GITHUB_REF_NAME" --draft=false --prerelease --latest=false

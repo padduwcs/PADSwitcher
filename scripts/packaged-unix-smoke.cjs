@@ -2,7 +2,8 @@
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),net=require('node:net'),assert=require('node:assert/strict'),{spawn,spawnSync}=require('node:child_process'),{WebSocket}=require('ws');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{
-  const output=path.resolve(__dirname,'../dist-unix'),dirs=(await fs.readdir(output,{withFileTypes:true})).filter(d=>d.isDirectory()).map(d=>path.join(output,d.name));
+  const output=process.env.PADSWITCHER_PACKAGED_DIR?path.resolve(process.env.PADSWITCHER_PACKAGED_DIR):path.resolve(__dirname,'../dist-unix');
+  const dirs=[output,...(await fs.readdir(output,{withFileTypes:true})).filter(d=>d.isDirectory()).map(d=>path.join(output,d.name))];
   let asar,binary;
   for(const dir of dirs){
     if(process.platform==='darwin'){

@@ -7,7 +7,15 @@ This is the `feature/cross-platform` branch. The stable Windows edition remains
 on [`main`](https://github.com/padduwcs/PADSwitcher/tree/main). The Unix worktree,
 app identity, data, default Codex home, build output and release channel are separate.
 
-See [the Unix/WSL guide](docs/UNIX.md), [validation record](docs/UNIX-VALIDATION.md)
+**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.1)**
+· [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md).
+
+Download a deb (recommended on Ubuntu/Debian), AppImage (compatible Linux desktops)
+or DMG (macOS). Linux x64/ARM64 and Mac Intel/Apple Silicon are available.
+The release includes bilingual installation guides and SHA-256 checksums.
+This is a public **Pre-release**; check its validation scope before use.
+
+For development, see [the Unix/WSL guide](docs/UNIX.md), [validation record](docs/UNIX-VALIDATION.md)
 and [GitHub builds](https://github.com/padduwcs/PADSwitcher/actions/workflows/unix-ci.yml?query=branch%3Afeature%2Fcross-platform).
 
 Linux requires an unlocked Secret Service such as GNOME Keyring; macOS uses the
