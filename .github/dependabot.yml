@@ -19,3 +19,38 @@ updates:
     commit-message:
       prefix: chore(actions)
     open-pull-requests-limit: 5
+
+  # The Linux/macOS edition is released from its own branch. Dependabot only
+  # watches the default branch unless a target branch is named explicitly.
+  - package-ecosystem: npm
+    directory: /
+    target-branch: feature/cross-platform
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: feature/cross-platform
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(actions)
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: gomod
+    directory: /src/helper/unix
+    target-branch: feature/cross-platform
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5

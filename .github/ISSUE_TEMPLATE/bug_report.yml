@@ -13,14 +13,26 @@ body:
     attributes:
       label: PADSwitcher version
       description: Shown in the executable filename or release page.
-      placeholder: 1.19.1
+      placeholder: 1.19.1 or 1.19.1-unix.2
+    validations:
+      required: true
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Edition and installer
+      options:
+        - Windows portable (.exe)
+        - Linux deb
+        - Linux AppImage
+        - macOS (dmg or zip)
+        - Built from source
     validations:
       required: true
   - type: input
-    id: windows
+    id: operating_system
     attributes:
-      label: Windows version
-      placeholder: Windows 11 24H2 x64
+      label: Operating system and architecture
+      placeholder: Windows 11 24H2 x64 / Ubuntu 24.04 x64 / macOS 15 arm64
     validations:
       required: true
   - type: dropdown
