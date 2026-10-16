@@ -23,6 +23,20 @@ Review fixes for the first public preview, verified before tagging:
 - Still requires the macOS CI runners: DMG and ZIP signature verification and
   the Keychain smoke checks.
 
+CI and publication: all five jobs passed in
+[GitHub Actions run 38895753261](https://github.com/padduwcs/PADSwitcher/actions/runs/38895753261)
+for commit `984f49fa5af1a8851858056a6e706ef9f99e38df` (212 Node tests and Go
+helper tests on each Unix runner; installed deb on Ubuntu x64/arm64; DMG launch
+plus DMG and ZIP signature checks on macOS Intel/Apple Silicon). The
+[release workflow](https://github.com/padduwcs/PADSwitcher/actions/runs/38896524474)
+rebuilt and published [Unix 1.19.1-unix.2](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
+with 19 verified assets; the Windows release keeps the Latest label. A download
+of the amd64 deb matched its checksum, and its helper reported a missing
+terminal and detected Ptyxis as expected.
+
+Not included: Dependabot's Electron 44.7.0 update failed the macOS signature
+checks in CI, so this release stays on the verified Electron 44.5.1.
+
 ## Local evidence — 2026-10-16
 
 - Windows 11 Home x64: JavaScript/PowerShell syntax and the inherited offline
