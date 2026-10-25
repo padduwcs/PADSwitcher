@@ -2,7 +2,10 @@
 
 Historical baseline audit of Unix.2. The Unix.3 follow-up upgrades Electron and
 dependencies, fixes the recorded Linux issues, and adds source setup commands.
-See [the current validation record](UNIX-VALIDATION.md) for the follow-up results.
+See [the current validation record](../UNIX-VALIDATION.md) for the follow-up results.
+Local artifact paths below describe that original session. Disposable downloads,
+toolchains and extracted installers can be removed after validation; use the
+current setup guide when reproducing checks.
 
 The exercised offline flows passed on this Ubuntu desktop after fixing the Linux
 smoke-test environment. This is evidence for the tested configuration, not a

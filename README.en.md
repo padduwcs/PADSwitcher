@@ -11,7 +11,8 @@ data, default Codex home, build output and release channel are separate. You can
 keep one source folder and switch branches to work on either edition.
 
 **[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)**
-· [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md).
+· [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md)
+· [Documentation](docs/README.md).
 
 Download a deb (recommended on Ubuntu/Debian), AppImage (compatible Linux desktops)
 or DMG (macOS). Linux x64/ARM64 and Mac Intel/Apple Silicon are available.

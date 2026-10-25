@@ -52,6 +52,27 @@ locally; do not stage generated files or change Windows source to hide them.
 The Unix attributes preserve the inherited Windows icon helper byte-for-byte.
 Its mixed line endings do not need to be normalized when working on this branch.
 
+## Repository housekeeping
+
+- Keep `main` for Windows and `feature/cross-platform` for Linux/macOS. Switching
+  branches is separate from merging their code or releasing an application.
+- Delete completed feature branches after confirming their tips are reachable
+  from both maintained branches and that no open PR uses them. GitHub is set to
+  delete PR head branches automatically after a merge.
+- Keep dependency-update branches while their PRs are open. Read the current
+  diff, since a bot branch name can retain an earlier version number. Merge only
+  after reviewing the change and passing the required platform checks.
+  Unix PR builds explicitly enable the preview's ad-hoc macOS signature, without
+  signing secrets, so installed-app signature checks also run on PRs.
+- Keep published releases and tags for downloads, provenance and rollback.
+- Keep final installers and their checksums under ignored `dist-unix/`, and
+  recent logs/screenshots under ignored `artifacts/`. Old extracted applications,
+  duplicate downloads, temporary fixtures and audit-only toolchains are disposable.
+  Rebuild before running checks that require an unpacked application.
+- Keep the configured user-local developer toolchains, `node_modules`, test SDK
+  environment and installed application available for continued development.
+  App data and credentials live outside these disposable build directories.
+
 ## Service pages
 
 `src/renderer/services.js` declares the service registry, entry cards and context

@@ -1,8 +1,9 @@
 # Unix edition validation
 
 Baseline: Windows `main` commit `5444e11e577753181604f06572cd75cb092bbeef`.
-Implementation is confined to `feature/cross-platform` in a separate worktree.
-The baseline worktree remained clean and its commit did not change during development.
+Implementation is confined to `feature/cross-platform`. Validation initially used
+a separate worktree; normal development can use [one checkout and switch branches](DEVELOPMENT.md#one-folder-and-two-branches).
+The Windows baseline stayed unchanged during development.
 
 ## 1.19.1-unix.3 — 2026-10-26
 
@@ -36,7 +37,7 @@ The baseline worktree remained clean and its commit did not change during develo
   prerelease with manual updates. No saved credentials, live inference or real
   Kaggle jobs were used in validation.
 
-The [earlier Linux audit](LINUX-AUDIT-2026-10-26.md) records the original findings
+The [earlier Linux audit](archive/LINUX-AUDIT-2026-10-26.md) records the original findings
 and the boundary between offline fixtures and real-account acceptance.
 
 ## 1.19.1-unix.2 local evidence — 2026-10-16

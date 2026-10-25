@@ -12,9 +12,7 @@ và quy trình phát hành riêng. Có thể dùng một thư mục mã nguồn 
 
 [Tải Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3) ·
 [Cài đặt và dùng lần đầu](docs/UNIX-INSTALL.md) · [English](README.en.md) ·
-[Hướng dẫn Unix/WSL](docs/UNIX.md) ·
-[Phạm vi kiểm chứng](docs/UNIX-VALIDATION.md) ·
-[Build trên GitHub Actions](https://github.com/padduwcs/PADSwitcher/actions/workflows/unix-ci.yml?query=branch%3Afeature%2Fcross-platform)
+[Tất cả hướng dẫn](docs/README.md)
 
 ## Tải và cài đặt
 
@@ -67,6 +65,9 @@ Trên macOS, cài Node.js 24 và Go 1.27.3+, clone đúng nhánh rồi chạy
 Tài liệu [UNIX.md](docs/UNIX.md) mô tả đầy đủ dependency, thư mục dữ liệu,
 Bash/Zsh, giới hạn WSL, kiểm thử và phát hành. Không sao chép kho DPAPI Windows
 sang bản Unix; thêm/đăng nhập tài khoản lại trong môi trường Unix.
+Xem [phạm vi kiểm chứng](docs/UNIX-VALIDATION.md) và
+[kết quả build trên GitHub](https://github.com/padduwcs/PADSwitcher/actions/workflows/unix-ci.yml?query=branch%3Afeature%2Fcross-platform)
+khi phát triển từ mã nguồn.
 
 ## Dùng một thư mục cho cả hai nhánh
 
