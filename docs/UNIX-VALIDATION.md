@@ -4,6 +4,29 @@ Baseline: Windows `main` commit `5444e11e577753181604f06572cd75cb092bbeef`.
 Implementation is confined to `feature/cross-platform` in a separate worktree.
 The baseline worktree remained clean and its commit did not change during development.
 
+## 1.19.1-unix.3 — 2026-10-26
+
+- Electron 44.9.3; native helper built with Go 1.27.3; refreshed npm lockfile
+  reports zero audit advisories at validation time.
+- Ubuntu 26.04 x64 desktop: 220 Node tests (216 passed, four Windows-only skips),
+  native Go tests, Go vet/race checks, six official Kaggle SDK contracts and
+  native Codex 0.163.0 loopback protocol / isolated Say hi checks passed.
+- Verified the source setup script downloads and checks official Node/Go archives,
+  installs dependencies, and builds the helper without replacing system toolchains.
+- Added regression coverage for Wayland/runtime preservation in isolated test
+  sessions and host desktop environment restoration from VS Code Snap.
+- Linux amd64 deb and x86_64 AppImage build with the patched Electron runtime.
+  Source Wayland UI, extended X11 layout checks and the installed deb startup,
+  sandbox, IPC and extracted AppImage layout checks passed on Ubuntu 26.04.
+- Installed the deb, its AppArmor profile and Python venv prerequisites on the
+  local desktop. Prepared the managed Kaggle environment without loading saved
+  credentials. npm audit and Go govulncheck found no advisories.
+- The GitHub Unix CI matrix must pass before creating the Unix release tag.
+  macOS signing and ARM64 installation remain covered by those native runners.
+
+The [earlier Linux audit](LINUX-AUDIT-2026-10-26.md) records the original findings
+and the boundary between offline fixtures and real-account acceptance.
+
 ## 1.19.1-unix.2 local evidence — 2026-10-16
 
 Review fixes for the first public preview, verified before tagging:

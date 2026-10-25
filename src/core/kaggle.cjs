@@ -21,7 +21,7 @@ const MESSAGES = {
   KAGGLE_NETWORK:'Không đọc được Kaggle. Kiểm tra mạng rồi thử lại.',
   KAGGLE_RESPONSE:'Kaggle trả về dữ liệu chưa hỗ trợ. Kiểm tra phiên bản công cụ.',
   KAGGLE_DEPENDENCIES:'Cần Python 3.11+, kaggle 2.2.4+ và kagglesdk 0.1.37+. Mở Thiết lập Kaggle.',
-  KAGGLE_PYTHON:'Không chạy được Python. Chọn python.exe trong Thiết lập Kaggle.',
+  KAGGLE_PYTHON:process.platform==='win32'?'Không chạy được Python. Chọn python.exe trong Thiết lập Kaggle.':'Không chạy được Python. Chọn python3 trong Thiết lập Kaggle.',
   KAGGLE_TIMEOUT:'Đọc Kaggle quá lâu. Thông tin cũ được giữ; hãy thử lại sau.',
 };
 const fail = code => new UserError(MESSAGES[code] || MESSAGES.KAGGLE_RESPONSE, code);

@@ -9,7 +9,7 @@ This is the `feature/cross-platform` branch. The stable Windows edition remains
 on [`main`](https://github.com/padduwcs/PADSwitcher/tree/main). The Unix worktree,
 app identity, data, default Codex home, build output and release channel are separate.
 
-**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)**
+**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)**
 · [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md).
 
 Download a deb (recommended on Ubuntu/Debian), AppImage (compatible Linux desktops)
@@ -29,27 +29,36 @@ Unix releases use `unix-v…` tags and are prereleases with `latest=false`.
 The macOS preview is ad-hoc signed and does not yet have Developer ID notarization.
 Downloaded builds do not require Node.js or Go.
 
-For development, install Node.js 24, Go 1.27.2+ and Git on Linux/macOS:
+## Clone and run on Linux
+
+For a source checkout on Ubuntu Desktop 24.04/26.04:
 
 ```bash
+sudo apt update
+sudo apt install git python3 python3-venv gnome-keyring
 git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
 cd PADSwitcher
-npm ci
-npm start
+bash scripts/setup-linux.sh
+# Ubuntu 24.04/26.04: configure the source-build sandbox.
+sudo chown root:root node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+bash scripts/start-linux.sh
 ```
 
-On the current Windows machine, use the separate worktree:
+The two sudo commands configure the downloaded Electron sandbox helper. Repeat
+them after `npm ci` replaces `node_modules`. Keep sandboxing enabled; do not use
+`--no-sandbox`. The deb installer configures sandboxing for downloaded builds.
 
-```powershell
-cd D:\Current_Projects\PADSwitcher-Unix
-.\scripts\wsl-dev.ps1 -Task verify
-.\scripts\wsl-dev.ps1 -Task start
-```
+The setup script downloads Node.js 24.18.1 and Go 1.27.3 from their official
+hosts, verifies SHA-256 hashes, installs npm dependencies and builds the helper.
+Toolchains live in your user data directory; system Node/Go and shell profiles
+are unchanged. You can rerun setup after an interrupted download. The start
+script loads the prepared environment. An unlocked desktop keyring and a terminal
+app are needed for account/CLI use. Minimal headless servers are not supported.
 
-The WSL helper mirrors source into a private Linux build workspace and keeps
-Linux dependencies separate from Windows. Verification uses disposable data,
-synthetic credentials and an isolated test keyring. Normal app startup requires
-an unlocked persistent system keyring before accounts can be stored.
+Already have Node.js 24+ and Go 1.27.3+? Run `npm ci` and `npm start` directly.
+On macOS, install those toolchains, clone this branch and use the same npm commands.
+For Windows/WSL, follow [the Unix/WSL guide](docs/UNIX.md).
 
 Windows DPAPI vaults cannot be imported by copying files. Add/sign in to accounts
 again in the Unix edition. Bash 3.2+ and Zsh support per-terminal Kaggle selection.

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.19.1-unix.3 — 2026-10-26
+
+- Update Electron to 44.9.3 and refresh vulnerable build/test dependencies.
+- Build the native helper with Go 1.27.3.
+- Preserve desktop runtime sockets in isolated Linux keyring tests so Wayland and Ptyxis work.
+- Restore host GTK/schema paths when source Electron is launched from VS Code Snap.
+- Add checksum-verified, user-local Linux source setup and start commands.
+- Clarify Ubuntu prerequisites, isolated Kaggle Python setup and first-use instructions in Vietnamese and English.
+- Correct Unix terminal and Python labels; keep Windows main and its release channel unchanged.
+
 ## 1.19.1-unix.2 — 2026-10-16
 
 - Start CLI sessions in the home folder instead of the process folder (`/` after

@@ -1,22 +1,29 @@
 # Development
 
-**Unix branch:** use [UNIX.md](UNIX.md) for Linux/macOS development, WSL testing,
-packaging and the independent GitHub workflow. The Windows build instructions
-below are retained as architecture history and apply to `main`.
+This branch builds the isolated Linux/macOS edition. For the complete Linux,
+macOS and WSL prerequisites and commands, use [UNIX.md](UNIX.md). For end-user
+installation without developer tools, use [the installation guide](UNIX-INSTALL.en.md).
 
-Use Windows 10/11 x64, Node.js 24 LTS, Git and .NET Framework 4.8. The native helper
-is compiled with the Windows .NET Framework C# compiler; it is generated, not tracked.
-
-```powershell
-git clone https://github.com/padduwcs/PADSwitcher.git
+```bash
+git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
 cd PADSwitcher
-npm ci
-npm start
+bash scripts/setup-linux.sh
+# Ubuntu 24.04+: keep the source Electron sandbox enabled.
+sudo chown root:root node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+bash scripts/start-linux.sh
 ```
 
-`npm start`, `npm test`, `npm run build` and `npm run dist` build the helper first.
-Use a local Codex CLI or the Windows Codex extension, version 0.160.0 or later;
-newer versions need compatibility verification when their protocol changes.
+Setup installs checksum-verified Node.js 24.18.1 and Go 1.27.3 toolchains under
+`~/.local/share/padswitcher-unix-dev` (or `$XDG_DATA_HOME`), runs `npm ci` and
+builds the helper. System Node/Go and shell startup files are untouched. Repeat
+the sandbox ownership/mode commands after a fresh `npm ci` on restricted Ubuntu
+desktops. Do not disable sandboxing. The installed deb supplies its own sandbox
+integration and does not require these source-development steps.
+
+For npm/go commands below, run `. ~/.local/share/padswitcher-unix-dev/env.sh` in
+your terminal, or use your existing Node.js 24+ and Go 1.27.3+ installation.
+On macOS, install those toolchains and use `npm ci` / `npm start` directly.
 
 ## Service pages
 
@@ -28,6 +35,8 @@ a page only navigates: account activation remains an explicit service action.
 Global appearance belongs to Settings; provider configuration belongs to its service.
 
 ## Checks and packaging
+
+For this Unix branch, use the complete check/build commands in [UNIX.md](UNIX.md#kiểm-thử-và-đóng-gói). The Windows-specific examples below document inherited architecture and apply only to `main`.
 
 ```powershell
 npm run check

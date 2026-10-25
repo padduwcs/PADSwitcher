@@ -1,7 +1,7 @@
 # Cài đặt PADSwitcher Unix
 
 [English](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md)
-· [Tải bản Unix 1.19.1-unix.2](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
+· [Tải bản Unix 1.19.1-unix.3](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)
 · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix quản lý tài khoản Codex/Kaggle trên Linux và macOS.
@@ -15,12 +15,12 @@ không cần Node.js hoặc Go để mở app.
 
 | Máy của bạn | File tải về |
 | --- | --- |
-| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.2-Linux-amd64.deb` (ưu tiên) |
-| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.2-Linux-arm64.deb` (ưu tiên) |
-| Linux khác, Intel/AMD (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage` |
-| Linux khác, ARM64 (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-arm64.AppImage` |
-| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg` |
-| Mac Intel | `PADSwitcher-1.19.1-unix.2-macOS-x64.dmg` |
+| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.3-Linux-amd64.deb` (ưu tiên) |
+| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.3-Linux-arm64.deb` (ưu tiên) |
+| Linux khác, Intel/AMD (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage` |
+| Linux khác, ARM64 (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.3-Linux-arm64.AppImage` |
+| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.3-macOS-arm64.dmg` |
+| Mac Intel | `PADSwitcher-1.19.1-unix.3-macOS-x64.dmg` |
 
 File `.zip` cho Mac là lựa chọn thay thế cho `.dmg`, cùng kiến trúc.
 Trên Linux, `uname -m` cho biết `x86_64` (Intel/AMD) hoặc `aarch64` (ARM64).
@@ -28,7 +28,7 @@ Trên Mac, xem Apple menu → About This Mac: **Chip** là Apple Silicon,
 **Processor Intel** là Intel.
 
 Các môi trường đã được tự động kiểm tra là Ubuntu 24.04 x64/ARM64 và
-macOS 15 Intel/Apple Silicon. Các bản Linux/macOS khác chưa được chứng nhận.
+macOS 15 Intel/Apple Silicon. Ubuntu 26.04 x64 cũng đã được kiểm tra trực tiếp. Các môi trường khác chưa được chứng nhận.
 Linux cần phiên desktop có Secret Service, chẳng hạn GNOME Keyring đã mở khóa,
 và một ứng dụng terminal để mở CLI/Kaggle: GNOME Terminal, Ptyxis, GNOME Console,
 Konsole, Xfce Terminal, MATE Terminal, Terminator, kitty, Alacritty, WezTerm, foot
@@ -43,7 +43,10 @@ WSL là môi trường thử từ Windows, xem [hướng dẫn WSL](https://gith
 Mở terminal tại thư mục chứa file tải về. Ví dụ cho Intel/AMD:
 
 ```bash
-sudo apt install ./PADSwitcher-1.19.1-unix.2-Linux-amd64.deb
+# Tải bộ cài và file .sha256 cùng tên vào cùng thư mục.
+sha256sum -c PADSwitcher-1.19.1-unix.3-Linux-amd64.deb.sha256
+# Chỉ cài khi checksum báo OK.
+sudo apt install ./PADSwitcher-1.19.1-unix.3-Linux-amd64.deb
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.deb`.
@@ -55,11 +58,33 @@ Nếu máy chưa cài GNOME Keyring, cài `gnome-keyring`, đăng xuất và đ�
 Kaggle cần thêm `python3` phiên bản 3.11+ và `python3-venv`.
 Ứng dụng sẽ hướng dẫn cài các SDK trong môi trường Python riêng khi thiết lập Kaggle.
 
+### Chuẩn bị Codex và Kaggle
+
+Trên Ubuntu Desktop, cài những thành phần còn thiếu:
+
+```bash
+sudo apt update
+sudo apt install gnome-keyring python3 python3-venv
+```
+
+Nếu máy chưa có terminal, cài thêm `gnome-terminal` (Ptyxis có sẵn trên một số
+bản Ubuntu). Không cần cài lại terminal đang dùng. Nếu vừa cài GNOME Keyring,
+đăng xuất và đăng nhập lại trước khi thêm tài khoản.
+
+**Chỉ dùng Codex?** Không cần cài Python hoặc SDK Kaggle. Cài Codex CLI/extension
+native, mở app và thêm tài khoản theo mục 3 bên dưới.
+
+**Dùng Kaggle?** Mở **Dịch vụ → Kaggle → Thiết lập → Sao chép lệnh cài**, dán
+vào terminal, chờ cài xong rồi bấm **Lưu & kiểm tra**. Giữ lựa chọn tự tìm Python:
+SDK được cài vào venv riêng, không sửa Python hệ thống. Nếu báo thiếu `ensurepip`
+hoặc không tạo được venv, chạy lại lệnh cài `python3-venv` ở trên. Không dùng
+`sudo pip` hay `--break-system-packages`.
+
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.AppImage`.
@@ -102,7 +127,7 @@ Giữ nguyên tên và nội dung của bundle. Không cần tắt Gatekeeper to
 2. **Codex:** cài Codex CLI native tương thích theo
    [hướng dẫn từ OpenAI](https://github.com/openai/codex#installing-and-running-codex-cli)
    cho Linux/macOS hoặc extension
-   Codex trong VS Code. Giao thức đã được kiểm tra với Codex `0.160.0`.
+   Codex trong VS Code. Giao thức CI dùng Codex `0.160.0`; bản `0.163.0` cũng đã qua kiểm tra cục bộ trên Linux.
    App tự tìm trong PATH, Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`),
    `~/.local/bin`, thư mục npm global (kể cả nvm) và extension
    VS Code/Cursor/Windsurf. Nếu app chưa tự tìm thấy, vào **Cài đặt Codex → Cấu hình Codex nâng cao →
@@ -133,10 +158,10 @@ Tải file `.sha256` có cùng tên với bộ cài và đặt cạnh bộ cài.
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.2-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.3-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.3-macOS-arm64.dmg.sha256
 ```
 
 Chỉ tiếp tục khi kết quả là `OK`. Release cũng có `SHA256SUMS.txt` tổng hợp.

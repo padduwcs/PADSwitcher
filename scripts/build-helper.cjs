@@ -5,7 +5,7 @@ const fs=require('node:fs');
 if(process.platform!=='win32') {
   if(!['linux','darwin'].includes(process.platform))throw Error('Only Linux and macOS are supported by this branch.');
   const result=spawnSync('go',['build','-trimpath','-ldflags=-s -w','-o',path.resolve('src/assets/PADCodex'),'.'],{cwd:path.resolve('src/helper/unix'),stdio:'inherit',env:{...process.env,CGO_ENABLED:'0'}});
-  if(result.error)throw Error('Go 1.27.2+ is required to build the Unix helper.');
+  if(result.error)throw Error('Go 1.27.3+ is required to build the Unix helper. Linux: run bash scripts/setup-linux.sh.');
   if(result.status!==0)process.exit(result.status||1);
   fs.chmodSync('src/assets/PADCodex',0o755);console.log('Standalone Unix PADCodex helper built.');
 }else{
