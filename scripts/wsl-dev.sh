@@ -5,9 +5,9 @@ task=${2:-start}
 dev_root="$HOME/.local/share/padswitcher-unix-dev"
 node_arch=x64
 if [ "$(uname -m)" = aarch64 ]; then node_arch=arm64; fi
-export PATH="$dev_root/toolchains/go/bin:$dev_root/toolchains/node-v24.18.1-linux-$node_arch/bin:$PATH"
+export PATH="$dev_root/toolchains/go1.27.3/bin:$dev_root/toolchains/node-v24.18.1-linux-$node_arch/bin:$dev_root/toolchains/go/bin:$PATH"
 if ! command -v node >/dev/null || [ "$(node -p process.platform)" != linux ] || ! command -v go >/dev/null; then
-  echo 'Install Linux Node.js 24 and Go 1.27.2+ in WSL. See docs/UNIX.md.' >&2
+  echo 'Install Linux Node.js 24 and Go 1.27.3+ in WSL. See docs/UNIX.md.' >&2
   exit 1
 fi
 source_id=$(printf '%s' "$source_root" | sha256sum | cut -c1-12)

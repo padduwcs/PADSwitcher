@@ -1,8 +1,44 @@
 # Unix edition validation
 
 Baseline: Windows `main` commit `5444e11e577753181604f06572cd75cb092bbeef`.
-Implementation is confined to `feature/cross-platform` in a separate worktree.
-The baseline worktree remained clean and its commit did not change during development.
+Implementation is confined to `feature/cross-platform`. Validation initially used
+a separate worktree; normal development can use [one checkout and switch branches](DEVELOPMENT.md#one-folder-and-two-branches).
+The Windows baseline stayed unchanged during development.
+
+## 1.19.1-unix.3 — 2026-10-26
+
+- Electron 44.9.3; native helper built with Go 1.27.3; refreshed npm lockfile
+  reports zero audit advisories at validation time.
+- Ubuntu 26.04 x64 desktop: 220 Node tests (216 passed, four Windows-only skips),
+  native Go tests, Go vet/race checks, six official Kaggle SDK contracts and
+  native Codex 0.163.0 loopback protocol / isolated Say hi checks passed.
+- Verified the source setup script downloads and checks official Node/Go archives,
+  installs dependencies, and builds the helper without replacing system toolchains.
+- Added regression coverage for Wayland/runtime preservation in isolated test
+  sessions and host desktop environment restoration from VS Code Snap.
+- Linux amd64 deb and x86_64 AppImage build with the patched Electron runtime.
+  Source Wayland UI, extended X11 layout checks and the installed deb startup,
+  sandbox, IPC and extracted AppImage layout checks passed on Ubuntu 26.04.
+- Installed the deb, its AppArmor profile and Python venv prerequisites on the
+  local desktop. Prepared the managed Kaggle environment without loading saved
+  credentials. npm audit and Go govulncheck found no advisories.
+- All five [CI jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40222587399)
+  passed for source commit `4bfe40d66203322c08658ac621cd55dee79e1706`.
+  All six [release jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40223192747)
+  also passed, including installed deb checks on x64/ARM64 and macOS DMG/ZIP
+  signature and installed-app checks on Intel/Apple Silicon.
+- [Unix.3 is public](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)
+  with 19 verified assets. Post-publication anonymous requests reached all eight
+  installer links. A downloaded amd64 deb, both installation guides and the
+  combined checksum catalog matched their published SHA-256 metadata.
+- Windows `main` remains at `e16cf98b909d528362a15a2aa2d9a86e2e15ed1a` with a
+  clean worktree. Windows release `v1.19.1` retains Latest; its asset IDs, sizes,
+  SHA-256 digests and update times are unchanged. Unix.3 remains a separate
+  prerelease with manual updates. No saved credentials, live inference or real
+  Kaggle jobs were used in validation.
+
+The [earlier Linux audit](archive/LINUX-AUDIT-2026-10-26.md) records the original findings
+and the boundary between offline fixtures and real-account acceptance.
 
 ## 1.19.1-unix.2 local evidence — 2026-10-16
 
@@ -22,6 +58,20 @@ Review fixes for the first public preview, verified before tagging:
   isolated desktop folder.
 - Still requires the macOS CI runners: DMG and ZIP signature verification and
   the Keychain smoke checks.
+
+CI and publication: all five jobs passed in
+[GitHub Actions run 38895753261](https://github.com/padduwcs/PADSwitcher/actions/runs/38895753261)
+for commit `984f49fa5af1a8851858056a6e706ef9f99e38df` (212 Node tests and Go
+helper tests on each Unix runner; installed deb on Ubuntu x64/arm64; DMG launch
+plus DMG and ZIP signature checks on macOS Intel/Apple Silicon). The
+[release workflow](https://github.com/padduwcs/PADSwitcher/actions/runs/38896524474)
+rebuilt and published [Unix 1.19.1-unix.2](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
+with 19 verified assets; the Windows release keeps the Latest label. A download
+of the amd64 deb matched its checksum, and its helper reported a missing
+terminal and detected Ptyxis as expected.
+
+Not included: Dependabot's Electron 44.7.0 update failed the macOS signature
+checks in CI, so this release stays on the verified Electron 44.5.1.
 
 ## Local evidence — 2026-10-16
 

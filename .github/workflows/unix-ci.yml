@@ -65,7 +65,11 @@ jobs:
       - name: macOS system keyring and Electron smoke
         if: runner.os == 'macOS'
         run: npm run smoke && npm run smoke:ui
-      - run: npm run dist
+      - name: Build installable packages
+        env:
+          # macOS previews use the ad-hoc identity "-", without signing secrets.
+          CSC_FOR_PULL_REQUEST: 'true'
+        run: npm run dist
       - run: node scripts/checksums.cjs
       - name: Prepare packaged Linux Chromium sandbox
         if: runner.os == 'Linux'

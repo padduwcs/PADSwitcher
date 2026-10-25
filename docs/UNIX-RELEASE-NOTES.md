@@ -10,23 +10,19 @@ below. No source build, Node.js or Go is needed to run the application.
 
 ### Có gì mới / What's new
 
-- CLI mở ở thư mục home thay vì `/` khi app được mở từ Finder/menu.
-  CLI sessions start in your home folder instead of `/` after a Finder/menu launch.
-- Hỗ trợ thêm Ptyxis, GNOME Console, MATE Terminal, Terminator, WezTerm, foot và
-  biến `TERMINAL`; báo rõ khi máy không có terminal.
-  Adds Ptyxis, GNOME Console, MATE Terminal, Terminator, WezTerm, foot and
-  `TERMINAL`, with a clear message when no terminal is available.
-- Chờ tối đa hai phút cho lần đầu macOS hỏi quyền điều khiển Terminal.
-  Waits up to two minutes for the first macOS Terminal automation prompt.
-- Tự tìm Codex cài bằng Homebrew, `~/.local/bin` và nvm.
-  Finds Codex installed with Homebrew, in `~/.local/bin` or under nvm.
-- `padkaggle` chỉ sửa profile shell bạn thật sự dùng, không thay thế dotfiles
-  dạng liên kết; terminal Kaggle nạp `~/.bashrc` của bạn.
-  `padkaggle` edits only the shell profiles you use, never replaces linked
-  dotfiles, and the Kaggle terminal loads your `~/.bashrc`.
-- Phiên riêng được mã hóa lại ổn định hơn khi đóng cửa sổ terminal; Ctrl+C không
-  còn bị gửi lặp. Private sessions are re-sealed reliably when a terminal window
-  closes, and Ctrl+C is no longer delivered twice.
+- Electron **44.9.3**, helper Go **1.27.3** và các dependency đã vá;
+  `npm audit` không còn cảnh báo tại thời điểm kiểm tra.
+  Patched Electron/native toolchain and dependency refresh; no npm audit
+  advisories at validation time.
+- Mở mã nguồn từ terminal VS Code Snap không còn nạp nhầm GTK/schema của Snap.
+  Source launches from VS Code Snap restore the host's desktop environment.
+- Clone repo rồi chạy `bash scripts/setup-linux.sh` và `bash scripts/start-linux.sh`;
+  Node/Go được tải từ nguồn chính thức, kiểm tra SHA-256 và giữ trong thư mục người dùng.
+  Source setup verifies official toolchain downloads without changing system Node/Go.
+- Hướng dẫn Việt/Anh rõ hơn cho Ubuntu, Codex, Kaggle/Python venv, cập nhật và gỡ cài đặt.
+  Clearer bilingual Ubuntu, first-use, isolated Kaggle Python, update and removal guides.
+- Kiểm thử Wayland/Ptyxis, terminal, lưu thiết lập và khởi động lại trên Ubuntu 26.04 x64.
+  Local Ubuntu 26.04 x64 checks cover Wayland/Ptyxis, terminals and saved-settings restarts.
 
 | Hệ điều hành / Platform | Tải về / Download |
 | --- | --- |

@@ -50,6 +50,6 @@ const event=(type,value)=>'event: '+type+'\ndata: '+JSON.stringify({type,...valu
     console.log('Native Say hi: two independent accounts, one request each, no tools executed, isolated credentials, quota refresh and cleanup passed.');
   } finally {
     await greetings.shutdown();for(const {rpc} of sessions)await rpc.close();upstream.closeAllConnections();await new Promise(r=>upstream.close(r));
-    if(path.dirname(root)!==parent||!path.basename(root).startsWith('run-'))throw Error('Unsafe fixture cleanup');await fs.rm(root,{recursive:true,force:true});
+    if(path.dirname(root)!==parent||!path.basename(root).startsWith('run-'))throw Error('Unsafe fixture cleanup');await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});
   }
 })().catch(error=>{console.error('Say hi protocol fixture failed:',error.stack);process.exitCode=1;});

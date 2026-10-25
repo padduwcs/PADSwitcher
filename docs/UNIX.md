@@ -4,7 +4,7 @@ Nhánh `feature/cross-platform` là bản Unix độc lập trong cùng reposito
 `main` tiếp tục là bản Windows ổn định. Không merge nhánh Unix vào `main`
 và không dùng tag `v*` cho bản Unix.
 
-Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
+Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)
 và làm theo [hướng dẫn cài đặt](UNIX-INSTALL.md) ([English](UNIX-INSTALL.en.md)).
 Các phần bên dưới dành cho phát triển, kiểm thử và vận hành release.
 
@@ -32,7 +32,7 @@ giao diện preview vẫn có thể chạy từ Windows trong worktree Unix.
 ## Thử từ Windows qua WSL
 
 Chạy trong **worktree Unix**, dùng Ubuntu WSL2 có WSLg. Công cụ phát triển cần
-Node.js 24 và Go 1.27.2+ bản Linux; Node/Go của Windows không thay thế được.
+Node.js 24 và Go 1.27.3+ bản Linux; Node/Go của Windows không thay thế được.
 Trên máy hiện tại, toolchain riêng được chuẩn bị trong
 `~/.local/share/padswitcher-unix-dev/toolchains` của Ubuntu.
 
@@ -77,13 +77,24 @@ các kết nối tự động của bản này nhắm tới công cụ chạy tr
 ```bash
 git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
 cd PADSwitcher
-npm ci
-npm start
+bash scripts/setup-linux.sh
+# Ubuntu 24.04+: đặt quyền sandbox sau mỗi lần npm ci.
+sudo chown root:root node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+bash scripts/start-linux.sh
 ```
+
+Hai script trên dành cho Linux. `setup-linux.sh` tải Node 24.18.1 và Go 1.27.3,
+kiểm tra checksum chính thức, cài npm dependency và build helper. Không sửa shell
+profile hoặc cài công cụ hệ thống; thư mục mặc định là
+`~/.local/share/padswitcher-unix-dev`. Nếu đặt `XDG_DATA_HOME`, dùng thư mục đó.
+Dùng `source ~/.local/share/padswitcher-unix-dev/env.sh` khi muốn gọi npm/go
+trực tiếp. Khi Node.js 24+ và Go 1.27.3+ đã có trong PATH, hoặc trên macOS,
+có thể dùng `npm ci` và `npm start` trực tiếp.
 
 Electron được đóng gói kèm ứng dụng; bản tải về không cần Node.js hoặc Go.
 Codex CLI native tương thích là dependency ngoài; protocol hiện được kiểm tra với
-`0.160.0`. Có thể dùng binary native của extension VS Code hoặc npm.
+`0.160.0` trong CI và `0.163.0` trên Linux cục bộ. Có thể dùng binary native của extension VS Code hoặc npm.
 Trên Linux cần Secret Service, ví dụ GNOME Keyring đã mở khóa; trên macOS dùng
 Keychain của người dùng. Không có phương án hạ cấp sang khóa plaintext.
 
@@ -139,8 +150,8 @@ GitHub có thể bỏ qua cả workflow push tag khi commit mang nhãn này. V�
 tài liệu có `[skip ci]` ở đầu nhánh, hãy chỉ định SHA của commit đã qua CI khi tạo tag.
 
 ```bash
-git tag unix-v1.19.1-unix.2
-git push origin unix-v1.19.1-unix.2
+git tag unix-v1.19.1-unix.3
+git push origin unix-v1.19.1-unix.3
 ```
 
 `unix-release.yml` kiểm tra tag khớp package version và commit thuộc nhánh Unix,

@@ -1,7 +1,7 @@
 # Install PADSwitcher Unix
 
 [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md)
-· [Download Unix 1.19.1-unix.2](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.2)
+· [Download Unix 1.19.1-unix.3](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)
 · [Report a problem](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix manages Codex/Kaggle accounts on Linux and macOS. This is a
@@ -14,12 +14,12 @@ Electron and the native helper are included.
 
 | Computer | Download |
 | --- | --- |
-| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.2-Linux-amd64.deb` (recommended) |
-| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.2-Linux-arm64.deb` (recommended) |
-| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage` |
-| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.2-Linux-arm64.AppImage` |
-| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg` |
-| Intel Mac | `PADSwitcher-1.19.1-unix.2-macOS-x64.dmg` |
+| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.3-Linux-amd64.deb` (recommended) |
+| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.3-Linux-arm64.deb` (recommended) |
+| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage` |
+| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.3-Linux-arm64.AppImage` |
+| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.3-macOS-arm64.dmg` |
+| Intel Mac | `PADSwitcher-1.19.1-unix.3-macOS-x64.dmg` |
 
 Mac `.zip` files are alternatives to the DMG for the same architecture.
 On Linux, `uname -m` shows `x86_64` (Intel/AMD) or `aarch64` (ARM64).
@@ -27,7 +27,7 @@ On a Mac, Apple menu → About This Mac shows **Chip** for Apple Silicon or
 an Intel **Processor**.
 
 Automated checks target Ubuntu 24.04 x64/ARM64 and macOS 15 Intel/Apple Silicon.
-Other OS versions are not certified. Linux requires a desktop session providing
+Ubuntu 26.04 x64 was also checked locally. Other environments are not certified. Linux requires a desktop session providing
 an unlocked Secret Service, such as GNOME Keyring, and a terminal app for CLI and
 Kaggle sessions: GNOME Terminal, Ptyxis, GNOME Console, Konsole, Xfce Terminal,
 MATE Terminal, Terminator, kitty, Alacritty, WezTerm, foot or xterm. To prefer
@@ -42,7 +42,10 @@ see the [WSL development guide](https://github.com/padduwcs/PADSwitcher/blob/fea
 Open a terminal in the download folder. For Intel/AMD:
 
 ```bash
-sudo apt install ./PADSwitcher-1.19.1-unix.2-Linux-amd64.deb
+# Download the installer and matching .sha256 into this folder.
+sha256sum -c PADSwitcher-1.19.1-unix.3-Linux-amd64.deb.sha256
+# Continue only when the checksum reports OK.
+sudo apt install ./PADSwitcher-1.19.1-unix.3-Linux-amd64.deb
 ```
 
 On ARM64, use the `Linux-arm64.deb` filename instead. Launch **PADSwitcher Unix**
@@ -53,11 +56,33 @@ If needed, install `gnome-keyring`, then sign out and back in. Kaggle additional
 needs Python 3.11+ and `python3-venv`; the app guides SDK installation into its
 own Python environment.
 
+### Prepare Codex and Kaggle
+
+On Ubuntu Desktop, install any missing prerequisites:
+
+```bash
+sudo apt update
+sudo apt install gnome-keyring python3 python3-venv
+```
+
+If no terminal is installed, add `gnome-terminal`; some Ubuntu versions already
+include Ptyxis. Keep your existing terminal if you have one. After installing
+GNOME Keyring for the first time, sign out and back in before adding accounts.
+
+**Codex only?** Python and the Kaggle SDKs are optional. Install the native Codex
+CLI/extension, open the app and follow section 3 to add an account.
+
+**Using Kaggle?** Open **Services → Kaggle → Setup → Copy install command**, paste
+it into your terminal, wait for installation, then choose **Save & check**.
+Leave Python discovery automatic to use the app's isolated venv. If creating the
+venv fails with missing `ensurepip`, install `python3-venv` as shown above.
+Do not use `sudo pip` or `--break-system-packages`.
+
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.2-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage
 ```
 
 On ARM64, use the `Linux-arm64.AppImage` filename. Data is stored in your user
@@ -101,7 +126,7 @@ Keep the bundle intact. You do not need to disable Gatekeeper system-wide.
 2. **Codex:** install a compatible native Codex CLI using
    [OpenAI's instructions](https://github.com/openai/codex#installing-and-running-codex-cli)
    for Linux/macOS or the Codex
-   VS Code extension. Protocol checks use Codex `0.160.0`. The app looks in
+   VS Code extension. CI protocol checks use Codex `0.160.0`; `0.163.0` also passed local Linux checks. The app looks in
    PATH, Homebrew (`/opt/homebrew/bin`, `/usr/local/bin`), `~/.local/bin`, npm
    global folders including nvm, and the VS Code/Cursor/Windsurf extension.
    If discovery fails,
@@ -133,10 +158,10 @@ Download the installer's matching `.sha256` file into the same folder:
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.2-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.3-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.2-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.3-macOS-arm64.dmg.sha256
 ```
 
 Continue only if it reports `OK`. A combined `SHA256SUMS.txt` is also provided.

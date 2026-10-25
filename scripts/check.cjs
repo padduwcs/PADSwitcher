@@ -11,7 +11,7 @@ if(process.platform==='win32'){
   if(result.status!==0){process.stderr.write(result.stderr||'PowerShell syntax check failed.');failures++;}
 }
 if(process.platform!=='win32'){
-  for(const file of ['src/core/padkaggle.sh','scripts/wsl-dev.sh','scripts/linux-test-session.sh']){
+  for(const file of ['src/core/padkaggle.sh','scripts/wsl-dev.sh','scripts/linux-test-session.sh','scripts/setup-linux.sh','scripts/start-linux.sh']){
     const result=spawnSync('/bin/bash',['-n',file],{encoding:'utf8'});if(result.status!==0){process.stderr.write(result.stderr||'Shell syntax check failed.');failures++;}
   }
 }

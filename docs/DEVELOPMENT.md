@@ -1,22 +1,77 @@
 # Development
 
-**Unix branch:** use [UNIX.md](UNIX.md) for Linux/macOS development, WSL testing,
-packaging and the independent GitHub workflow. The Windows build instructions
-below are retained as architecture history and apply to `main`.
+This branch builds the isolated Linux/macOS edition. For the complete Linux,
+macOS and WSL prerequisites and commands, use [UNIX.md](UNIX.md). For end-user
+installation without developer tools, use [the installation guide](UNIX-INSTALL.en.md).
 
-Use Windows 10/11 x64, Node.js 24 LTS, Git and .NET Framework 4.8. The native helper
-is compiled with the Windows .NET Framework C# compiler; it is generated, not tracked.
-
-```powershell
-git clone https://github.com/padduwcs/PADSwitcher.git
+```bash
+git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
 cd PADSwitcher
-npm ci
-npm start
+bash scripts/setup-linux.sh
+# Ubuntu 24.04+: keep the source Electron sandbox enabled.
+sudo chown root:root node_modules/electron/dist/chrome-sandbox
+sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
+bash scripts/start-linux.sh
 ```
 
-`npm start`, `npm test`, `npm run build` and `npm run dist` build the helper first.
-Use a local Codex CLI or the Windows Codex extension, version 0.160.0 or later;
-newer versions need compatibility verification when their protocol changes.
+Setup installs checksum-verified Node.js 24.18.1 and Go 1.27.3 toolchains under
+`~/.local/share/padswitcher-unix-dev` (or `$XDG_DATA_HOME`), runs `npm ci` and
+builds the helper. System Node/Go and shell startup files are untouched. Repeat
+the sandbox ownership/mode commands after a fresh `npm ci` on restricted Ubuntu
+desktops. Do not disable sandboxing. The installed deb supplies its own sandbox
+integration and does not require these source-development steps.
+
+For npm/go commands below, run `. ~/.local/share/padswitcher-unix-dev/env.sh` in
+your terminal, or use your existing Node.js 24+ and Go 1.27.3+ installation.
+On macOS, install those toolchains and use `npm ci` / `npm start` directly.
+
+## One folder and two branches
+
+One checkout is enough for normal development. Use `main` for Windows and
+`feature/cross-platform` for Linux/macOS. Commit or stash unfinished work and stop
+any source-running app before switching:
+
+```bash
+git status
+git switch main                    # Choose Windows
+# Or, when working on Linux/macOS:
+git switch feature/cross-platform
+```
+
+Switching updates tracked files without merging branches or moving their tips.
+It does not change an installed app or its user data. A second worktree is
+optional when both versions need to remain open simultaneously.
+
+Dependencies and generated helpers belong to the selected edition. Follow that
+branch's setup instructions after switching; on Linux, rerun `setup-linux.sh`
+and the sandbox ownership/mode commands shown above. Generated Unix output
+(`dist-unix/` and `src/assets/PADCodex`) can remain locally when viewing `main`.
+If Git lists it as untracked there, add these two paths to `.git/info/exclude`
+locally; do not stage generated files or change Windows source to hide them.
+
+The Unix attributes preserve the inherited Windows icon helper byte-for-byte.
+Its mixed line endings do not need to be normalized when working on this branch.
+
+## Repository housekeeping
+
+- Keep `main` for Windows and `feature/cross-platform` for Linux/macOS. Switching
+  branches is separate from merging their code or releasing an application.
+- Delete completed feature branches after confirming their tips are reachable
+  from both maintained branches and that no open PR uses them. GitHub is set to
+  delete PR head branches automatically after a merge.
+- Keep dependency-update branches while their PRs are open. Read the current
+  diff, since a bot branch name can retain an earlier version number. Merge only
+  after reviewing the change and passing the required platform checks.
+  Unix PR builds explicitly enable the preview's ad-hoc macOS signature, without
+  signing secrets, so installed-app signature checks also run on PRs.
+- Keep published releases and tags for downloads, provenance and rollback.
+- Keep final installers and their checksums under ignored `dist-unix/`, and
+  recent logs/screenshots under ignored `artifacts/`. Old extracted applications,
+  duplicate downloads, temporary fixtures and audit-only toolchains are disposable.
+  Rebuild before running checks that require an unpacked application.
+- Keep the configured user-local developer toolchains, `node_modules`, test SDK
+  environment and installed application available for continued development.
+  App data and credentials live outside these disposable build directories.
 
 ## Service pages
 
@@ -28,6 +83,8 @@ a page only navigates: account activation remains an explicit service action.
 Global appearance belongs to Settings; provider configuration belongs to its service.
 
 ## Checks and packaging
+
+For this Unix branch, use the complete check/build commands in [UNIX.md](UNIX.md#kiểm-thử-và-đóng-gói). The Windows-specific examples below document inherited architecture and apply only to `main`.
 
 ```powershell
 npm run check

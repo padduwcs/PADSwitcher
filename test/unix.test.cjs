@@ -13,6 +13,25 @@ async function until(fn){for(let i=0;i<100;i++){const v=await fn();if(v)return v
 test('Unix command quoting treats paths and shell metacharacters as data',()=>{
   assert.equal(unix.quote("space ' quote; $(touch /tmp/no)"),"'space '\\'' quote; $(touch /tmp/no)'");
 });
+test('Linux test session preserves desktop sockets while isolating keyring storage',{skip:process.platform!=='linux'},async t=>{
+  const root=await temporary(t),bin=path.join(root,'bin'),runtime=path.join(root,'desktop-runtime'),log=path.join(root,'keyring-args');
+  await fs.mkdir(bin);await fs.mkdir(runtime,{mode:0o700});
+  const socket=path.join(runtime,'wayland-test'),server=require('node:net').createServer();
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(socket,resolve);});
+  t.after(()=>new Promise(resolve=>server.close(resolve)));
+  await fs.writeFile(path.join(bin,'gnome-keyring-daemon'),'#!/bin/sh\n/bin/cat >/dev/null\nprintf "%s\\n" "$@" > "$PAD_TEST_KEYRING_LOG"\n',{mode:0o700});
+  const inspect=`const fs=require('node:fs'),path=require('node:path'),e=process.env;console.log(JSON.stringify({runtime:e.XDG_RUNTIME_DIR,display:e.WAYLAND_DISPLAY,config:e.XDG_CONFIG_HOME,data:e.XDG_DATA_HOME,cache:e.XDG_CACHE_HOME,privateRuntime:(fs.statSync(e.XDG_RUNTIME_DIR).mode&0o777)===0o700,socket:e.WAYLAND_DISPLAY?fs.statSync(path.join(e.XDG_RUNTIME_DIR,e.WAYLAND_DISPLAY)).isSocket():null,control:e.GNOME_KEYRING_CONTROL||null,agent:e.SSH_AUTH_SOCK||null}));`;
+  const env={...process.env,PATH:bin+path.delimiter+process.env.PATH,PAD_TEST_KEYRING_LOG:log,XDG_RUNTIME_DIR:runtime,WAYLAND_DISPLAY:'wayland-test',GNOME_KEYRING_CONTROL:'/fixture/desktop-keyring',SSH_AUTH_SOCK:'/fixture/desktop-agent'};
+  const run=()=>unix.run('/bin/sh',[path.resolve(__dirname,'../scripts/linux-test-session.sh'),process.execPath,'-e',inspect],{env});
+  const desktop=JSON.parse(await run());
+  assert.equal(desktop.runtime,runtime);assert.equal(desktop.display,'wayland-test');assert.equal(desktop.socket,true);assert.equal(desktop.control,null);assert.equal(desktop.agent,null);
+  assert.equal(path.dirname(desktop.config),path.dirname(desktop.data));assert.equal(path.dirname(desktop.cache),path.dirname(desktop.data));
+  const args=await fs.readFile(log,'utf8');assert(args.includes('--control-directory='+path.join(path.dirname(desktop.data),'runtime/keyring')));assert(!args.includes(runtime));
+  assert.equal(await fs.stat(desktop.data).then(()=>true,()=>false),false,'temporary data is removed');
+  delete env.XDG_RUNTIME_DIR;delete env.WAYLAND_DISPLAY;
+  const headless=JSON.parse(await run());assert.equal(headless.privateRuntime,true);assert.equal(headless.runtime,path.join(path.dirname(headless.data),'runtime'));
+  assert.equal(await fs.stat(headless.runtime).then(()=>true,()=>false),false,'headless fallback is removed');
+});
 test('Unix process blockers recognize macOS IDE app bundles without blocking unrelated Electron apps',()=>{
   const list=[{ProcessId:1234,Name:'Electron',ExecutablePath:'/Applications/Visual Studio Code.app/Contents/MacOS/Electron'},{ProcessId:1235,Name:'Electron',ExecutablePath:'/Applications/Other.app/Contents/MacOS/Electron'},{ProcessId:process.pid,Name:'codex'}];
   assert.deepEqual(unix.blockers(list).map(p=>p.ProcessId),[1234]);
