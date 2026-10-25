@@ -25,6 +25,33 @@ For npm/go commands below, run `. ~/.local/share/padswitcher-unix-dev/env.sh` in
 your terminal, or use your existing Node.js 24+ and Go 1.27.3+ installation.
 On macOS, install those toolchains and use `npm ci` / `npm start` directly.
 
+## One folder and two branches
+
+One checkout is enough for normal development. Use `main` for Windows and
+`feature/cross-platform` for Linux/macOS. Commit or stash unfinished work and stop
+any source-running app before switching:
+
+```bash
+git status
+git switch main                    # Choose Windows
+# Or, when working on Linux/macOS:
+git switch feature/cross-platform
+```
+
+Switching updates tracked files without merging branches or moving their tips.
+It does not change an installed app or its user data. A second worktree is
+optional when both versions need to remain open simultaneously.
+
+Dependencies and generated helpers belong to the selected edition. Follow that
+branch's setup instructions after switching; on Linux, rerun `setup-linux.sh`
+and the sandbox ownership/mode commands shown above. Generated Unix output
+(`dist-unix/` and `src/assets/PADCodex`) can remain locally when viewing `main`.
+If Git lists it as untracked there, add these two paths to `.git/info/exclude`
+locally; do not stage generated files or change Windows source to hide them.
+
+The Unix attributes preserve the inherited Windows icon helper byte-for-byte.
+Its mixed line endings do not need to be normalized when working on this branch.
+
 ## Service pages
 
 `src/renderer/services.js` declares the service registry, entry cards and context

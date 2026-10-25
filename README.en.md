@@ -6,8 +6,9 @@
 Manage Codex/Kaggle accounts, inspect quota and connect local developer tools.
 
 This is the `feature/cross-platform` branch. The stable Windows edition remains
-on [`main`](https://github.com/padduwcs/PADSwitcher/tree/main). The Unix worktree,
-app identity, data, default Codex home, build output and release channel are separate.
+on [`main`](https://github.com/padduwcs/PADSwitcher/tree/main). The Unix app identity,
+data, default Codex home, build output and release channel are separate. You can
+keep one source folder and switch branches to work on either edition.
 
 **[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)**
 · [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md).
@@ -63,5 +64,27 @@ For Windows/WSL, follow [the Unix/WSL guide](docs/UNIX.md).
 Windows DPAPI vaults cannot be imported by copying files. Add/sign in to accounts
 again in the Unix edition. Bash 3.2+ and Zsh support per-terminal Kaggle selection.
 See the guide for setup, supported connections and validation limits.
+
+## One folder and two branches
+
+A single `PADSwitcher` folder is enough. Git replaces its tracked source files
+with the selected branch when you switch:
+
+```bash
+cd PADSwitcher
+git status
+git switch main                    # Windows source
+git switch feature/cross-platform  # Linux/macOS source
+```
+
+The two `git switch` commands are alternatives; choose the edition you need.
+Commit or stash unfinished changes before switching. Stop any app running from
+source first. An app installed from a release installer runs independently.
+
+Prepare dependencies using the selected branch's instructions after switching.
+When returning to Linux, rerun `bash scripts/setup-linux.sh` and the two sandbox
+commands above before starting from source. Switching branches does not merge
+their code. A second worktree is optional when both branches need to be open at
+once. See [the development guide](docs/DEVELOPMENT.md#one-folder-and-two-branches).
 
 Licensed under [MIT](LICENSE). Independent of OpenAI, Kaggle and JetBrains.
