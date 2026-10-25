@@ -21,8 +21,20 @@ The baseline worktree remained clean and its commit did not change during develo
 - Installed the deb, its AppArmor profile and Python venv prerequisites on the
   local desktop. Prepared the managed Kaggle environment without loading saved
   credentials. npm audit and Go govulncheck found no advisories.
-- The GitHub Unix CI matrix must pass before creating the Unix release tag.
-  macOS signing and ARM64 installation remain covered by those native runners.
+- All five [CI jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40222587399)
+  passed for source commit `4bfe40d66203322c08658ac621cd55dee79e1706`.
+  All six [release jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40223192747)
+  also passed, including installed deb checks on x64/ARM64 and macOS DMG/ZIP
+  signature and installed-app checks on Intel/Apple Silicon.
+- [Unix.3 is public](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)
+  with 19 verified assets. Post-publication anonymous requests reached all eight
+  installer links. A downloaded amd64 deb, both installation guides and the
+  combined checksum catalog matched their published SHA-256 metadata.
+- Windows `main` remains at `e16cf98b909d528362a15a2aa2d9a86e2e15ed1a` with a
+  clean worktree. Windows release `v1.19.1` retains Latest; its asset IDs, sizes,
+  SHA-256 digests and update times are unchanged. Unix.3 remains a separate
+  prerelease with manual updates. No saved credentials, live inference or real
+  Kaggle jobs were used in validation.
 
 The [earlier Linux audit](LINUX-AUDIT-2026-10-26.md) records the original findings
 and the boundary between offline fixtures and real-account acceptance.
