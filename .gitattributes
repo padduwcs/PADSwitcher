@@ -5,3 +5,6 @@
 *.js text eol=lf
 *.yml text eol=lf
 *.ps1 text eol=crlf
+
+# Preserve the Windows icon helper byte-for-byte, including its mixed line endings.
+scripts/create-icon.cjs -text
