@@ -239,3 +239,30 @@ test('a connection reset after response.completed does not block successful tool
   for(let i=0;i<2;i++){const response=await f.call({input:[]},headers);await response.text().catch(()=>{});}
   assert.equal(f.seen.length,2);assert.equal(f.r.failedRequests.size,0);
 });
+
+test('successful native SSE without Content-Type permits the next model step in the same turn',async t=>{
+  const f=await fixture(t,(req,res)=>{res.writeHead(200);res.end(completed);});
+  const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
+  for(let i=0;i<3;i++){
+    const response=await f.call({input:[{role:'user',content:'Fixture context'}],stream:true},headers);
+    assert.equal(response.status,200,'a completed model step must not poison the next tool follow-up');assert.equal(await response.text(),completed);
+  }
+  assert.equal(f.seen.length,3);assert.equal(f.r.failedRequests.size,0);assert.equal(f.r.usage.blockedReplays,0);
+});
+
+test('missing MIME does not hide an early quota fallback or allow incomplete-stream replay',async t=>{
+  const f=await fixture(t,(req,res,entry)=>{res.writeHead(200);res.end(entry.account==='a'?event('response.failed',{response:{error:quota.error}}):completed);});
+  const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
+  assert.equal(await (await f.call({input:[],stream:true},headers)).text(),completed);
+  assert.deepEqual(f.seen.map(x=>x.account),['a','b']);assert(f.seen[0].bytes.equals(f.seen[1].bytes));assert.equal(f.r.failedRequests.size,0);
+  assert.equal(await (await f.call({input:[],stream:true},headers)).text(),completed);assert.equal(f.seen.length,3);
+  const broken=await fixture(t,(req,res)=>{res.writeHead(200);res.end(event('response.output_text.delta',{delta:'partial'}));});
+  await (await broken.call({input:[],stream:true},headers)).text();assert.equal((await broken.call({input:[],stream:true},headers)).status,400);assert.equal(broken.seen.length,1);
+});
+
+test('valid non-streaming JSON responses are not classified as uncertain failures',async t=>{
+  const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'application/json'});res.end('{"output":[],"status":"completed"}');});
+  const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
+  for(let i=0;i<2;i++){const response=await f.call({input:[],stream:false},headers);assert.equal(response.status,200);assert.equal((await response.json()).status,'completed');}
+  assert.equal(f.seen.length,2);assert.equal(f.r.failedRequests.size,0);
+});

@@ -1,6 +1,6 @@
 {
   "name": "padswitcher-unix",
-  "version": "1.19.1-unix.5",
+  "version": "1.19.1-unix.6",
   "description": "Profile Account Directory Switcher — isolated Linux and macOS edition",
   "private": true,
   "desktopName": "padswitcher-unix.desktop",

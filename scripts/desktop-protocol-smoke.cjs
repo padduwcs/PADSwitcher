@@ -15,7 +15,7 @@ const fixtureExpiry=Math.floor(Date.now()/1000)+86400;
 function token(id){return jwt({sub:'fixture-user-'+id,email:id+'@example.test',exp:fixtureExpiry,'https://api.openai.com/auth':{chatgpt_account_id:id,chatgpt_user_id:'fixture-user-'+id,chatgpt_plan_type:'plus'}});}
 function respond(res,output){
   const event=(type,value={})=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
-  const id='resp_fixture';res.writeHead(200,{'Content-Type':'text/event-stream'});
+  const id='resp_fixture';res.writeHead(200); // The real Codex backend may omit Content-Type on valid SSE.
   res.write(event('response.created',{response:{id,status:'in_progress',output:[]}}));
   output.forEach((item,index)=>{res.write(event('response.output_item.added',{output_index:index,item:{...item,...(item.type==='message'?{content:[]}:{arguments:''})}}));if(item.type==='function_call')res.write(event('response.function_call_arguments.delta',{item_id:item.id,output_index:index,delta:item.arguments}));res.write(event('response.output_item.done',{output_index:index,item}));});
   res.end(event('response.completed',{response:{id,status:'completed',output,usage:{input_tokens:100,output_tokens:5,total_tokens:105}}}));

@@ -5,7 +5,37 @@ Implementation is confined to `feature/cross-platform`. Validation initially use
 a separate worktree; normal development can use [one checkout and switch branches](DEVELOPMENT.md#one-folder-and-two-branches).
 The Windows baseline stayed unchanged during development.
 
+## 1.19.1-unix.6 — 2026-10-26
+
+- A real Unix.5 report exposed a false-positive replay guard after successful
+  tool calls. Read-only native HTTP diagnostics showed successful `/responses`
+  responses with no Content-Type, followed by PAD's 400 replay block.
+- A new regression reproduces the Unix.5 failure (`400` instead of `200` for
+  the next step). Classification now considers the requested streaming protocol
+  and actual completion event. Missing MIME alone never marks a turn failed;
+  valid non-streaming JSON remains supported.
+- Native protocol fixtures now omit MIME on successful tool steps; desktop and
+  fault fixtures exercise omitted MIME throughout. Successful tool follow-ups,
+  context/cache preservation, quota fallback and incomplete-stream protection
+  are checked together, using synthetic accounts and loopback model responses.
+- Local Ubuntu 26.04 x64: 245 Node tests (241 passed, four Windows-only
+  skips), syntax checks, Linux packaging and sandboxed packaged startup passed.
+  Native `0.160.0`, bundled desktop `0.163.0-alpha.11.1` and extension
+  `0.164.0-alpha.11.1` protocol checks cover the corrected stream handling.
+  The installed Linux ChatGPT app again resumed and displayed the synthetic
+  conversation, and all nine native fault/success cases passed without MIME.
+- The fix is restricted to the Unix branch. User conversation/configuration
+  files and the stable Windows edition are unchanged. The real PAD connection
+  remains off during repair; full real-account acceptance follows installation.
+
 ## 1.19.1-unix.5 — 2026-10-26
+
+**Superseded by Unix.6:** Unix.5 incorrectly treated a missing SSE MIME header
+as inference failure and blocked successful tool follow-ups. Its synthetic
+fixtures declared Content-Type and missed the wire format seen on the user's
+real connection. The native fault counts below remain valid but did not prove
+real-backend compatibility.
+
 
 - Fixes a Unix.4 regression: per-thread desktop overrides invented a standalone
   `mcp_servers.codex_app` entry without a transport. Plugin-only configurations

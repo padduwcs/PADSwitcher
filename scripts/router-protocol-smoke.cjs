@@ -7,8 +7,8 @@ const {ModelRouter,decodeRequest}=require('../src/core/model-router.cjs');
 const {CodexRpc}=require('../src/core/rpc.cjs');
 const platform=require('../src/core/platform.cjs').createPlatform(path.resolve('artifacts/protocol-platform'));
 const event=(type,value={})=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
-function respond(res,output,token){
-  const id='resp_fixture';res.writeHead(200,{'Content-Type':'text/event-stream','x-codex-turn-state':token});
+function respond(res,output,token,contentType=true){
+  const id='resp_fixture';res.writeHead(200,{...(contentType?{'Content-Type':'text/event-stream'}:{}),'x-codex-turn-state':token});
   res.write(event('response.created',{response:{id,status:'in_progress',output:[]}}));
   output.forEach((item,index)=>{
     res.write(event('response.output_item.added',{output_index:index,item:{...item,...(item.type==='message'?{content:[]}:{arguments:''})}}));
@@ -24,9 +24,9 @@ function respond(res,output,token){
     const chunks=[];for await(const chunk of req)chunks.push(chunk);
     if(req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"models":[]}');return;}
     const bytes=Buffer.concat(chunks),body=decodeRequest(bytes,req.headers['content-encoding']);seen.push({account:req.headers['chatgpt-account-id'],headers:req.headers,bytes,body});
-    if(seen.length===1){respond(res,[{type:'function_call',id:'fc_one',call_id:'call_one',name:'write_marker',arguments:'{}'}],'state-a');return;}
+    if(seen.length===1){respond(res,[{type:'function_call',id:'fc_one',call_id:'call_one',name:'write_marker',arguments:'{}'}],'state-a',false);return;}
     if(seen.length===2){res.writeHead(429,{'Content-Type':'application/json'});res.end('{"error":{"type":"usage_limit_reached","resets_in_seconds":900}}');return;}
-    if(seen.length===3){respond(res,[{type:'function_call',id:'fc_two',call_id:'call_two',name:'write_marker',arguments:'{}'}],'state-b');return;}
+    if(seen.length===3){respond(res,[{type:'function_call',id:'fc_two',call_id:'call_two',name:'write_marker',arguments:'{}'}],'state-b',false);return;}
     respond(res,[{type:'message',id:'msg_done',role:'assistant',status:'completed',content:[{type:'output_text',text:'FIXTURE_DONE',annotations:[]}]}],'state-b');
   });
   await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve));
@@ -63,6 +63,6 @@ function respond(res,output,token){
     // Read-only account/thread inspection and an idle connection must not infer.
     await rpc.request('account/read',{refreshToken:false});await new Promise(resolve=>setTimeout(resolve,1500));assert.equal(seen.length,4);
     assert.equal(await fs.stat(path.join(home,'auth.json')).then(()=>true,()=>false),false);
-    console.log('Native loopback cache headers, same-turn A/B routing, per-account sticky state, exact retry and two tools executed once: passed.');
+    console.log('Native tool follow-ups with/without Content-Type, cache headers, same-turn A/B routing, per-account sticky state, exact retry and two tools executed once: passed.');
   }finally{await rpc?.close();await router?.stop();upstream.closeAllConnections();await new Promise(resolve=>upstream.close(resolve));}
 })().catch(error=>{console.error('Native protocol fixture failed:',error.code||error.name,error.message);process.exitCode=1;});

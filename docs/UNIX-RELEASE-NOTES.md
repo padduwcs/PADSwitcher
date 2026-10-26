@@ -10,6 +10,14 @@ below. No source build, Node.js or Go is needed to run the application.
 
 ### Có gì mới / What's new
 
+- Sửa lỗi Unix.5 chặn nhầm sau khi dùng công cụ: phản hồi model thành công
+  thiếu Content-Type vẫn được nhận diện đúng, không khóa bước tiếp theo.
+  Fix Unix.5 false replay blocks after successful tool calls when upstream
+  omits Content-Type. Real uncertain-failure protection stays enabled.
+- Bài thử mới tái hiện được lỗi cũ, rồi xác nhận công cụ tiếp tục, chuyển quota
+  và mở lại chat với SSE thiếu Content-Type; các lỗi kết nối thật vẫn chỉ có
+  một lần gửi lên máy chủ mô phỏng. Regression tests cover the observed wire
+  format alongside native tool/context/fallback and fault-count checks.
 - Sửa lỗi Unix.4 `invalid transport in mcp_servers.codex_app` khi mở chat cũ.
   Giữ transport của plugin và kết nối công cụ với phiên desktop hiện tại.
   Fix Unix.4 conversation resume with plugin-provided desktop tools.

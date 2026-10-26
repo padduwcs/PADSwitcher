@@ -18,7 +18,7 @@ const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.string
     if(scenario==='status503'){res.writeHead(503);res.end('{"error":{"type":"server_error"}}');return;}
     if(scenario==='status429'){res.writeHead(429);res.end('{"error":{"type":"rate_limit_exceeded"}}');return;}
     if(scenario==='drop'){req.socket.destroy();return;}
-    res.writeHead(200,{'Content-Type':'text/event-stream'});
+    res.writeHead(200); // Omitted MIME header must not hide either completion or a broken stream.
     res.write(event('response.created',{response:{id:'resp_fixture',status:'in_progress',output:[]}}));
     if(scenario==='partial'){
       res.write(event('response.output_item.added',{output_index:0,item:{type:'message',id:'msg_fixture',role:'assistant',content:[]}}));

@@ -168,7 +168,10 @@ class ModelRouter {
             const reader=response.body?.getReader();let length=0;
             if(reader)for(;;){const {done,value}=await reader.read();if(done)break;touch();length+=value.length;if(length>MAX_ERROR){await reader.cancel();this.blockReplay(requestKey);this.error(res,502,'upstream_error','Upstream error body is too large.');return;}prefix.push(Buffer.from(value));}
             try{const value=JSON.parse(Buffer.concat(prefix).toString());if(response.status===429&&quotaError(value))quota=value;}catch{}
-          }else if(['responses','responses/lite'].includes(route)&&/text\/event-stream/.test(response.headers.get('content-type')||'')){
+          }else if(['responses','responses/lite'].includes(route)&&(body?.stream===true||/text\/event-stream/.test(response.headers.get('content-type')||''))){
+            // Native Codex accepts SSE without Content-Type. Decide from the
+            // requested protocol too, then verify the actual terminal event.
+            // A missing MIME header is not an inference failure.
             sse=true;
             const peek=await this.peek(response,controller,touch);prefix=peek.prefix;quota=peek.quota;streamReader=peek.reader;
             if(!quota){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);await this.forward(response,res,prefix,peek.reader,touch,observe);return;}
@@ -182,7 +185,6 @@ class ModelRouter {
           if(quota&&!canReplay)this.note('blocked','Yêu cầu dùng trạng thái riêng của tài khoản; không tự phát lại.');
           if(quota&&this.g.service.state.autoSwitch?.enabled&&!personal)this.note('blocked','Tự đổi chỉ hỗ trợ tài khoản cá nhân Free, Plus và Pro đã xác định.');
           if(response.ok){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);}
-          if(track&&['responses','responses/lite'].includes(route)&&!sse)this.blockReplay(requestKey);
           if(!response.ok)this.blockReplay(requestKey);
           await this.forward(response,res,prefix,streamReader,touch,observe);return;
         }
