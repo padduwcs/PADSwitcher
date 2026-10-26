@@ -16,6 +16,17 @@ app.whenReady().then(async()=>{
   const tools=await window.webContents.executeJavaScript("window.pad.action('kaggleTools')");assert.equal(tools.ok,true);
   await window.webContents.executeJavaScript("window.padUI.setLanguage('en');window.padUI.setTheme('dark');render();new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
   await fs.mkdir(path.resolve('artifacts'),{recursive:true});const screenshot=await window.webContents.capturePage();await fs.writeFile(path.resolve('artifacts/unix-ui.png'),screenshot.toPNG());
+  // Renderer-only fixture: no credentials, native gateway or real app launch.
+  await window.webContents.executeJavaScript(`
+    state.profiles=[{id:'fixture-desktop',label:'Desktop test · Plus',plan:'plus',email:'desktop@example.test',status:'ready',quota:[]}];
+    state.gateway={...state.gateway,status:'ready',profileId:'fixture-desktop',connected:{desktop:1}};
+    state.desktop={...state.desktop,available:true,configuration:'configured',connected:1,profileId:'fixture-desktop',home:'/fixture/.codex'};
+    window.padUI.setLanguage('vi');window.padUI.setTheme('light');render();
+    document.querySelector('[data-service=codex]').click();document.querySelector('.service-tab[data-page=connections]').click();
+    new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
+  assert.equal(await window.webContents.executeJavaScript("document.querySelector('#desktop-state').textContent"),'Đang kết nối');
+  assert.equal(await window.webContents.executeJavaScript('document.documentElement.scrollWidth>innerWidth'),false);
+  await fs.writeFile(path.resolve('artifacts/unix-desktop-ui.png'),(await window.webContents.capturePage()).toPNG());
   assert.equal(await fs.stat(path.join(root,'PADSwitcher','data')).then(()=>true,()=>false),false);
   console.log('Electron startup, sandbox, service navigation, Python probe and isolated data: passed.');
   app.quit();

@@ -8,13 +8,14 @@ const { createQuotaRefresher } = require('./core/quota-refresh.cjs');
 const { GatewayHub } = require('./core/gateway-hub.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { JetBrainsIntegration } = require('./core/jetbrains.cjs');
+const { DesktopIntegration } = require('./core/desktop.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
 const unix=process.platform!=='win32';
 if(unix)process.umask(0o077);
 if(process.env.PADSWITCHER_APPDATA_DIR){if(!path.isAbsolute(process.env.PADSWITCHER_APPDATA_DIR))throw Error('PADSWITCHER_APPDATA_DIR must be absolute.');app.setPath('appData',process.env.PADSWITCHER_APPDATA_DIR);}
 app.setName('PADSwitcher Unix');
 app.setPath('userData',path.join(app.getPath('appData'),'PADSwitcher-Unix'));
-let window, service, kaggle, gateway, integration, jetbrains, tray, timer, kaggleTimer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
+let window, service, kaggle, gateway, integration, jetbrains, desktop, tray, timer, kaggleTimer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
 let uiLocale='vi';
 const text=(vi,en)=>uiLocale==='en'?en:vi;
 function updateTray() {
@@ -43,7 +44,8 @@ async function start() {
   service.kaggle = kaggle;
   kaggle.on('change',()=>service.changed());
   gateway=new GatewayHub(service);integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);
-  const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const [next,jb]=await Promise.all([integration.status(),jetbrains.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)){service.vscode=next;service.jetbrains=jb;service.changed();}})().finally(()=>{integrationFlight=null;}));
+  desktop=new DesktopIntegration(service,gateway);await desktop.init();
+  const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const before=JSON.stringify(desktop.view());const [next,jb]=await Promise.all([integration.status(),jetbrains.status(),desktop.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)||before!==JSON.stringify(desktop.view())){service.vscode=next;service.jetbrains=jb;service.changed();}})().finally(()=>{integrationFlight=null;}));
   await checkIntegration();
   window = new BrowserWindow({ width: 1260, height: 840, minWidth: 1000, minHeight: 680, title: 'PADSwitcher Unix', icon:path.join(__dirname,'assets','padswitcher-emblem.png'), backgroundColor:'#F6F8FB', autoHideMenuBar:true, show:false, webPreferences: { preload:path.join(__dirname,'preload.cjs'), nodeIntegration:false, contextIsolation:true, sandbox:true, webSecurity:true, devTools:!app.isPackaged } });
   window.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
@@ -115,6 +117,9 @@ async function start() {
         case 'restoreVSCode': await integration.restore();await checkIntegration();break;
         case 'configureJetBrains': result=await service.exclusive(()=>jetbrains.configure(gateway.helper));await checkIntegration();break;
         case 'restoreJetBrains': await service.exclusive(()=>jetbrains.restore());await checkIntegration();break;
+        case 'desktopLaunch': result=await desktop.launch(args.id);await checkIntegration();break;
+        case 'desktopDisconnect': await desktop.disconnect();await checkIntegration();break;
+        case 'desktopHome': await desktop.setHome(args.home);await checkIntegration();break;
         case 'copyCLI': {
           if(gateway.status!=='ready')throw new UserError('Bật gateway trước.', 'GATEWAY_STOPPED');
           clipboard.writeText(service.platform.quote(gateway.helper));break;
@@ -137,7 +142,7 @@ async function start() {
         case 'settings': result = await service.settings(args); break;
         case 'diagnostics': result = await service.diagnostics(); break;
         case 'pick': {
-          if (!['codexPath','workspace','desktopHome','kaggleWorkspace','kagglePython'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
+          if (!['codexPath','workspace','desktopHome','desktopCodexHome','kaggleWorkspace','kagglePython'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
           const executable=['codexPath','kagglePython'].includes(args.kind);
           const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'kagglePython' ? text('Chọn Python 3.11+','Choose Python 3.11+') : executable ? text('Chọn executable Codex chính thức','Choose official Codex executable') : text('Chọn thư mục','Choose folder'), properties: executable ? ['openFile'] : ['openDirectory'] });
           result = selected.canceled ? null : selected.filePaths[0]; break;

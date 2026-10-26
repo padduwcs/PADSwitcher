@@ -4,7 +4,7 @@ Nhánh `feature/cross-platform` là bản Unix độc lập trong cùng reposito
 `main` tiếp tục là bản Windows ổn định. Không merge nhánh Unix vào `main`
 và không dùng tag `v*` cho bản Unix.
 
-Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)
+Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)
 và làm theo [hướng dẫn cài đặt](UNIX-INSTALL.md) ([English](UNIX-INSTALL.en.md)).
 Các phần bên dưới dành cho phát triển, kiểm thử và vận hành release.
 
@@ -13,7 +13,7 @@ Các phần bên dưới dành cho phát triển, kiểm thử và vận hành r
 | Thành phần | Windows ổn định | Bản Unix |
 | --- | --- | --- |
 | Nhánh | `main` | `feature/cross-platform` |
-| Thư mục trên máy hiện tại | `D:\Current_Projects\PADSwitcher` | `D:\Current_Projects\PADSwitcher-Unix` |
+| Mã nguồn trong một thư mục | `git switch main` | `git switch feature/cross-platform` |
 | Định danh | `personal.pad.padswitcher` | `personal.pad.padswitcher.unix` |
 | Dữ liệu | `%APPDATA%\PADSwitcher\data` | Linux: `$XDG_CONFIG_HOME/PADSwitcher-Unix/data`, mặc định `~/.config/PADSwitcher-Unix/data`; macOS: `~/Library/Application Support/PADSwitcher-Unix/data` |
 | Phiên Codex mặc định | Theo bản Windows | `codex-home` bên trong dữ liệu Unix |
@@ -112,6 +112,7 @@ npm test
 npm run test:helper
 npm run smoke:protocol
 npm run smoke:say-hi
+npm run smoke:desktop
 ```
 
 Linux dùng kho khóa kiểm thử độc lập:
@@ -137,6 +138,30 @@ notarization cho phát hành rộng rãi là công việc riêng.
 executable đóng gói; phải là đường dẫn tuyệt đối. Namespace `PADSwitcher-Unix`
 vẫn luôn được thêm vào bên trong.
 
+### Codex desktop giữ lịch sử
+
+Xem [các bước sử dụng](UNIX-INSTALL.md#tiếp-tục-hội-thoại-codex-trong-chatgptcodex-desktop).
+Desktop dùng backend native đi kèm ứng dụng đã cài, với `CODEX_HOME` mặc định
+`~/.codex` để đọc lại lịch sử. Backend này chia sẻ bộ định tuyến tài khoản chung
+với PAD, nhưng không dùng cơ sở dữ liệu riêng của gateway CLI/IDE. Đăng nhập
+được cấp trong bộ nhớ và xác minh bằng `getAuthStatus`; không ghi đè auth.json
+hay sửa binary/launcher của desktop. Công cụ MCP được gắn với pipe của phiên
+desktop hiện tại theo từng thread, không dùng pipe cũ kế thừa từ PAD.
+
+`desktop-integration.json` chỉ lưu bật/tắt và đường dẫn lịch sử. PAD truyền
+`CODEX_CLI_PATH` và chế độ stdio khi người dùng mở desktop từ nút kết nối.
+Đây là cơ chế override nội bộ của app desktop, cần kiểm tra lại sau các bản
+cập nhật upstream. Linux discovery hỗ trợ gói `/usr/lib/chatgpt` và một số
+đường dẫn `/opt`; macOS kiểm tra ChatGPT/Codex trong Applications. Không tự
+đóng ứng dụng đang chạy hoặc cố chiếm phiên daemon của desktop.
+
+`npm run smoke:desktop` dùng tài khoản JWT giả, server model loopback và lịch
+sử tạm: đổi do quota, retry giữ nguyên request, thao tác công cụ đúng một lần,
+đổi thủ công, restart/resume và MCP. Không cần tài khoản OpenAI thật.
+Trên Linux có desktop đã cài, `PADSWITCHER_DESKTOP_SMOKE_APP=1 npm run smoke:desktop`
+kiểm tra thêm app thật chạy headless với userData tạm và proxy chặn mạng.
+Tùy chọn headless này không phải kiểm thử giao diện app macOS.
+
 ## GitHub và phát hành
 
 `unix-ci.yml` chạy trên push/PR vào `feature/cross-platform`: unit test lõi dùng chung trên Windows và
@@ -150,8 +175,8 @@ GitHub có thể bỏ qua cả workflow push tag khi commit mang nhãn này. V�
 tài liệu có `[skip ci]` ở đầu nhánh, hãy chỉ định SHA của commit đã qua CI khi tạo tag.
 
 ```bash
-git tag unix-v1.19.1-unix.3
-git push origin unix-v1.19.1-unix.3
+git tag unix-v1.19.1-unix.4
+git push origin unix-v1.19.1-unix.4
 ```
 
 `unix-release.yml` kiểm tra tag khớp package version và commit thuộc nhánh Unix,

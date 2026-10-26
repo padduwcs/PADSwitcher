@@ -64,6 +64,8 @@ class ProfileService extends EventEmitter {
   }
   view() {
     return {
+      platform: this.platform.kind,
+      desktop: this.desktopIntegration?.view() || {configuration:'notConfigured',available:false,connected:0},
       version: require('../../package.json').version, profiles: this.state.profiles.map(p => ({ ...p, running: this.running.has(p.id), desktopActive: p.id === this.state.activeDesktopId })),
       settings: { ...this.state.settings }, busy: this.busy||!!this.gateway?.flight, login: this.login ? { profileId: this.login.profileId } : null,
       sayHi: this.sayHi.view(),

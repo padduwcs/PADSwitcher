@@ -1,7 +1,7 @@
 # Install PADSwitcher Unix
 
 [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md)
-· [Download Unix 1.19.1-unix.3](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)
+· [Download Unix 1.19.1-unix.4](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)
 · [Report a problem](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix manages Codex/Kaggle accounts on Linux and macOS. This is a
@@ -14,12 +14,12 @@ Electron and the native helper are included.
 
 | Computer | Download |
 | --- | --- |
-| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.3-Linux-amd64.deb` (recommended) |
-| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.3-Linux-arm64.deb` (recommended) |
-| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage` |
-| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.3-Linux-arm64.AppImage` |
-| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.3-macOS-arm64.dmg` |
-| Intel Mac | `PADSwitcher-1.19.1-unix.3-macOS-x64.dmg` |
+| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.4-Linux-amd64.deb` (recommended) |
+| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.4-Linux-arm64.deb` (recommended) |
+| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage` |
+| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.4-Linux-arm64.AppImage` |
+| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.4-macOS-arm64.dmg` |
+| Intel Mac | `PADSwitcher-1.19.1-unix.4-macOS-x64.dmg` |
 
 Mac `.zip` files are alternatives to the DMG for the same architecture.
 On Linux, `uname -m` shows `x86_64` (Intel/AMD) or `aarch64` (ARM64).
@@ -43,9 +43,9 @@ Open a terminal in the download folder. For Intel/AMD:
 
 ```bash
 # Download the installer and matching .sha256 into this folder.
-sha256sum -c PADSwitcher-1.19.1-unix.3-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.4-Linux-amd64.deb.sha256
 # Continue only when the checksum reports OK.
-sudo apt install ./PADSwitcher-1.19.1-unix.3-Linux-amd64.deb
+sudo apt install ./PADSwitcher-1.19.1-unix.4-Linux-amd64.deb
 ```
 
 On ARM64, use the `Linux-arm64.deb` filename instead. Launch **PADSwitcher Unix**
@@ -81,8 +81,8 @@ Do not use `sudo pip` or `--break-system-packages`.
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.3-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage
 ```
 
 On ARM64, use the `Linux-arm64.AppImage` filename. Data is stored in your user
@@ -152,16 +152,57 @@ Keep PADSwitcher running while using its Codex connections. Closing the window
 may minimize it to the tray; use **Quit PADSwitcher** in the tray menu to exit.
 If the desktop does not display a tray icon, launch the app again to reopen it.
 
+### Continue a Codex conversation in ChatGPT/Codex desktop
+
+This connection changes the account used by **local Codex** in the desktop app,
+keeping its existing conversation store and project folders. Regular ChatGPT
+sign-in and cloud chat history stay with their original account. Personal
+Free/Plus/Pro accounts are supported; organization accounts, cloud/remote tasks
+and realtime/background sessions are outside this connection's scope.
+
+1. Install the official ChatGPT/Codex desktop with its bundled native Codex.
+2. In PADSwitcher, choose an account → **Use this account** in **Shared** mode.
+3. For the first connection, save your work and **fully quit** ChatGPT/Codex
+   desktop. Closing a window may only minimize it; use the app's Quit action.
+4. Open **Connections → Codex in desktop → Open desktop through PADSwitcher**.
+   Wait for **Connected**, then reopen your existing Codex conversation.
+5. Later, select another account in PADSwitcher. Manual switches wait for active
+   turns to finish; continue messaging in the same chat. When auto-switching is
+   enabled, the router handles explicit quota rejections before returning model
+   output, without repeating tool actions that have already run.
+
+Desktop uses the **shared account** alongside CLI/IDE connections in Shared mode.
+Connections configured with a separate account keep their own selection.
+Check PADSwitcher for the active Codex account and quota; the desktop's ChatGPT
+account menu may still show its original ChatGPT sign-in.
+
+Desktop history defaults to `~/.codex`, separate from PADSwitcher's private
+`codex-home`. If you use another folder, choose **How to connect → Choose
+conversation folder** before launching. Do not delete, move or copy `auth.json`
+to connect. If old chats are missing, check the folder before creating a new chat.
+
+Keep PADSwitcher running. After quitting/restarting PADSwitcher, fully quit and
+reopen desktop through the button if it has not reconnected. To return to the
+original setup: quit desktop → **Disconnect desktop** in PADSwitcher → open
+ChatGPT/Codex from the system menu. Original credentials and history are preserved.
+
+This experimental integration uses the desktop's runtime override mechanism.
+The installed Linux app `26.1016.61520` was checked with an isolated synthetic
+handshake, and native Codex retained context/tools across switching and restart.
+Full real-account workflows and the macOS desktop app have not been verified;
+desktop updates may require integration changes. A failed account verification
+disconnects desktop and reports an error for inspection.
+
 ## 4. Verify a download
 
 Download the installer's matching `.sha256` file into the same folder:
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.3-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.4-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.3-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.4-macOS-arm64.dmg.sha256
 ```
 
 Continue only if it reports `OK`. A combined `SHA256SUMS.txt` is also provided.

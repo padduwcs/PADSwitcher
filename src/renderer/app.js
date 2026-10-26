@@ -87,6 +87,16 @@ function render() {
   const g=gatewayForScope()||{status:'stopped'};
   renderConnectionStatus(state.gateway||g);
   renderRoutes();
+  const desktop=state.desktop||{},desktopProfile=state.profiles.find(p=>p.id===desktop.profileId);
+  $('.desktop-card').classList.toggle('hidden',state.platform==='windows');
+  $('#desktop-state').textContent=desktop.connected?(desktop.pendingId?'Đang chờ đổi tài khoản':'Đang kết nối'):desktop.launching?'Đang mở desktop…':desktop.configuration==='configured'?'Chờ desktop':'Chưa kết nối';
+  $('#desktop-next').textContent=desktop.lastError||(desktop.connected?'Codex desktop đang dùng '+(desktopProfile?.label||'tài khoản đã chọn')+'.':!desktop.available?'Cài ChatGPT/Codex desktop chính thức để kết nối.':desktop.running?'Lưu công việc và thoát hẳn desktop trước lần kết nối đầu tiên.':'Mở desktop qua PADSwitcher rồi mở lại hội thoại Codex cũ.');
+  if(ui.language==='en'&&desktop.connected&&!desktop.lastError)$('#desktop-next').textContent='Codex desktop is using '+(desktopProfile?.label||'the selected account')+'.';
+  $('#desktop-home-value').textContent=desktop.home||'';
+  $('#open-desktop-connected').disabled=state.busy||desktop.launching||!desktop.available||!state.gateway?.profileId||!!desktop.connected;
+  $('#disconnect-desktop').disabled=state.busy||desktop.launching||desktop.configuration!=='configured';
+  $('#desktop-home-pick').disabled=state.busy||desktop.launching||!!desktop.connected;
+
   $('#gateway-status').textContent=({stopped:'Chưa bật kết nối',starting:'Đang khởi động Codex…',ready:'Đã kết nối Codex',stopping:'Đang dừng…',error:'Kết nối cần khởi động lại'}[g.status]||g.status);
   const pending=state.profiles.find(x=>x.id===g.pendingId);
   $('#gateway-detail').textContent=g.lastError|| (g.status==='ready'?`${g.clients} kết nối · ${g.activeTurns} lượt đang chạy${pending?' · Sẽ dùng '+pending.label+' khi lượt hiện tại xong':''}`:'Chọn tài khoản bên dưới → Dùng tài khoản này.');
@@ -144,7 +154,12 @@ function renderDetail(p) {
     </div>`;
   document.querySelectorAll('[data-reset-credit]').forEach(button => button.onclick = () => resetModal(p,button.dataset.resetCredit || null));
   $('#use-gateway').onclick = async()=>{const r=await call('gateway',{id:p.id,scope:accountScope});if(r)toast(gatewayForScope()?.pendingId?'Sẽ chuyển khi lượt đang chạy hoàn tất.':'Đang dùng '+p.label+'.');};
-  $('#use-desktop').onclick = () => showModal('Dùng cho desktop',`<p>Chuyển sang <span class="confirm-name" data-literal>${e(p.label)}</span>.</p><p class="field-help">Kết thúc tác vụ và thoát Codex/ChatGPT cùng IDE đang dùng Codex trước khi chuyển. Phiên trước được lưu để khôi phục; lịch sử và cấu hình được giữ nguyên.</p>`,async () => { closeModal(); const response = await call('switch',{id:p.id},'Đã đổi phiên. Mở lại desktop và kiểm tra tài khoản đang hiển thị.'); if (response) showModal('Đã chuyển phiên', '<p>Mở Codex desktop để tiếp tục. Kiểm tra tên tài khoản trong ứng dụng trước khi gửi yêu cầu mới.</p>',async () => { closeModal(); await call('openDesktop'); },'Mở Codex desktop'); },'Chuyển tài khoản');
+  if(state.platform==='unix'){
+    $('#use-desktop').textContent='Dùng trong Codex desktop';
+    $('#use-desktop').disabled=state.busy||state.desktop?.launching||!state.desktop?.available;
+    $('#profile-legacy .field-help').textContent=ui.language==='en'?'Desktop uses the shared account and supports auto-switching. Private CLI sessions stay separate.':'Desktop dùng tài khoản chung và hỗ trợ tự đổi. CLI riêng giữ lựa chọn độc lập.';
+    $('#use-desktop').onclick=()=>desktopLaunchDialog(p.id);
+  }else $('#use-desktop').onclick = () => showModal('Dùng cho desktop',`<p>Chuyển sang <span class="confirm-name" data-literal>${e(p.label)}</span>.</p><p class="field-help">Kết thúc tác vụ và thoát Codex/ChatGPT cùng IDE đang dùng Codex trước khi chuyển. Phiên trước được lưu để khôi phục; lịch sử và cấu hình được giữ nguyên.</p>`,async () => { closeModal(); const response = await call('switch',{id:p.id},'Đã đổi phiên. Mở lại desktop và kiểm tra tài khoản đang hiển thị.'); if (response) showModal('Đã chuyển phiên', '<p>Mở Codex desktop để tiếp tục. Kiểm tra tên tài khoản trong ứng dụng trước khi gửi yêu cầu mới.</p>',async () => { closeModal(); await call('openDesktop'); },'Mở Codex desktop'); },'Chuyển tài khoản');
   $('#launch-cli').onclick = () => call('launch',{id:p.id},'Đã mở CLI. Đóng cửa sổ CLI khi xong để khóa lại phiên.');
   $('#resume-cli').onclick = () => call('launch',{id:p.id,resume:true},'Đã mở bộ chọn hội thoại CLI.');
   $('#refresh-one').onclick = () => call('refresh',{id:p.id},'Đã cập nhật quota.');
@@ -365,3 +380,14 @@ api.onDevice(device => { $('#login-detail').textContent = ui.t(`Mã thiết bị
 api.onRefreshError?.(error => toast(ui.error(error),true));
 call('state').then(response => { if (response) { state = response.result; render(); } });
 setInterval(() => { if (state && ['accounts','kaggle'].includes(page) && !state.busy && !$('#modal').open) render(); },30000);
+
+function desktopLaunchDialog(id){
+  const label=state.profiles.find(p=>p.id===id)?.label||'';
+  showModal('Kết nối Codex desktop','<p><span>Tài khoản</span>: <strong data-literal>'+e(label)+'</strong>.</p><p>Desktop sẽ dùng tài khoản chung đã chọn qua PADSwitcher và giữ kho hội thoại Codex hiện tại.</p><p>Áp dụng cùng tài khoản cho các kết nối đang dùng chung.</p><p class="field-help">Lần đầu: lưu công việc và thoát hẳn desktop trước khi mở. Các lần đổi tài khoản sau chờ lượt đang chạy hoàn tất và không cần đóng desktop. Áp dụng cho Codex cục bộ; lịch sử ChatGPT thông thường không chuyển giữa tài khoản.</p>',async()=>{
+    closeModal();const r=await call('desktopLaunch',{id});
+    if(r)toast(r.result?.connected?'Đã gửi yêu cầu chọn tài khoản cho desktop.':'Đã yêu cầu mở desktop. Chờ trạng thái Đang kết nối.');
+  },'Mở desktop qua PADSwitcher');
+}
+$('#open-desktop-connected').onclick=()=>desktopLaunchDialog(state.gateway?.profileId);
+$('#disconnect-desktop').onclick=()=>showModal('Gỡ kết nối desktop','<p>Thoát desktop trước khi tiếp tục. Sau khi gỡ, mở ChatGPT/Codex từ menu hệ thống để dùng lại đăng nhập ban đầu. Hội thoại và tệp đăng nhập cũ được giữ nguyên.</p>',async()=>{closeModal();await call('desktopDisconnect',{},'Đã gỡ kết nối desktop.');},'Gỡ kết nối desktop');
+$('#desktop-home-pick').onclick=async()=>{const r=await call('pick',{kind:'desktopCodexHome'});if(r?.result)await call('desktopHome',{home:r.result});};

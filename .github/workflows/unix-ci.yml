@@ -53,6 +53,7 @@ jobs:
       - run: npm run test:kaggle
       - run: npm run smoke:protocol
       - run: npm run smoke:say-hi
+      - run: npm run smoke:desktop
       - name: Prepare Linux Chromium sandbox
         if: runner.os == 'Linux'
         run: |

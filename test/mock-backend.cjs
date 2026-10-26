@@ -5,7 +5,7 @@ const args=process.argv.slice(2),url=new URL(args[args.indexOf('--listen')+1]);
 const token=fs.readFileSync(args[args.indexOf('--ws-token-file')+1],'utf8');
 if(!args.includes('cli_auth_credentials_store="ephemeral"'))process.exit(2);
 const wss=new WebSocketServer({host:'127.0.0.1',port:Number(url.port),verifyClient:info=>info.req.headers.authorization==='Bearer '+token});
-let account=null,nextTurn=0;const turns=new Map(),refresh=new Map();
+let account=null,nextTurn=0,wrongAuth=!!process.env.PAD_TEST_WRONG_AUTH;const turns=new Map(),refresh=new Map();
 function send(s,m){if(s.readyState===1)s.send(JSON.stringify(m));}
 function notify(method,params){for(const s of wss.clients)send(s,{method,params});}
 wss.on('connection',socket=>socket.on('message',data=>{
@@ -15,6 +15,9 @@ wss.on('connection',socket=>socket.on('message',data=>{
   switch(m.method){
     case 'initialize':if(m.params?.fixtureRejectInitialize){send(socket,{id:m.id,error:{code:-1,message:'Fixture handshake rejected'}});return;}result={userAgent:'fixture'};break;
     case 'account/login/start':account=m.params;break;
+    case 'getAuthStatus':result={authMethod:'chatgptAuthTokens',authToken:wrongAuth?'fixture-wrong-token':account?.accessToken};break;
+    case 'fixture/wrongAuth':wrongAuth=true;break;
+    case 'fixture/echo':result=m.params;break;
     case 'account/read':result={account:{type:'chatgpt',email:account?.chatgptAccountId+'@example.test'}};break;
     case 'thread/start':result={thread:{id:'thread-fixture'}};break;
     case 'turn/start':case 'review/start':{

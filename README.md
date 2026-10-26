@@ -10,13 +10,13 @@ Nhánh này là `feature/cross-platform`. Bản Windows ổn định tiếp tụ
 và quy trình phát hành riêng. Có thể dùng một thư mục mã nguồn rồi chuyển nhánh
 để làm việc với từng bản.
 
-[Tải Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3) ·
+[Tải Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4) ·
 [Cài đặt và dùng lần đầu](docs/UNIX-INSTALL.md) · [English](README.en.md) ·
 [Tất cả hướng dẫn](docs/README.md)
 
 ## Tải và cài đặt
 
-Mở [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3),
+Mở [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4),
 chọn `.deb` cho Ubuntu/Debian, `.AppImage` cho Linux tương thích hoặc `.dmg` cho Mac.
 Có đủ Linux x64/ARM64 và Mac Intel/Apple Silicon. Bảng chọn file, hướng dẫn
 Keychain/GNOME Keyring, cập nhật và xử lý lỗi nằm trong

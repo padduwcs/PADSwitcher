@@ -242,6 +242,22 @@ function dom(t,demo = true, editState = null) {
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/kaggle.js'),'utf8'));
   window.eval(script); t.after(() => {window.close();assert.deepEqual(errors,[],'Renderer must not throw uncaught errors');}); return window;
 }
+test('Unix desktop launch names the shared account, explains history and waits for a verified connection',async t=>{
+  const w=dom(t,true,s=>{s.platform='unix';s.desktop={available:true,configuration:'notConfigured',home:'/home/test/.codex',connected:0};s.gateway={...s.gateway,status:'ready',profileId:s.profiles[1].id};});await settle();const d=w.document,calls=[];
+  w.pad.action=async(command,args)=>{calls.push({command,args});return {ok:true,result:{launched:true,connected:false}};};
+  assert(!d.querySelector('#open-desktop-connected').disabled);d.querySelector('#open-desktop-connected').click();
+  assert(d.querySelector('#modal-body').textContent.includes('Dự án · Pro'));assert(d.querySelector('#modal-body').textContent.includes('thoát hẳn desktop'));assert.equal(calls.length,0);
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  assert.equal(calls[0].command,'desktopLaunch');assert.equal(calls[0].args.id,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');assert(!calls.some(c=>c.command==='switch'));
+  assert(d.querySelector('.toast').textContent.includes('Chờ trạng thái'));assert.equal(d.querySelector('#desktop-state').textContent,'Chưa kết nối');
+});
+test('desktop indicators distinguish waiting, pending and missing app states and translate account labels safely',async t=>{
+  for(const [desktop,expected]of [[{available:false},'Chưa kết nối'],[{available:true,configuration:'configured'},'Chờ desktop'],[{available:true,connected:2,pendingId:'next'},'Đang chờ đổi tài khoản']]){
+    const w=dom(t,true,s=>{s.platform='unix';s.desktop={...desktop,profileId:s.profiles[1].id};});await settle();const d=w.document;
+    assert.equal(d.querySelector('#desktop-state').textContent,expected);assert(d.querySelector('#open-desktop-connected').disabled);
+    d.querySelector('#language-toggle').click();if(desktop.connected){assert.equal(d.querySelector('#desktop-state').textContent,'Waiting to switch accounts');assert(d.querySelector('#desktop-next').textContent.includes('Dự án · Pro'));}else if(!desktop.available)assert(d.querySelector('#desktop-next').textContent.includes('Install the official'));
+  }
+});
 test('renderer shows a useful empty state and disables quota refresh with no accounts',async t => {
   const w = dom(t,false); await settle();
   assert.equal(w.document.querySelector('#empty').classList.contains('hidden'),false);

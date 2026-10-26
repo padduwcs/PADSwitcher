@@ -5,6 +5,33 @@ Implementation is confined to `feature/cross-platform`. Validation initially use
 a separate worktree; normal development can use [one checkout and switch branches](DEVELOPMENT.md#one-folder-and-two-branches).
 The Windows baseline stayed unchanged during development.
 
+## 1.19.1-unix.4 — 2026-10-26
+
+- Local Ubuntu 26.04 x64: 236 Node tests (232 passed, four Windows-only skips),
+  Go helper tests, syntax checks and six official Kaggle SDK contracts passed.
+  npm audit reported zero advisories at validation time.
+- New desktop transport checks use native Codex `0.160.0` and the installed
+  desktop's `0.163.0-alpha.11.1`, synthetic accounts and loopback inference:
+  same thread/context across quota A/B, byte-identical retry, dynamic tool run
+  once, manual switch, restart/resume and a fresh desktop MCP pipe.
+- The installed Linux ChatGPT desktop `26.1016.61520` connected successfully
+  through PAD in a separate headless userData directory. Account verification
+  and the connection indicator passed. No real credentials or live model
+  requests were used. This verifies the native handshake, not a full signed-in
+  GUI conversation. Original auth.json was unchanged in the fixture.
+- Source and packaged Electron startup, sandbox, IPC, service navigation and
+  isolated storage passed. The desktop connection card was visually checked.
+  A local deb/AppImage build completed. System keyring, encrypted vault,
+  guardian, Bash/Zsh selection and terminal supervisor checks also passed.
+- Manual switching waits for active desktop/shared turns; new turns cannot
+  race the switch. Failed native account verification disconnects only the
+  desktop transport and leaves the shared model router available.
+- Desktop integration uses internal runtime override options. Full real-account
+  acceptance and the actual macOS desktop GUI remain unverified. Regular
+  ChatGPT sign-in/history, cloud/remote and realtime/background sessions are
+  outside this feature. See the bilingual installation guides for first-use,
+  history folder selection and returning to the original login.
+
 ## 1.19.1-unix.3 — 2026-10-26
 
 - Electron 44.9.3; native helper built with Go 1.27.3; refreshed npm lockfile

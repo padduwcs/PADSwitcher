@@ -10,7 +10,7 @@ on [`main`](https://github.com/padduwcs/PADSwitcher/tree/main). The Unix app ide
 data, default Codex home, build output and release channel are separate. You can
 keep one source folder and switch branches to work on either edition.
 
-**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.3)**
+**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)**
 · [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md)
 · [Documentation](docs/README.md).
 

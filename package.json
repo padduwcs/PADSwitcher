@@ -1,6 +1,6 @@
 {
   "name": "padswitcher-unix",
-  "version": "1.19.1-unix.3",
+  "version": "1.19.1-unix.4",
   "description": "Profile Account Directory Switcher — isolated Linux and macOS edition",
   "private": true,
   "desktopName": "padswitcher-unix.desktop",
@@ -47,7 +47,8 @@
     "prebuild": "node scripts/build-helper.cjs",
     "predist": "node scripts/build-helper.cjs",
     "build": "node scripts/package-unix.cjs --dir",
-    "dist": "node scripts/package-unix.cjs"
+    "dist": "node scripts/package-unix.cjs",
+    "smoke:desktop": "node scripts/desktop-protocol-smoke.cjs"
   },
   "devDependencies": {
     "electron": "44.9.3",

@@ -1,15 +1,28 @@
 ## Linux / macOS — {{VERSION}} · Pre-release
 
 **Tiếng Việt:** Bản Unix thử nghiệm: quản lý tài khoản Codex/Kaggle, quota,
-kết nối CLI/VS Code/JetBrains và shell Bash/Zsh. Chọn bộ cài theo bảng bên dưới.
+kết nối CLI/VS Code/JetBrains/desktop và shell Bash/Zsh. Chọn bộ cài theo bảng bên dưới.
 Không cần tải Source code hay cài Node.js/Go để mở ứng dụng.
 
 **English:** Unix preview: Codex/Kaggle account management, quota,
-CLI/VS Code/JetBrains connections and Bash/Zsh integration. Choose an installer
+CLI/VS Code/JetBrains/desktop connections and Bash/Zsh integration. Choose an installer
 below. No source build, Node.js or Go is needed to run the application.
 
 ### Có gì mới / What's new
 
+- Kết nối Codex cục bộ trong ChatGPT/Codex desktop qua tài khoản chung, giữ
+  cùng kho hội thoại và dự án; đổi thủ công chờ lượt đang chạy hoàn tất.
+  Local desktop Codex can use the shared account while keeping conversation
+  history; manual switches wait for active turns to finish.
+- Giữ công cụ MCP của phiên desktop, xác minh tài khoản native và giữ nguyên
+  tệp đăng nhập ban đầu. Có hướng dẫn kết nối/gỡ kết nối Việt/Anh trong app
+  và hướng dẫn cài đặt. Desktop MCP tools and native account verification are
+  covered; the original sign-in file is preserved.
+- Kiểm thử offline dùng Codex native cho đổi quota trong cùng chat, tool chỉ
+  chạy một lần và mở lại chat cũ. Bắt tay app Linux `26.1016.61520` đã kiểm tra
+  bằng phiên thử riêng; luồng tài khoản thật và desktop macOS chưa được xác nhận.
+  Offline native protocol and isolated installed Linux handshake checked;
+  full real-account workflows and the macOS desktop app are not yet verified.
 - Electron **44.9.3**, helper Go **1.27.3** và các dependency đã vá;
   `npm audit` không còn cảnh báo tại thời điểm kiểm tra.
   Patched Electron/native toolchain and dependency refresh; no npm audit
@@ -65,6 +78,12 @@ installed deb/DMG startup are checked automatically. Real-account browser login,
 actual IDE workflows, Terminal automation prompts and other desktop distributions
 still need practical acceptance feedback. See the
 [validation record](https://github.com/padduwcs/PADSwitcher/blob/{{TAG}}/docs/UNIX-VALIDATION.md).
+
+Desktop integration is experimental and applies to local Codex with personal
+Free/Plus/Pro accounts. It does not transfer regular ChatGPT history or change
+the desktop's regular ChatGPT sign-in. Cloud/remote and realtime/background
+sessions are outside this connection. Fully quit desktop once, open it through
+PADSwitcher, then reopen the existing Codex chat. Keep PADSwitcher running.
 
 Ứng dụng dùng định danh, dữ liệu, Codex home và kênh phát hành Unix riêng.
 Không chép kho tài khoản Windows sang Unix; đăng nhập/thêm tài khoản lại.

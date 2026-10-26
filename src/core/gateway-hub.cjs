@@ -10,11 +10,11 @@ function kind(m){const n=m.params?.clientInfo?.name;return m.params?._padswitche
 class GatewayHub{
   constructor(service,options={}){
     this.service=service;this.options=options;this.private=new Map();this.waiting=new Set();this.transitions=new Map();this.flight=null;
-    this.shared=new Gateway(service,{...options,attach:front=>this.attach(front),clientCount:()=>this.all().reduce((n,g)=>n+g.clients.size,0)+this.waiting.size});service.gateway=this;
+    this.shared=new Gateway(service,{...options,canChange:()=>!this.desktop?.turns.size&&!this.desktop?.changing,canStart:()=>!this.desktop?.changing&&!this.desktop?.pendingId,attach:front=>this.attach(front),clientCount:()=>this.all().reduce((n,g)=>n+g.clients.size,0)+this.waiting.size});service.gateway=this;
     this.router={isUsing:id=>this.isUsing(id)};
     this.recovery={cancel:message=>{for(const g of this.all())g.recovery.cancel(message);}};
   }
-  all(){return [this.shared,...this.private.values()];}
+  all(){return [this.shared,...this.private.values(),...(this.desktop?[this.desktop]:[])];}
   config(scope){return this.transitions.get(scope)||this.service.state.clientRoutes[scope];}
   scope(scope='shared'){if(scope==='shared')return scope;if(!SCOPES.includes(scope))throw new UserError('Kết nối không hợp lệ.', 'INVALID_SETTINGS');return this.config(scope).mode==='private'?scope:'shared';}
   route(scope='shared'){return this.scope(scope)==='shared'?this.shared:this.private.get(scope);}
@@ -26,7 +26,7 @@ class GatewayHub{
   isUsing(id){return [...this.transitions.values()].some(r=>r.mode==='private'&&r.profileId===id)||this.all().some(g=>g.profileId===id||g.pendingId===id||g.router?.isUsing(id));}
   changed(){this.service.changed();}
   view(){
-    const base=this.shared.view(),views=this.all().map(g=>g.view()),connected={vscode:0,jetbrains:0,cli:0,other:0};
+    const base=this.shared.view(),views=this.all().map(g=>g.view()),connected={vscode:0,jetbrains:0,cli:0,desktop:0,other:0};
     for(const v of views)for(const k of Object.keys(connected))connected[k]+=v.connected[k]||0;
     const scopes=Object.fromEntries(SCOPES.map(k=>{const config=this.service.state.clientRoutes[k],g=this.route(k);return [k,{...g?.view(),mode:config.mode,autoSwitch:config.mode==='private'?config.autoSwitch:this.service.state.autoSwitch}];}));
     return {...base,connected,clients:views.reduce((n,v)=>n+v.clients,0)+this.waiting.size,activeTurns:views.reduce((n,v)=>n+v.activeTurns,0),scopes,routingBusy:!!this.flight};
@@ -39,6 +39,23 @@ class GatewayHub{
     const g=new Gateway(facade,{...this.options,attach:undefined,root:path.join(owner.root,'gateway','routes',scope),isolatedState:true});
     this.private.set(scope,g);return g;
   }
+  async startDesktop({home,executable,environment}){
+    if(this.status!=='ready'||!this.shared.router)throw new UserError('Bật kết nối Codex trước khi mở desktop.', 'GATEWAY_STOPPED');
+    if(this.desktop?.status==='error'){await this.desktop.stop(true);this.desktop=null;}
+    if(!this.desktop){
+      const owner=this.service,hub=this;
+      const state=new Proxy({}, {get:(_t,k)=>k==='settings'?{...owner.state.settings,desktopHome:home}:k==='gatewayProfileId'?owner.state.desktopGatewayProfileId:k==='gatewayEnabled'?false:owner.state[k],set:(_t,k,v)=>{if(k==='gatewayProfileId')owner.state.desktopGatewayProfileId=v;else if(k!=='gatewayEnabled')owner.state[k]=v;return true;}});
+      const facade={root:owner.root,platform:owner.platform,state,running:owner.running,get busy(){return owner.busy;},get:id=>owner.get(id),accessBundle:(...args)=>owner.accessBundle(...args),save:()=>owner.save(),changed:()=>owner.changed()};
+      this.desktop=new Gateway(facade,{...this.options,attach:undefined,root:path.join(owner.root,'gateway','desktop'),executable,environment,clientKind:'desktop',isolatedState:false,sharedRouter:this.shared.router,verifyAccount:true,canChange:()=>!hub.shared.turns.size&&!hub.shared.changing,canStart:()=>!hub.shared.changing&&!hub.shared.pendingId});
+    }
+    if(this.desktop.status!=='ready'||this.desktop.profileId!==this.shared.router.profileId||this.desktop.pendingId)await this.desktop.start(this.shared.router.profileId);
+    return this.desktop;
+  }
+  async stopDesktop(){
+    if(!this.desktop)return;
+    if(this.desktop.clients.size)throw new UserError('Thoát desktop đã kết nối trước khi gỡ kết nối.', 'DESKTOP_RUNNING');
+    await this.desktop.stop();this.desktop=null;this.changed();
+  }
   async start(id,scope='shared'){
     if(this.flight)throw new UserError('Chờ thay đổi chế độ kết nối hoàn tất.', 'BUSY');
     const target=this.scope(scope);
@@ -47,6 +64,8 @@ class GatewayHub{
     if(target==='shared')await this.shared.start(id);
     else {if(this.status!=='ready')await this.shared.start(this.service.state.gatewayProfileId||id);await this.privateGateway(target).start(id);}
     for(const k of SCOPES)if(this.config(k).mode==='private'&&this.private.get(k)?.status!=='ready')await this.privateGateway(k).start(this.config(k).profileId);
+    await this.service.desktopIntegration?.resumeGateway();
+    if(target==='shared'&&this.desktop?.status==='ready'&&(this.desktop.profileId!==id||this.desktop.pendingId))await this.desktop.select(id);
   }
   async select(id,scope='shared'){const g=this.route(scope);if(!g)throw new UserError('Bật kết nối trước khi đổi tài khoản.', 'GATEWAY_STOPPED');await g.select(id);}
   async configure({scope,mode,profileId}){
@@ -95,7 +114,7 @@ class GatewayHub{
     if(this.flight)throw new UserError('Chờ thay đổi chế độ kết nối hoàn tất.', 'BUSY');
     if(!force){for(const g of this.all())if(g.status==='ready')await g.reconcile();if(this.turns.size||this.all().some(g=>g.router?.active))throw new UserError('Codex còn yêu cầu đang chạy. Chờ hoàn tất trước khi dừng.', 'GATEWAY_ACTIVE');}
     for(const p of this.waiting)p.front.terminate();this.waiting.clear();
-    for(const g of [...this.private.values(),this.shared])await g.stop(force);this.private.clear();
+    for(const g of [...(this.desktop?[this.desktop]:[]),...this.private.values(),this.shared])await g.stop(force);this.desktop=null;this.private.clear();
   }
 }
 module.exports={GatewayHub,kind};

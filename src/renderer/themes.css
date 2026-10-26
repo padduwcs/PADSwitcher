@@ -188,7 +188,7 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
 #accounts-page .detail-actions > .button { border-radius:10px; line-height:20px; }
 #accounts-page #say-hi-one > .icon { width:17px; height:17px; }
 #accounts-page #say-hi-one:disabled { background:var(--surface); color:var(--muted); opacity:.45; }
-.connection-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.connection-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .integration-card { min-width:0; display:flex; flex-direction:column; }
 .integration-card > .button, .integration-card > .integration-actions { align-self:flex-start; margin-bottom:20px; }
 .integration-card .button { white-space:normal; }

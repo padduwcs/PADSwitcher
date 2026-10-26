@@ -23,7 +23,8 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
   const root=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'padswitcher-packaged-')));await fs.chmod(root,0o700);
   const server=net.createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;await new Promise(r=>server.close(r));
   const env={...process.env,PADSWITCHER_APPDATA_DIR:root};delete env.ELECTRON_RUN_AS_NODE;delete env.NODE_OPTIONS;
-  const child=spawn(binary,[`--remote-debugging-port=${port}`],{env,stdio:'ignore',detached:true});let launchError;child.on('error',e=>launchError=e);let socket;
+  const headless=process.platform==='linux'&&process.env.PADSWITCHER_SMOKE_HEADLESS==='1';
+  const child=spawn(binary,[`--remote-debugging-port=${port}`,...(headless?['--ozone-platform=headless','--disable-gpu']:[])],{env,stdio:'ignore',detached:true});let launchError;child.on('error',e=>launchError=e);let socket;
   try {
     let page;for(let i=0;i<150;i++){if(launchError)throw launchError;if(child.exitCode!==null)throw Error('Packaged app exited before creating a window');try{page=(await(await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(p=>p.type==='page'&&p.url.endsWith('/renderer/index.html'));if(page)break;}catch{}await pause(100);}
     assert(page,'Packaged renderer was not available');socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((r,j)=>{socket.once('open',r);socket.once('error',j);});let sequence=0;const pending=new Map();socket.on('message',raw=>{const message=JSON.parse(raw);if(pending.has(message.id)){const item=pending.get(message.id);pending.delete(message.id);message.error?item.reject(Error(message.error.message)):item.resolve(message.result);}});

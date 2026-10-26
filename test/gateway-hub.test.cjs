@@ -19,7 +19,7 @@ test('one stable endpoint dispatches shared clients together and private clients
   assert.equal((await vs.request('account/read')).account.email,email('a'));assert.equal((await jb.request('account/read')).account.email,email('c'));
   await hub.start(b.id,'vscode');assert.equal((await vs.request('account/read')).account.email,email('b'));assert.equal((await jb.request('account/read')).account.email,email('c'));assert.equal((await cli.request('account/read')).account.email,email('a'));
   await hub.start(d.id);assert.equal((await cli.request('account/read')).account.email,email('d'));assert.equal((await vs.request('account/read')).account.email,email('b'));assert.equal((await jb.request('account/read')).account.email,email('c'));
-  assert.deepEqual(hub.view().connected,{vscode:1,jetbrains:1,cli:1,other:0});assert.notEqual(hub.private.get('vscode').backend.pid,hub.private.get('jetbrains').backend.pid);
+  assert.deepEqual(hub.view().connected,{vscode:1,jetbrains:1,cli:1,desktop:0,other:0});assert.notEqual(hub.private.get('vscode').backend.pid,hub.private.get('jetbrains').backend.pid);
 });
 test('private quota fallback preserves request bytes and affects only that route; account cooldown is shared',async t=>{
   const {hub,service,profiles:[a,b,c,d],client}=await ready(t);

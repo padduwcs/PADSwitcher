@@ -266,7 +266,8 @@ func bridge(c connection, token string) error {
 		scanner.Buffer(make([]byte, 8192), maxFrame)
 		for scanner.Scan() {
 			line := append([]byte(nil), scanner.Bytes()...)
-			if os.Getenv("PADSWITCHER_CLIENT_KIND") == "jetbrains" {
+			clientKind := os.Getenv("PADSWITCHER_CLIENT_KIND")
+			if clientKind == "jetbrains" || clientKind == "desktop" {
 				var m map[string]any
 				if err := json.Unmarshal(line, &m); err != nil {
 					done <- err
@@ -278,7 +279,16 @@ func bridge(c connection, token string) error {
 						done <- errPrivate
 						return
 					}
-					p["_padswitcherClient"] = "jetbrains"
+					p["_padswitcherClient"] = clientKind
+					if clientKind == "desktop" {
+						environment := map[string]string{}
+						for _, key := range []string{"CODEX_APP_TOOLS_PIPE_PATH", "CODEX_MCP_NODE_PATH"} {
+							if value := os.Getenv(key); value != "" {
+								environment[key] = value
+							}
+						}
+						p["_padswitcherDesktopEnvironment"] = environment
+					}
 					line, _ = json.Marshal(m)
 				}
 			}

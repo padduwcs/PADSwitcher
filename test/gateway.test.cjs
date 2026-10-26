@@ -40,6 +40,23 @@ test('a rejected handshake, unknown client and CLI never appear as a connected e
   const unknown=new WsRpc(await connect(g.url,g.frontToken));t.after(()=>unknown.close());await unknown.initialize();await until(()=>g.view().connected.other>=1);
   assert.equal(g.view().connected.vscode,0);
 });
+test('a pipelined initialized notification counts only after a successful handshake',async t=>{
+  const {g}=await ready(t),accepted=await connect(g.url,g.frontToken),rejected=await connect(g.url,g.frontToken);
+  t.after(()=>{accepted.close();rejected.close();});
+  accepted.send(JSON.stringify({id:0,method:'initialize',params:{clientInfo:{name:'codex_vscode'}}}));
+  accepted.send(JSON.stringify({method:'initialized'}));
+  rejected.send(JSON.stringify({id:0,method:'initialize',params:{clientInfo:{name:'codex_vscode'},fixtureRejectInitialize:true}}));
+  rejected.send(JSON.stringify({method:'initialized'}));
+  await until(()=>g.view().connected.vscode===1);await pause(30);
+  assert.equal(g.view().connected.vscode,1);assert.equal(g.view().connected.desktop,0);
+});
+test('installed desktop handshake may omit initialized but still requires native acceptance',async t=>{
+  const {g}=await ready(t),desktop=new WsRpc(await connect(g.url,g.frontToken)),rejected=new WsRpc(await connect(g.url,g.frontToken));
+  t.after(()=>{desktop.close();rejected.close();});
+  await desktop.request('initialize',{clientInfo:{name:'Codex Desktop'},_padswitcherClient:'desktop'});
+  await assert.rejects(rejected.request('initialize',{clientInfo:{name:'Codex Desktop'},_padswitcherClient:'desktop',fixtureRejectInitialize:true}));
+  assert.equal(g.view().connected.desktop,1);
+});
 test('gateway changes memory authentication across connected clients without writing shared auth',async t=>{
   const {g,c,a,b,desktop}=await ready(t);const d=new WsRpc(await connect(g.url,g.frontToken));await d.initialize();t.after(()=>d.close());
   assert.equal((await c.request('account/read')).account.email,'fixture-account-a@example.test');
