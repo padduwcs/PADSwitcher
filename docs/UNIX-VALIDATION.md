@@ -5,7 +5,47 @@ Implementation is confined to `feature/cross-platform`. Validation initially use
 a separate worktree; normal development can use [one checkout and switch branches](DEVELOPMENT.md#one-folder-and-two-branches).
 The Windows baseline stayed unchanged during development.
 
+## 1.19.1-unix.7 — 2026-10-27
+
+- A subsequent real report showed Unix.6 could still block a legitimate model
+  step. The previous guard keyed a whole turn, conflating automatic recovery
+  with new steering input or completed tool results. Regressions reproduce the
+  old `400` and verify those forms of progress remain available in the same chat.
+  Partial assistant recovery alone still cannot authorize another inference.
+- Repeated native desktop/extension testing exposed a second bug: automatic
+  native-auth synchronization set `pendingId`, which incorrectly disabled the
+  next quota fallback as if it were a manual account choice. Synchronization
+  now has an explicit source, follows newer routing decisions and cannot roll
+  back a newer selected account when a delayed login completes.
+- `npm run smoke:continuity` runs the production desktop and VS Code routes
+  with native Codex, synthetic sign-ins and a loopback model server. Each run
+  completes **14 turns, 12 quota fallbacks and four accepted mid-turn steers**.
+  It performs **14 real disposable file writes with zero duplicates**, verifies
+  all 40 upstream attempts, identical fallback bytes, preserved context and
+  seven turns in each existing thread. The final two clients run concurrently.
+  Data-only SSE, missing MIME and 2 MiB completion frames are included.
+- Native engines checked locally: `0.160.0`, desktop `0.163.0-alpha.11.1` and
+  extension `0.164.0-alpha.11.1`. The existing installed Linux ChatGPT GUI also
+  resumed and displayed the synthetic chat with current desktop MCP tools.
+  Tests use no real model inference or account quota.
+- Local Ubuntu checks: **250 Node tests, 246 passed, four Windows-only skips**;
+  syntax, native helper, protocol and nine success/fault scenarios passed.
+  Each fault sends exactly one upstream model attempt, and later user turns
+  remain usable. Source and release CI include the new continuity test on
+  Linux x64/ARM64 and macOS Intel/Apple Silicon.
+- Account fallback status/setup is visible on Accounts and Connections, with
+  exact bilingual click paths. On the user's closed local PAD installation,
+  the shared policy was explicitly enabled with two signed-in personal accounts;
+  desktop and the VS Code Shared route use that same enabled policy.
+- The stable Windows branch/release remain separate. The tests above establish
+  the synthetic protocol behavior, not uninterrupted availability of the remote
+  service. Real quota exhaustion was not forced on the user's accounts.
+
 ## 1.19.1-unix.6 — 2026-10-26
+
+**Superseded by Unix.7:** later real use exposed whole-turn replay blocking and
+a repeated-switch/auth-sync race. The initial checks below did not cover those
+cases; the new continuity suite above does.
 
 - A real Unix.5 report exposed a false-positive replay guard after successful
   tool calls. Read-only native HTTP diagnostics showed successful `/responses`

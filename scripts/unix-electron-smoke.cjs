@@ -27,6 +27,19 @@ app.whenReady().then(async()=>{
   assert.equal(await window.webContents.executeJavaScript("document.querySelector('#desktop-state').textContent"),'Đang kết nối');
   assert.equal(await window.webContents.executeJavaScript('document.documentElement.scrollWidth>innerWidth'),false);
   await fs.writeFile(path.resolve('artifacts/unix-desktop-ui.png'),(await window.webContents.capturePage()).toPNG());
+  await window.webContents.executeJavaScript(`
+    state.profiles.push({...state.profiles[0],id:'fixture-backup',label:'Backup test · Plus',email:'backup@example.test'});
+    state.autoSwitch={enabled:true,order:state.profiles.map(p=>p.id)};render();
+    document.querySelector('#open-shared-auto').click();
+    new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))`);
+  assert.equal(await window.webContents.executeJavaScript('document.querySelector("#auto-enabled").checked'),true);
+  assert.equal(await window.webContents.executeJavaScript('document.querySelectorAll("[data-auto-id]:checked").length'),2);
+  await fs.writeFile(path.resolve('artifacts/unix-autoswitch-setup.png'),(await window.webContents.capturePage()).toPNG());
+  await window.webContents.executeJavaScript('document.querySelector("#modal-cancel").click()');window.setSize(1000,680);
+  await window.webContents.executeJavaScript('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))');
+  assert.equal(await window.webContents.executeJavaScript('document.documentElement.scrollWidth>innerWidth'),false);
+  assert.equal(await window.webContents.executeJavaScript('document.querySelector("#recovery-title").textContent'),'Tự chuyển khi hết quota: Bật');
+  await fs.writeFile(path.resolve('artifacts/unix-autoswitch-ui.png'),(await window.webContents.capturePage()).toPNG());
   assert.equal(await fs.stat(path.join(root,'PADSwitcher','data')).then(()=>true,()=>false),false);
   console.log('Electron startup, sandbox, service navigation, Python probe and isolated data: passed.');
   app.quit();

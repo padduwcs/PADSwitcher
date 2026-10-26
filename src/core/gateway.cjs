@@ -21,7 +21,7 @@ function validBearer(value,token){const bytes=Buffer.from(String(value||''));con
 class Gateway {
   constructor(service,options={}) {
     this.service=service;this.root=options.root||path.join(service.root,'gateway');this.options=options;
-    this.status='stopped';this.profileId=null;this.pendingId=null;this.changing=false;this.clients=new Set();this.turns=new Map();this.error=null;this.refreshFlight=null;this.generation=0;
+    this.status='stopped';this.profileId=null;this.pendingId=null;this.pendingSource=null;this.changing=false;this.clients=new Set();this.turns=new Map();this.error=null;this.refreshFlight=null;this.generation=0;
     service.gateway=this;
     this.recovery=new Recovery(this);
     this.knownTurns=new Map();
@@ -87,20 +87,23 @@ class Gateway {
     } catch(e){await this.stop(true);this.status='error';this.error=publicError(e).message;this.changed();throw e;}
   }
   syncRoute(){
+    // A later automatic rotation may supersede an auth sync waiting behind an
+    // active desktop/IDE turn. Retarget the sync, never treat it as a user choice.
+    if(this.pendingId&&this.pendingSource==='route'&&this.router?.profileId)this.pendingId=this.router.profileId;
     if(this.router?.profileId&&this.router.profileId!==this.profileId&&!this.router.active&&!this.turns.size&&!this.pendingId&&!this.changing&&this.status==='ready'){
-      this.pendingId=this.router.profileId;this.applyPending().catch(()=>{});
+      this.pendingId=this.router.profileId;this.pendingSource='route';this.applyPending().catch(()=>{});
     }
   }
   backendFailed(){this.recovery.cancel();if(!this.options.sharedRouter)this.router?.cancel();this.status='error';this.error='Codex gateway đã dừng. Mở lại gateway để kết nối.';for(const c of this.clients)c.front.close(1011,'Codex backend stopped');this.changed();}
   async select(id){
     this.service.get(id);if(this.status!=='ready')throw new UserError('Hãy bật gateway trước.', 'GATEWAY_STOPPED');
     this.recovery.cancel(this.recovery.busy?'Bạn đã chọn tài khoản thủ công; đã hủy tự tiếp tục.':null);
-    this.pendingId=id;this.error=null;this.changed();await this.applyPending();
+    this.pendingId=id;this.pendingSource='manual';this.error=null;this.changed();await this.applyPending();
   }
   async applyPending(){
     if(!['ready','starting'].includes(this.status)||this.changing||this.refreshFlight||this.turns.size||this.router?.active||this.options.canChange?.()===false||!this.pendingId)return;
     if(this.options.sharedRouter&&this.pendingId!==this.router.profileId)return;
-    this.changing=true;this.changed();const id=this.pendingId,generation=this.generation,control=this.control;
+    this.changing=true;this.changed();const id=this.pendingId,source=this.pendingSource,generation=this.generation,control=this.control;
     try {
       await this.reconcile();
       if(this.generation!==generation||this.turns.size||this.options.canChange?.()===false)return;
@@ -114,11 +117,13 @@ class Gateway {
         if(!['chatgpt','chatgptAuthTokens'].includes(auth.authMethod)||!crypto.timingSafeEqual(hash(auth.authToken),hash(bundle.accessToken)))throw new UserError('Chưa xác minh được tài khoản desktop. Giữ hội thoại và kiểm tra lại kết nối.', 'DESKTOP_AUTH_VERIFY');
       }
       if(this.generation!==generation)return;
-      this.profileId=id;if(this.pendingId===id)this.pendingId=null;
-      if(!this.options.sharedRouter)this.router?.select(id);
-      this.service.state.gatewayProfileId=id;await this.service.save();this.error=null;
-    }catch(e){if(this.generation===generation){this.pendingId=null;this.error=publicError(e).message;if(this.options.verifyAccount){this.status='error';for(const c of this.clients)c.front.close(1011,'Desktop account verification failed');}}throw e;}
-    finally{if(this.generation===generation){this.changing=false;this.changed();}}
+      this.profileId=id;if(this.pendingId===id&&this.pendingSource===source)this.pendingId=null;
+      // Synchronization follows the router. A slow native login must never
+      // roll back a newer model-account selection made while it was pending.
+      if(!this.options.sharedRouter&&source!=='route')this.router?.select(id);
+      this.service.state.gatewayProfileId=source==='route'?this.router.profileId:id;await this.service.save();this.error=null;
+    }catch(e){if(this.generation===generation){this.pendingId=null;this.pendingSource=null;this.error=publicError(e).message;if(this.options.verifyAccount){this.status='error';for(const c of this.clients)c.front.close(1011,'Desktop account verification failed');}}throw e;}
+    finally{if(this.generation===generation){this.changing=false;if(!this.pendingId)this.pendingSource=null;this.changed();}}
     if(this.pendingId)await this.applyPending();
   }
   async reconcile(){
@@ -292,7 +297,7 @@ class Gateway {
     if(this.http)await new Promise(r=>this.http.close(r));this.http=null;
     if(this.backend&&this.backend.exitCode===null){const ended=new Promise(r=>this.backend.once('close',r));this.backend.kill();await Promise.race([ended,pause(3000)]);}this.backend=null;
     this.desktopTools?.stop();this.desktopTools=null;
-    this.turns.clear();this.knownTurns.clear();this.profileId=null;this.pendingId=null;this.changing=false;this.status='stopped';
+    this.turns.clear();this.knownTurns.clear();this.profileId=null;this.pendingId=null;this.pendingSource=null;this.changing=false;this.status='stopped';
     for(const file of ['connection.json','client-capability','backend-capability'])await fs.unlink(path.join(this.root,file)).catch(()=>{});
     this.changed();
   }

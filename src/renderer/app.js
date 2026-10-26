@@ -87,6 +87,8 @@ function render() {
   const g=gatewayForScope()||{status:'stopped'};
   renderConnectionStatus(state.gateway||g);
   renderRoutes();
+  $('#shared-auto-status').textContent='Tự chuyển khi hết quota: '+(state.autoSwitch?.enabled?'Bật':'Tắt');
+  $('#open-shared-auto').disabled=state.busy;
   const desktop=state.desktop||{},desktopProfile=state.profiles.find(p=>p.id===desktop.profileId);
   $('.desktop-card').classList.toggle('hidden',state.platform==='windows');
   $('#desktop-state').textContent=desktop.connected?(desktop.pendingId?'Đang chờ đổi tài khoản':'Đang kết nối'):desktop.launching?'Đang mở desktop…':desktop.configuration==='configured'?'Chờ desktop':'Chưa kết nối';
@@ -113,12 +115,11 @@ function render() {
   $('#restore-jetbrains').disabled=state.busy||state.jetbrains?.configuration!=='configured';
   $('#stop-gateway').disabled=state.busy||['stopped','starting','stopping'].includes(g.status);
   const recovery=g.recovery||{},policy=policyForScope()||{enabled:false,order:[]};
-  $('#recovery-title').textContent='Tự đổi · '+(policy.enabled?'Bật':'Tắt');
+  $('#recovery-title').textContent='Tự chuyển khi hết quota: '+(policy.enabled?'Bật':'Tắt');
   $('#configure-auto').setAttribute('aria-label','Thiết lập tự đổi khi hết quota: '+(policy.enabled?'đang bật':'đang tắt'));
   $('#recovery-detail').textContent=recovery.message||(policy.enabled?`${policy.order.length} tài khoản theo thứ tự ưu tiên. Thử lại lần gọi bị hết quota.`:state.profiles.length<2?'Thêm một tài khoản dự phòng để bật tự đổi.':'Chọn tài khoản dự phòng để công việc tiếp tục.');
   $('.recovery-panel').classList.toggle('enabled',policy.enabled);
-  const lastRecovery=recovery.events?.at(-1);
-  $('#recovery-detail').classList.toggle('hidden',!(recovery.queued||recovery.active||['blocked','error','exhausted'].includes(lastRecovery?.type)));
+  $('#recovery-detail').classList.remove('hidden');
   $('#configure-auto').disabled=state.busy;$('#cancel-recovery').disabled=!(recovery.queued||recovery.active);$('#recovery-history').disabled=!recovery.events?.length;
   $('#recovery-history').classList.toggle('hidden',!recovery.events?.length);
   $('#cancel-recovery').classList.toggle('hidden',!(recovery.queued||recovery.active));
@@ -360,6 +361,7 @@ $('#configure-auto').onclick=()=>{
     const response=await call('autoSwitchSettings',{scope:accountScope,enabled,order:chosen.sort((a,b)=>a.priority-b.priority).map(x=>x.id)},'Đã lưu cấu hình tự đổi tài khoản.');if(response)closeModal();
   },'Lưu thiết lập');
 };
+$('#open-shared-auto').onclick=()=>{accountScope='shared';localStorage.setItem('pad-account-scope',accountScope);navigate('accounts');render();$('#configure-auto').click();};
 $('#cancel-recovery').onclick=()=>call('cancelRecovery',{scope:accountScope},'Đã hủy tự tiếp tục đang chờ. Lượt đã chạy vẫn do Codex điều khiển.');
 $('#recovery-history').onclick=()=>{
   const events=gatewayForScope()?.recovery?.events||[],label=id=>state.profiles.find(p=>p.id===id)?.label||'Tài khoản';

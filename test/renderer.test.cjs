@@ -358,6 +358,16 @@ test('automatic switching setup selects accounts, orders priority and persists o
   d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
   const saved=(await w.pad.action('state')).result.autoSwitch;assert.equal(saved.enabled,true);assert.deepEqual(Array.from(saved.order),['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);assert(d.querySelector('#recovery-title').textContent.includes('Bật'));
 });
+
+test('connections expose shared auto-switch status and open its setup from another selected scope',async t=>{
+  const w=dom(t);await settle();const d=w.document;
+  d.querySelector('[data-service=codex]').click();d.querySelector('#account-scope').value='vscode';d.querySelector('#account-scope').dispatchEvent(new w.Event('change'));d.querySelector('.service-tab[data-page=connections]').click();
+  assert.equal(d.querySelector('#shared-auto-status').textContent,'Tự chuyển khi hết quota: Tắt');
+  d.querySelector('#open-shared-auto').click();assert.equal(d.querySelector('#account-scope').value,'shared');assert.equal(d.querySelector('#modal').classList.contains('hidden'),false);
+  d.querySelector('#auto-enabled').checked=true;d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  assert.equal(d.querySelector('#shared-auto-status').textContent,'Tự chuyển khi hết quota: Bật');
+  d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#shared-auto-status').textContent,'Auto-switch on quota: On');
+});
 test('automatic recovery history escapes labels and explains blocked state',async t=>{
   const w=dom(t,true,state=>{state.autoSwitch={enabled:true,order:state.profiles.map(p=>p.id)};state.gateway.recovery={queued:1,events:[{at:new Date().toISOString(),message:'<img src=x onerror=alert(1)>',from:state.profiles[0].id}],message:'Hết quota: đang chờ.'};});await settle();const d=w.document;
   assert.equal(d.querySelector('#cancel-recovery').disabled,false);assert(d.querySelector('#recovery-detail').textContent.includes('đang chờ'));
@@ -392,10 +402,10 @@ test('account management stays expanded across updates and card selection retain
   d.querySelectorAll('.account-card')[0].click();assert.equal(d.querySelector('#profile-management').open,false);
 });
 
-test('quiet status hides normal explanations but exposes connection errors and blocked recovery',async t=>{
+test('auto-switch setup stays visible and connection errors expose their explanation',async t=>{
   const normal=dom(t);await settle();
   assert(normal.document.querySelector('#gateway-detail').classList.contains('hidden'));
-  assert(normal.document.querySelector('#recovery-detail').classList.contains('hidden'));
+  assert.equal(normal.document.querySelector('#recovery-detail').classList.contains('hidden'),false);
   const blocked=dom(t,true,state=>{state.gateway.lastError='Không kết nối được.';state.gateway.recovery={message:'Công cụ chưa hoàn tất.',events:[{type:'blocked'}]};});await settle();
   assert.equal(blocked.document.querySelector('#gateway-detail').classList.contains('hidden'),false);
   assert.equal(blocked.document.querySelector('#recovery-detail').classList.contains('hidden'),false);

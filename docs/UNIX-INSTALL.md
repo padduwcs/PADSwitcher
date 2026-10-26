@@ -1,7 +1,7 @@
 # Cài đặt PADSwitcher Unix
 
 [English](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md)
-· [Tải bản Unix 1.19.1-unix.6](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.6)
+· [Tải bản Unix 1.19.1-unix.7](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7)
 · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix quản lý tài khoản Codex/Kaggle trên Linux và macOS.
@@ -15,12 +15,12 @@ không cần Node.js hoặc Go để mở app.
 
 | Máy của bạn | File tải về |
 | --- | --- |
-| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.6-Linux-amd64.deb` (ưu tiên) |
-| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.6-Linux-arm64.deb` (ưu tiên) |
-| Linux khác, Intel/AMD (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.6-Linux-x86_64.AppImage` |
-| Linux khác, ARM64 (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.6-Linux-arm64.AppImage` |
-| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.6-macOS-arm64.dmg` |
-| Mac Intel | `PADSwitcher-1.19.1-unix.6-macOS-x64.dmg` |
+| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.7-Linux-amd64.deb` (ưu tiên) |
+| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.7-Linux-arm64.deb` (ưu tiên) |
+| Linux khác, Intel/AMD (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.7-Linux-x86_64.AppImage` |
+| Linux khác, ARM64 (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.7-Linux-arm64.AppImage` |
+| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.7-macOS-arm64.dmg` |
+| Mac Intel | `PADSwitcher-1.19.1-unix.7-macOS-x64.dmg` |
 
 File `.zip` cho Mac là lựa chọn thay thế cho `.dmg`, cùng kiến trúc.
 Trên Linux, `uname -m` cho biết `x86_64` (Intel/AMD) hoặc `aarch64` (ARM64).
@@ -44,9 +44,9 @@ Mở terminal tại thư mục chứa file tải về. Ví dụ cho Intel/AMD:
 
 ```bash
 # Tải bộ cài và file .sha256 cùng tên vào cùng thư mục.
-sha256sum -c PADSwitcher-1.19.1-unix.6-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.7-Linux-amd64.deb.sha256
 # Chỉ cài khi checksum báo OK.
-sudo apt install ./PADSwitcher-1.19.1-unix.6-Linux-amd64.deb
+sudo apt install ./PADSwitcher-1.19.1-unix.7-Linux-amd64.deb
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.deb`.
@@ -83,8 +83,8 @@ hoặc không tạo được venv, chạy lại lệnh cài `python3-venv` ở t
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.6-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.6-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.7-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.7-Linux-x86_64.AppImage
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.AppImage`.
@@ -152,6 +152,31 @@ Giữ PADSwitcher mở khi dùng kết nối Codex. Nút đóng cửa sổ có t
 khay; dùng **Quit/Thoát PADSwitcher** trong menu khay để thoát hẳn.
 Nếu desktop không hiện khay hệ thống, có thể mở lại cửa sổ bằng cách chạy app lần nữa.
 
+### Bật tự chuyển tài khoản cho desktop và extension
+
+Kết nối thành công và tự chuyển tài khoản là hai trạng thái riêng. Tự chuyển
+cần được bật một lần và có ít nhất hai tài khoản đã đăng nhập.
+
+1. Mở **PADSwitcher Unix → Codex → Kết nối**.
+2. Ở đầu trang, xem dòng **Tự chuyển khi hết quota: Bật/Tắt** rồi bấm
+   **Thiết lập tự chuyển**. Nút này mở thiết lập **Dùng chung**.
+3. Tích **Tự đổi tài khoản khi hết quota** và chọn ít nhất hai tài khoản.
+   Đặt ưu tiên **1**, **2** theo thứ tự muốn dùng.
+4. Bấm **Lưu thiết lập**. Xác nhận trạng thái đổi thành
+   **Tự chuyển khi hết quota: Bật**. Thiết lập được giữ khi mở lại ứng dụng.
+5. Desktop luôn dùng thiết lập chung. Extension VS Code ở chế độ **Dùng chung**
+   cũng dùng đúng thiết lập đó; không cần bật riêng lần nữa. Nếu extension chọn
+   **Tài khoản riêng**, vào **Tài khoản → Dùng cho → VS Code** để bật danh sách riêng.
+6. Giữ PADSwitcher chạy và dùng Codex qua kết nối đã thiết lập. Khi máy chủ
+   báo hết quota trước khi trả kết quả cho lần gọi model, PADSwitcher thử tài
+   khoản dự phòng với nguyên yêu cầu đó, giữ chat và các kết quả công cụ đã có.
+   Nếu mọi tài khoản đều hết quota hoặc phản hồi bị ngắt do lỗi mạng, Codex sẽ
+   báo lý do để bạn xử lý trong chính chat đó.
+
+Bạn cũng có thể mở cùng thiết lập ở **Codex → Tài khoản**, bằng nút
+**Tự chuyển khi hết quota: Bật/Tắt** phía trên danh sách tài khoản, bên phải.
+Đổi tài khoản dùng chung không tự gộp lịch sử riêng của desktop và VS Code.
+
 ### Tiếp tục hội thoại Codex trong ChatGPT/Codex desktop
 
 Tính năng này đổi **tài khoản dùng cho Codex cục bộ** trong app desktop, giữ cùng
@@ -171,9 +196,10 @@ realtime/background không thuộc kết nối này.
    Nếu bật tự đổi, bộ định tuyến xử lý lỗi hết quota xác định trước khi phát
    kết quả, không gửi lại thao tác công cụ đã thực hiện.
 
-Khi lỗi mạng/model hoặc câu trả lời bị ngắt, PADSwitcher chặn Codex tự gửi lại
-trong lượt bị lỗi để hạn chế tiêu hao quota lặp. Hãy xem kết quả và các thao tác
-đã thực hiện trước khi gửi một lượt mới. Tự đổi tài khoản chỉ áp dụng cho lỗi
+Khi lỗi mạng/model hoặc câu trả lời bị ngắt, PADSwitcher dừng tự gửi lặp bước
+model chưa rõ kết quả để tránh tốn quota. Việc bạn nhắn thêm trong cùng chat
+hoặc có kết quả công cụ mới vẫn được tiếp tục; không khóa cả lượt chat. Hãy
+kiểm tra thao tác vừa thực hiện trước khi yêu cầu làm lại. Tự đổi tài khoản chỉ áp dụng cho lỗi
 hết quota rõ ràng, trước khi trả kết quả. Kiểm tra **Chẩn đoán → Hoạt động model**
 để xem số yêu cầu/lần gửi; các số này không phải lượng quota bị trừ.
 
@@ -215,10 +241,10 @@ Tải file `.sha256` có cùng tên với bộ cài và đặt cạnh bộ cài.
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.6-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.7-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.6-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.7-macOS-arm64.dmg.sha256
 ```
 
 Chỉ tiếp tục khi kết quả là `OK`. Release cũng có `SHA256SUMS.txt` tổng hợp.

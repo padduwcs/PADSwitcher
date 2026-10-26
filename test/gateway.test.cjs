@@ -68,6 +68,16 @@ test('gateway changes memory authentication across connected clients without wri
   assert((await fs.readFile(path.join(g.root,'connection.json'),'utf8')).includes('tokenFile'));
   assert.equal(a.id!==b.id,true);
 });
+
+test('a slow native auth sync follows newer routing without selecting the stale account again',async t=>{
+  const {g,a,b,service}=await ready(t),selected=[];
+  g.router={active:0,profileId:b.id,select:id=>{selected.push(id);g.router.profileId=id;},stop:async()=>{},usage:{}};
+  let arrived,release;const received=new Promise(r=>arrived=r),gate=new Promise(r=>release=r),request=g.control.request.bind(g.control);
+  g.control.request=async(method,params)=>{if(method==='account/login/start'&&params.chatgptAccountId==='fixture-account-b'){arrived();await gate;}return request(method,params);};
+  g.pendingId=b.id;g.pendingSource='route';const syncing=g.applyPending();await received;
+  g.router.profileId=a.id;g.syncRoute();assert.equal(g.pendingId,a.id);release();await syncing;
+  assert.equal(g.profileId,a.id);assert.equal(g.router.profileId,a.id);assert.deepEqual(selected,[]);assert.equal(service.state.gatewayProfileId,a.id);assert.equal(g.pendingId,null);
+});
 test('switch waits for every active turn; refuses new turns and does not replay them',async t=>{
   const {g,c,b}=await ready(t);const first=await c.request('turn/start',{threadId:'one'}),second=await c.request('turn/start',{threadId:'two'});
   await g.select(b.id);assert.equal(g.turns.size,2);assert.equal(g.pendingId,b.id);

@@ -10,6 +10,20 @@ below. No source build, Node.js or Go is needed to run the application.
 
 ### Có gì mới / What's new
 
+- Sửa việc khóa cả lượt sau một lần ngắt: tin nhắn bổ sung và kết quả công cụ
+  mới tiếp tục trong cùng chat; gửi lặp tự động của bước chưa rõ kết quả vẫn
+  được dừng để tránh tốn quota. Scope uncertain-retry protection to model
+  progress instead of locking a whole turn, including mid-turn steering.
+- Sửa lần tự đổi tiếp theo bị bỏ qua khi desktop/extension đang đồng bộ đăng nhập
+  sau lần đổi trước. Phân biệt đồng bộ tự động với lựa chọn thủ công của người dùng.
+  Repeated account fallback works while native account state is synchronizing.
+- Hiển thị rõ **Tự chuyển khi hết quota: Bật/Tắt** ở cả Tài khoản và Kết nối,
+  có nút mở thiết lập chung và hướng dẫn từng bước Việt/Anh. Visible auto-switch
+  status and setup on both Accounts and Connections, with bilingual instructions.
+- Bài thử Codex native cho desktop và extension: **14 lượt hoàn tất, 12 lần đổi
+  quota giả lập, 4 tin bổ sung giữa lượt, 14 thao tác ghi tệp, không ghi lặp**;
+  hai kết nối còn được chạy đồng thời. Repeatable loopback acceptance tests
+  exercise switching, steering, real disposable tool side effects and concurrency.
 - Sửa lỗi Unix.5 chặn nhầm sau khi dùng công cụ: phản hồi model thành công
   thiếu Content-Type vẫn được nhận diện đúng, không khóa bước tiếp theo.
   Fix Unix.5 false replay blocks after successful tool calls when upstream

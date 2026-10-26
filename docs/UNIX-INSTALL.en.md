@@ -1,7 +1,7 @@
 # Install PADSwitcher Unix
 
 [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md)
-· [Download Unix 1.19.1-unix.6](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.6)
+· [Download Unix 1.19.1-unix.7](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7)
 · [Report a problem](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix manages Codex/Kaggle accounts on Linux and macOS. This is a
@@ -14,12 +14,12 @@ Electron and the native helper are included.
 
 | Computer | Download |
 | --- | --- |
-| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.6-Linux-amd64.deb` (recommended) |
-| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.6-Linux-arm64.deb` (recommended) |
-| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.6-Linux-x86_64.AppImage` |
-| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.6-Linux-arm64.AppImage` |
-| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.6-macOS-arm64.dmg` |
-| Intel Mac | `PADSwitcher-1.19.1-unix.6-macOS-x64.dmg` |
+| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.7-Linux-amd64.deb` (recommended) |
+| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.7-Linux-arm64.deb` (recommended) |
+| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.7-Linux-x86_64.AppImage` |
+| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.7-Linux-arm64.AppImage` |
+| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.7-macOS-arm64.dmg` |
+| Intel Mac | `PADSwitcher-1.19.1-unix.7-macOS-x64.dmg` |
 
 Mac `.zip` files are alternatives to the DMG for the same architecture.
 On Linux, `uname -m` shows `x86_64` (Intel/AMD) or `aarch64` (ARM64).
@@ -43,9 +43,9 @@ Open a terminal in the download folder. For Intel/AMD:
 
 ```bash
 # Download the installer and matching .sha256 into this folder.
-sha256sum -c PADSwitcher-1.19.1-unix.6-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.7-Linux-amd64.deb.sha256
 # Continue only when the checksum reports OK.
-sudo apt install ./PADSwitcher-1.19.1-unix.6-Linux-amd64.deb
+sudo apt install ./PADSwitcher-1.19.1-unix.7-Linux-amd64.deb
 ```
 
 On ARM64, use the `Linux-arm64.deb` filename instead. Launch **PADSwitcher Unix**
@@ -81,8 +81,8 @@ Do not use `sudo pip` or `--break-system-packages`.
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.6-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.6-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.7-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.7-Linux-x86_64.AppImage
 ```
 
 On ARM64, use the `Linux-arm64.AppImage` filename. Data is stored in your user
@@ -152,6 +152,32 @@ Keep PADSwitcher running while using its Codex connections. Closing the window
 may minimize it to the tray; use **Quit PADSwitcher** in the tray menu to exit.
 If the desktop does not display a tray icon, launch the app again to reopen it.
 
+### Enable account fallback for desktop and the extension
+
+A configured connection and enabled account fallback are separate states.
+Enable fallback once after signing in to at least two accounts.
+
+1. Open **PADSwitcher Unix → Codex → Connections**.
+2. At the top, find **Auto-switch on quota: On/Off**, then click
+   **Set up auto-switch** to open the **Shared** policy.
+3. Check **Switch accounts on usage limit**, select at least two accounts,
+   and assign priorities **1**, **2** in the order you want.
+4. Click **Save setup** and verify **Auto-switch on quota: On**.
+   The setting survives application restarts.
+5. Desktop always uses this shared policy. VS Code in **Shared** mode uses
+   the same policy, with no second switch to enable. For an extension configured
+   with a **Separate account**, use **Accounts → Use for → VS Code** to configure
+   its separate fallback list.
+6. Keep PADSwitcher running and use its configured Codex connection. An explicit
+   quota rejection before model output triggers the next available account with
+   the identical request, preserving the chat and completed tool results. If all
+   accounts are exhausted or a network failure interrupts output, Codex explains
+   the stop so you can continue in the same conversation.
+
+The same setup is also available on **Codex → Accounts** using the
+**Auto-switch on quota: On/Off** button above the account list on the right.
+Sharing accounts does not merge the separate desktop and VS Code histories.
+
 ### Continue a Codex conversation in ChatGPT/Codex desktop
 
 This connection changes the account used by **local Codex** in the desktop app,
@@ -171,9 +197,10 @@ and realtime/background sessions are outside this connection's scope.
    enabled, the router handles explicit quota rejections before returning model
    output, without repeating tool actions that have already run.
 
-After a network/model error or interrupted response, PADSwitcher blocks native
-automatic replay within the failed turn to limit repeated quota consumption.
-Inspect the result and tool actions before starting a new turn. Account fallback
+After a network/model error or interrupted response, PADSwitcher stops automatic
+repetition of the uncertain model step to avoid duplicate usage. A new message
+in the same chat or a new tool result remains forward progress; the entire turn
+is not locked. Inspect the previous result before asking to repeat an action. Account fallback
 only handles explicit quota rejection before output. **Diagnostics → Model activity**
 shows request/attempt counts; these are not quota charges.
 
@@ -216,10 +243,10 @@ Download the installer's matching `.sha256` file into the same folder:
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.6-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.7-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.6-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.7-macOS-arm64.dmg.sha256
 ```
 
 Continue only if it reports `OK`. A combined `SHA256SUMS.txt` is also provided.

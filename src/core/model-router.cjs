@@ -104,14 +104,20 @@ class ModelRouter {
     this.g.service.state.quotaCooldowns={...this.g.service.state.quotaCooldowns,[id]:Number.isFinite(reset)&&reset>now?reset:now+900000};
     this.persist('Không lưu được thời gian chờ quota; vẫn giữ trong phiên hiện tại.');
   }
-  requestKey(req,route,bytes){
+  requestKey(req,route,bytes,body){
     // Hash only; never retain prompts or native identifiers in diagnostics.
     // A new explicit turn may intentionally repeat the same input.
     let turn='';try{const value=JSON.parse(req.headers['x-codex-turn-metadata']||'{}').turn_id;if(typeof value==='string'&&value.length<=256)turn=value;}catch{}
-    const hash=crypto.createHash('sha256').update(JSON.stringify([turn?'turn':route,req.headers['thread-id']||req.headers['session-id']||'',turn]));
-    // Native stream recovery may alter the body after partial output. Stop the
-    // entire failed turn, including that recovery, until the user starts anew.
-    if(!turn)hash.update(bytes);
+    const hash=crypto.createHash('sha256').update(JSON.stringify([route,req.headers['thread-id']||req.headers['session-id']||'',turn]));
+    // A turn contains many model steps. New steering input and completed tool
+    // results are forward progress, even when native keeps the same turn ID.
+    // Automatic stream recovery can append partial assistant output; that alone
+    // is not progress and must not authorize another uncertain inference.
+    if(turn){
+      const input=body?.input;
+      const progress=Array.isArray(input)?input.filter(item=>item?.role==='user'||['function_call_output','custom_tool_call_output','tool_search_output'].includes(item?.type)):input;
+      hash.update(JSON.stringify(progress)??'');
+    }else hash.update(bytes);
     return hash.digest('hex');
   }
   blockReplay(key){if(!key)return;this.failedRequests.add(key);while(this.failedRequests.size>1024)this.failedRequests.delete(this.failedRequests.values().next().value);}
@@ -127,7 +133,7 @@ class ModelRouter {
     // Timeout inactivity, not total generation time. Cutting off a healthy long
     // stream can make native Codex retry inference that already consumed quota.
     let timer;const touch=()=>{clearTimeout(timer);timer=setTimeout(()=>controller.abort(),this.options.idleTimeoutMs||300000);};touch();
-    let bytes=Buffer.alloc(0),requestKey=null,inferenceStarted=false,sse=false,streamCompleted=false;const used=new Set();
+    let bytes=Buffer.alloc(0),requestKey=null,inferenceStarted=false,sse=false,streamCompleted=false,streamFailed=false;const used=new Set();
     try{
       const chunks=[];let size=0;
       for await(const chunk of req){touch();size+=chunk.length;if(size>MAX_BODY){this.error(res,413,'request_too_large','Model request is too large.');return;}chunks.push(chunk);}
@@ -136,8 +142,8 @@ class ModelRouter {
         try{body=decodeRequest(bytes,req.headers['content-encoding']);}catch{this.error(res,400,'invalid_request','Invalid model request.');return;}
       }
       const track=req.method==='POST'&&route.startsWith('responses');
-      if(track){requestKey=this.requestKey(req,route,bytes);if(this.failedRequests.has(requestKey)){this.usage.blockedReplays++;this.note('blocked','Đã chặn gửi lại tự động sau lỗi kết nối/model. Kiểm tra kết quả rồi bắt đầu lượt mới nếu cần.');this.error(res,400,'model_replay_blocked','Automatic replay blocked after an uncertain model failure. Check the previous result before starting a new turn.');return;}}
-      const observe=track?observeUsage(this.usage,ok=>{if(ok)streamCompleted=true;else this.blockReplay(requestKey);}):()=>{};
+      if(track){requestKey=this.requestKey(req,route,bytes,body);if(this.failedRequests.has(requestKey)){this.usage.blockedReplays++;this.note('blocked','Kết nối bị ngắt ở bước trước. Đã dừng gửi lặp bước đó để tránh tốn quota; bạn có thể nhắn tiếp trong cùng chat.');this.error(res,400,'model_replay_blocked','The previous model step was interrupted. Automatic retry stopped to avoid duplicate usage. Send a new message in this chat to continue.');return;}}
+      const observe=track?observeUsage(this.usage,ok=>{if(ok)streamCompleted=true;else streamFailed=true;}):()=>{};
       if(track){this.usage.requests++;this.usage.lastModel=typeof body?.model==='string'&&/^[a-z0-9_.-]{1,80}$/i.test(body.model)?body.model:null;this.usage.lastEffort=['none','minimal','low','medium','high','xhigh','max'].includes(body?.reasoning?.effort)?body.reasoning.effort:null;}
       const canReplay=replayable(body),attempted=new Set(),deadline=Date.now()+120000;
       let first=this.profileId||this.g.profileId,lastQuota=null;
@@ -177,7 +183,8 @@ class ModelRouter {
             if(!quota){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);await this.forward(response,res,prefix,peek.reader,touch,observe);return;}
           }
           const personal=personalProfile(this.g.service.state.profiles.find(p=>p.id===first))&&['free','plus','pro'].includes(String(bundle.chatgptPlanType||'').toLowerCase());
-          if(quota&&this.g.service.state.autoSwitch?.enabled&&personal&&!this.g.pendingId&&!this.g.changing&&canReplay&&epoch===this.epoch){
+          const manualChange=(this.g.pendingId||this.g.changing)&&this.g.pendingSource!=='route';
+          if(quota&&this.g.service.state.autoSwitch?.enabled&&personal&&!manualChange&&canReplay&&epoch===this.epoch){
             await this.cooldown(id,quota);lastQuota=quota;
             this.note('retrying','Hết quota: đang thử tài khoản dự phòng cho cùng lần gọi model.',id);
             break;
@@ -193,7 +200,7 @@ class ModelRouter {
       if(inferenceStarted&&!streamCompleted)this.blockReplay(requestKey);
       if(!controller.signal.aborted)this.note('error','Lần gọi model bị lỗi kết nối; không tự phát lại.');
       this.error(res,502,'model_transport_error','Model connection failed. No automatic replay was performed.');
-    }finally{if(inferenceStarted&&!streamCompleted&&(controller.signal.aborted||sse))this.blockReplay(requestKey);clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
+    }finally{if(inferenceStarted&&!streamCompleted&&(controller.signal.aborted||sse||streamFailed))this.blockReplay(requestKey);clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
   }
   async peek(response,controller,touch=()=>{}){
     const reader=response.body.getReader(),prefix=[],decoder=new TextDecoder();let text='',parsed=0,size=0;
