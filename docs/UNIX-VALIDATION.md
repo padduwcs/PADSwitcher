@@ -37,6 +37,21 @@ The Windows baseline stayed unchanged during development.
   exact bilingual click paths. On the user's closed local PAD installation,
   the shared policy was explicitly enabled with two signed-in personal accounts;
   desktop and the VS Code Shared route use that same enabled policy.
+- All five [source CI jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40370836410)
+  and all six [release jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40370840577)
+  passed for `40ec2b16f77aada49343596beba8d2953b6aac17`.
+  [Unix.7 is public](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7)
+  with all 19 assets verified; eight anonymous installer links passed. Downloaded
+  amd64 deb, bilingual guides, sidecar checksums and catalog match GitHub digests.
+  The public deb's router/synchronization/UI match source, and its sandboxed
+  executable startup, IPC and navigation passed on the user's machine.
+- The machine is installed with `1.19.1~unix.7`, with package integrity and
+  installed/source runtime comparison verified. The real manager is open; its
+  live native gateway authenticated the selected account. VS Code configuration
+  and helper are present, and both effective fallback policies are enabled.
+  Original desktop auth/config hashes stayed unchanged; no test model request
+  was sent to real accounts. The repair chat stays open directly until the user
+  reopens desktop through PADSwitcher to use this connection.
 - The stable Windows branch/release remain separate. The tests above establish
   the synthetic protocol behavior, not uninterrupted availability of the remote
   service. Real quota exhaustion was not forced on the user's accounts.
