@@ -50,7 +50,8 @@
     "dist": "node scripts/package-unix.cjs",
     "smoke:desktop": "node scripts/desktop-protocol-smoke.cjs",
     "smoke:faults": "node scripts/router-fault-smoke.cjs",
-    "smoke:continuity": "node scripts/router-continuity-smoke.cjs"
+    "smoke:continuity": "node scripts/router-continuity-smoke.cjs",
+    "check:docs": "node scripts/check-docs.cjs"
   },
   "devDependencies": {
     "electron": "44.9.3",

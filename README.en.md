@@ -1,91 +1,85 @@
-<p align="center"><img src="src/assets/padswitcher-emblem.png" width="220" alt="PADSwitcher"></p>
+<p align="center"><img src="src/assets/padswitcher-emblem.png" width="180" alt="PADSwitcher"></p>
 
-# PADSwitcher Unix
+# PADSwitcher
 
-**Profile Account Directory Switcher — an isolated Linux and macOS edition.**
-Manage Codex/Kaggle accounts, inspect quota and connect local developer tools.
+Manage **Codex and Kaggle accounts**, inspect quota and automatically switch to
+an available backup Codex account when the current account reaches its limit.
 
-This is the `feature/cross-platform` branch. The stable Windows edition remains
-on [`main`](https://github.com/padduwcs/PADSwitcher/tree/main). The Unix app identity,
-data, default Codex home, build output and release channel are separate. You can
-keep one source folder and switch branches to work on either edition.
+[Tiếng Việt](README.md) · [Documentation](docs/README.md) · [Report a bug](https://github.com/padduwcs/PADSwitcher/issues/new/choose)
 
-**[Download Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)**
-· [Install and first launch](docs/UNIX-INSTALL.en.md) · [Tiếng Việt](README.md)
-· [Documentation](docs/README.md).
+<a id="downloads"></a>
+## Download and install
 
-Download a deb (recommended on Ubuntu/Debian), AppImage (compatible Linux desktops)
-or DMG (macOS). Linux x64/ARM64 and Mac Intel/Apple Silicon are available.
-The release includes bilingual installation guides and SHA-256 checksums.
-This is a public **Pre-release**; check its validation scope before use.
+**To use the app, choose an installer below.** Cloning the source, Node.js and
+Go are unnecessary for downloaded installers. Windows runs **PADSwitcher**;
+Linux/macOS run **PADSwitcher Unix**, with separate accounts and data.
 
-For development, see [the Unix/WSL guide](docs/UNIX.md), [validation record](docs/UNIX-VALIDATION.md)
-and [GitHub builds](https://github.com/padduwcs/PADSwitcher/actions/workflows/unix-ci.yml?query=branch%3Afeature%2Fcross-platform).
+| Operating system | Release | Installer | Guide |
+| --- | --- | --- | --- |
+| Windows 10/11 x64 | [Stable](https://github.com/padduwcs/PADSwitcher/releases/latest) | Portable `Windows.exe` | [English](https://github.com/padduwcs/PADSwitcher/blob/main/docs/WINDOWS-INSTALL.en.md) |
+| Ubuntu/Debian x64 or ARM64 | [Unix.7 · preview](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7) | `.deb` | [English](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md) |
+| Other compatible Linux desktops | [Unix.7 · preview](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7) | `.AppImage` | [Linux requirements](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md) |
+| macOS Intel or Apple Silicon | [Unix.7 · preview](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7) | `.dmg` or `.zip` | [English](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md) |
 
-Linux requires an unlocked Secret Service such as GNOME Keyring; macOS uses the
-user's Keychain. A compatible native Codex CLI is installed separately. Kaggle
-requires Python 3.11+ and the SDK versions shown in the app.
+Open **Assets** on the release page and choose your operating system and CPU
+architecture. A `.sha256` file verifies an installer; **Source code** is for
+source checkouts. On Ubuntu 24.04/26.04, use the deb rather than AppImage.
 
-Build artifacts are AppImage/deb on Linux and dmg/zip on macOS, with SHA-256 files.
-Unix releases use `unix-v…` tags and are prereleases with `latest=false`.
-The macOS preview is ad-hoc signed and does not yet have Developer ID notarization.
-Downloaded builds do not require Node.js or Go.
+Windows portable builds are unsigned. The Mac preview is ad-hoc signed without
+notarization; the installation guide explains the first launch. Unix previews
+keep the stable Windows release's **Latest** download unchanged.
 
-## Clone and run on Linux
+## First use
 
-For a source checkout on Ubuntu Desktop 24.04/26.04:
+1. Install/open the app, choose **Services → Codex**, and add an account through
+   your browser.
+2. Open **Connections** and set up **VS Code**, **CLI** or **JetBrains**.
+   Unix also offers **Open desktop through PADSwitcher** for local Codex.
+3. For account fallback, add at least two accounts, open the auto-switch setup,
+   select backup accounts and save. Keep PADSwitcher running while connected.
+
+Unix desktop Codex uses the **Shared** fallback policy. Extensions in Shared
+mode use the same policy; separate-account connections have their own lists.
+[Step-by-step auto-switch setup](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md#enable-account-fallback-for-desktop-and-the-extension).
+
+Fallback supports personal Codex Free/Plus/Pro accounts and explicit quota
+rejections before output. Regular ChatGPT history does not move between accounts;
+cloud/remote jobs are outside this local Codex connection.
+
+**Kaggle:** open **Services → Kaggle → Setup**, install the tools shown, add your
+API token and open a terminal for the account you want. Each terminal keeps its
+own account selection. [Kaggle guide](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/KAGGLE.en.md).
+
+<p align="center"><img src="docs/images/light.png" width="49%" alt="Light theme"><img src="docs/images/dark.png" width="49%" alt="Dark theme"></p>
+
+## Clone and develop
+
+The repository maintains two branches. **Choose the branch when cloning**:
+
+| Edition | Branch | Setup and run |
+| --- | --- | --- |
+| Windows | `main` | [Windows development](https://github.com/padduwcs/PADSwitcher/blob/main/docs/DEVELOPMENT.md) |
+| Linux/macOS | `feature/cross-platform` | [Unix development](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/DEVELOPMENT.md) |
+
+Linux/macOS:
 
 ```bash
-sudo apt update
-sudo apt install git python3 python3-venv gnome-keyring
 git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
 cd PADSwitcher
-bash scripts/setup-linux.sh
-# Ubuntu 24.04/26.04: configure the source-build sandbox.
-sudo chown root:root node_modules/electron/dist/chrome-sandbox
-sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-bash scripts/start-linux.sh
 ```
 
-The two sudo commands configure the downloaded Electron sandbox helper. Repeat
-them after `npm ci` replaces `node_modules`. Keep sandboxing enabled; do not use
-`--no-sandbox`. The deb installer configures sandboxing for downloaded builds.
+On Linux, follow the Unix guide's **Linux** section to prepare tools and the
+sandbox. On Mac, follow **macOS**. For Windows, clone with `--branch main`.
+A clone without `--branch` defaults to Windows source.
 
-The setup script downloads Node.js 24.18.1 and Go 1.27.3 from their official
-hosts, verifies SHA-256 hashes, installs npm dependencies and builds the helper.
-Toolchains live in your user data directory; system Node/Go and shell profiles
-are unchanged. You can rerun setup after an interrupted download. The start
-script loads the prepared environment. An unlocked desktop keyring and a terminal
-app are needed for account/CLI use. Minimal headless servers are not supported.
+One checkout is enough; save your changes before switching branches. Installed
+applications run independently of source checkouts. See [Contributing](CONTRIBUTING.md)
+and [using one folder](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/DEVELOPMENT.md#one-folder-and-two-branches).
 
-Already have Node.js 24+ and Go 1.27.3+? Run `npm ci` and `npm start` directly.
-On macOS, install those toolchains, clone this branch and use the same npm commands.
-For Windows/WSL, follow [the Unix/WSL guide](docs/UNIX.md).
+## Documentation and support
 
-Windows DPAPI vaults cannot be imported by copying files. Add/sign in to accounts
-again in the Unix edition. Bash 3.2+ and Zsh support per-terminal Kaggle selection.
-See the guide for setup, supported connections and validation limits.
+- [Documentation index](docs/README.md) · [Support](SUPPORT.md) · [Security](SECURITY.md)
+- [Windows changelog](https://github.com/padduwcs/PADSwitcher/blob/main/CHANGELOG.md) · [Unix changelog](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/CHANGELOG.md)
+- [Unix validation and limits](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-VALIDATION.md)
 
-## One folder and two branches
-
-A single `PADSwitcher` folder is enough. Git replaces its tracked source files
-with the selected branch when you switch:
-
-```bash
-cd PADSwitcher
-git status
-git switch main                    # Windows source
-git switch feature/cross-platform  # Linux/macOS source
-```
-
-The two `git switch` commands are alternatives; choose the edition you need.
-Commit or stash unfinished changes before switching. Stop any app running from
-source first. An app installed from a release installer runs independently.
-
-Prepare dependencies using the selected branch's instructions after switching.
-When returning to Linux, rerun `bash scripts/setup-linux.sh` and the two sandbox
-commands above before starting from source. Switching branches does not merge
-their code. A second worktree is optional when both branches need to be open at
-once. See [the development guide](docs/DEVELOPMENT.md#one-folder-and-two-branches).
-
-Licensed under [MIT](LICENSE). Independent of OpenAI, Kaggle and JetBrains.
+Released under [MIT](LICENSE). Independent of OpenAI, Kaggle and JetBrains.

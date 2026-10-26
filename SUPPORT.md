@@ -1,22 +1,20 @@
 # Support
 
-PADSwitcher is a community-maintained project.
+Start with the [documentation index](docs/README.md) and the app's Help page.
 
-## Get help
-
-1. Read the [README](README.en.md) and the in-app Help page.
-2. Check the [Codex guide](docs/CODEX.md#english) or [Kaggle guide](docs/KAGGLE.en.md).
+1. Choose the installation guide for **Windows** or **Linux/macOS**.
+2. Check the guide for the affected Codex/Kaggle integration.
 3. Search [existing issues](https://github.com/padduwcs/PADSwitcher/issues).
-4. If the problem is reproducible, open a [bug report](https://github.com/padduwcs/PADSwitcher/issues/new/choose).
+4. Open a [bug report](https://github.com/padduwcs/PADSwitcher/issues/new/choose) if the issue is reproducible.
 
-Include the PADSwitcher version, Windows version, affected integration, steps to reproduce, expected behavior, and actual behavior.
+Include the PADSwitcher version, operating system and CPU architecture, installer
+type, affected integration, reproduction steps, expected result and actual result.
+For Unix, include whether you use VS Code, CLI, JetBrains or local desktop Codex.
 
-## Protect your data
+Never post account sessions, Kaggle tokens, account identifiers, `auth.json`,
+vaults, gateway connection files, app-data archives or unredacted screenshots.
+Maintainers do not need your credentials. Security reports go through
+[SECURITY.md](SECURITY.md).
 
-Never post Codex sessions, Kaggle tokens, account identifiers, `auth.json`, `.dpapi` files, gateway connection files, app-data archives, or unredacted screenshots. PADSwitcher maintainers do not need your credentials to diagnose a bug.
-
-Security vulnerabilities must be reported through [SECURITY.md](SECURITY.md), not a public support issue.
-
-## Project boundaries
-
-PADSwitcher cannot provide support for OpenAI, Kaggle, JetBrains, VS Code, account billing, service bans, quota policy, or third-party availability. Use the relevant vendor's support channel for those issues.
+PADSwitcher does not control third-party service availability, account billing,
+quota rules or model access. Contact the relevant vendor for those issues.

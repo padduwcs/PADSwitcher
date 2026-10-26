@@ -21,6 +21,7 @@ jobs:
           python-version: '3.12'
       - run: npm ci
       - run: npm run check
+      - run: npm run check:docs
       - run: npm test
       - run: npm run test:kaggle
   build:
@@ -56,6 +57,7 @@ jobs:
       - run: npm ci
       - run: npm install --global @openai/codex@0.160.0
       - run: npm run check
+      - run: npm run check:docs
       - run: npm test
       - run: npm run test:helper
       - run: npm run test:kaggle

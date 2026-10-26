@@ -1,197 +1,137 @@
-# Development
+# Unix development
 
-This branch builds the isolated Linux/macOS edition. For the complete Linux,
-macOS and WSL prerequisites and commands, use [UNIX.md](UNIX.md). For end-user
-installation without developer tools, use [the installation guide](UNIX-INSTALL.en.md).
+This guide is for **Linux/macOS** on `feature/cross-platform`.
+For Windows use [the Windows guide](https://github.com/padduwcs/PADSwitcher/blob/main/docs/DEVELOPMENT.md).
+To use the app without building, follow [installation](UNIX-INSTALL.en.md).
+
+## Linux
+
+Use Ubuntu Desktop 24.04/26.04 with Git, Python 3.11+, an unlocked Secret Service
+(for example GNOME Keyring) and a terminal. On a minimal installation:
+
+```bash
+sudo apt update
+sudo apt install git python3 python3-venv gnome-keyring
+```
+
+Clone the Unix branch and prepare the source checkout:
 
 ```bash
 git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
 cd PADSwitcher
 bash scripts/setup-linux.sh
-# Ubuntu 24.04+: keep the source Electron sandbox enabled.
 sudo chown root:root node_modules/electron/dist/chrome-sandbox
 sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
 bash scripts/start-linux.sh
 ```
 
-Setup installs checksum-verified Node.js 24.18.1 and Go 1.27.3 toolchains under
-`~/.local/share/padswitcher-unix-dev` (or `$XDG_DATA_HOME`), runs `npm ci` and
-builds the helper. System Node/Go and shell startup files are untouched. Repeat
-the sandbox ownership/mode commands after a fresh `npm ci` on restricted Ubuntu
-desktops. Do not disable sandboxing. The installed deb supplies its own sandbox
-integration and does not require these source-development steps.
+Setup downloads checksum-verified Node.js 24.18.1 and Go 1.27.3 into
+`~/.local/share/padswitcher-unix-dev` (or `$XDG_DATA_HOME`), installs dependencies
+and builds the native helper. It preserves system toolchains and shell profiles.
+The two sudo commands configure the source Electron sandbox; repeat them after
+`npm ci` replaces `node_modules`. Keep the sandbox enabled. Installed deb users
+follow the installation guide instead of these source-only commands.
 
-For npm/go commands below, run `. ~/.local/share/padswitcher-unix-dev/env.sh` in
-your terminal, or use your existing Node.js 24+ and Go 1.27.3+ installation.
-On macOS, install those toolchains and use `npm ci` / `npm start` directly.
+For later npm/Go commands, load the prepared tools:
+
+```bash
+. ~/.local/share/padswitcher-unix-dev/env.sh
+```
+
+## macOS
+
+Install Git, Node.js 24+ and Go 1.27.3+, and use your unlocked login Keychain.
+Then:
+
+```bash
+git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
+cd PADSwitcher
+npm ci
+npm start
+```
+
+The Linux setup/sandbox commands do not apply to macOS. For the downloaded Mac
+preview, first-launch permissions are covered in [installation](UNIX-INSTALL.en.md).
+WSL development is covered separately in [UNIX.md](UNIX.md).
 
 ## One folder and two branches
 
-One checkout is enough for normal development. Use `main` for Windows and
-`feature/cross-platform` for Linux/macOS. Commit or stash unfinished work and stop
-any source-running app before switching:
+One checkout is enough. Stop source-running apps, commit or stash unfinished
+work and select the edition:
 
 ```bash
 git status
-git switch main                    # Choose Windows
-# Or, when working on Linux/macOS:
+git switch main
+```
+
+The command above selects Windows. To return to Unix:
+
+```bash
 git switch feature/cross-platform
 ```
 
-Switching updates tracked files without merging branches or moving their tips.
-It does not change an installed app or its user data. A second worktree is
-optional when both versions need to remain open simultaneously.
+Switching changes tracked source, without merging editions or changing installed
+apps/account data. Prepare the selected branch's dependencies again. On Linux,
+rerun setup and the source sandbox permission commands when returning to Unix.
+Generated `dist-unix/` and `src/assets/PADCodex` may remain when viewing `main`;
+if Git lists them there, exclude those paths locally in `.git/info/exclude`.
+A second worktree is optional for simultaneous development.
 
-Dependencies and generated helpers belong to the selected edition. Follow that
-branch's setup instructions after switching; on Linux, rerun `setup-linux.sh`
-and the sandbox ownership/mode commands shown above. Generated Unix output
-(`dist-unix/` and `src/assets/PADCodex`) can remain locally when viewing `main`.
-If Git lists it as untracked there, add these two paths to `.git/info/exclude`
-locally; do not stage generated files or change Windows source to hide them.
+## Checks
 
-The Unix attributes preserve the inherited Windows icon helper byte-for-byte.
-Its mixed line endings do not need to be normalized when working on this branch.
-
-## Repository housekeeping
-
-- Keep `main` for Windows and `feature/cross-platform` for Linux/macOS. Switching
-  branches is separate from merging their code or releasing an application.
-- Delete completed feature branches after confirming their tips are reachable
-  from both maintained branches and that no open PR uses them. GitHub is set to
-  delete PR head branches automatically after a merge.
-- Keep dependency-update branches while their PRs are open. Read the current
-  diff, since a bot branch name can retain an earlier version number. Merge only
-  after reviewing the change and passing the required platform checks.
-  Unix PR builds explicitly enable the preview's ad-hoc macOS signature, without
-  signing secrets, so installed-app signature checks also run on PRs.
-- Keep published releases and tags for downloads, provenance and rollback.
-- Keep final installers and their checksums under ignored `dist-unix/`, and
-  recent logs/screenshots under ignored `artifacts/`. Old extracted applications,
-  duplicate downloads, temporary fixtures and audit-only toolchains are disposable.
-  Rebuild before running checks that require an unpacked application.
-- Keep the configured user-local developer toolchains, `node_modules`, test SDK
-  environment and installed application available for continued development.
-  App data and credentials live outside these disposable build directories.
-
-## Service pages
-
-`src/renderer/services.js` declares the service registry, entry cards and context
-navigation. Add a service there with its existing page IDs and translated labels;
-add the corresponding `.page` section in `index.html` and its renderer/IPC as needed.
-The delegated `data-page` handler supports cards rebuilt by state updates. Opening
-a page only navigates: account activation remains an explicit service action.
-Global appearance belongs to Settings; provider configuration belongs to its service.
-
-## Checks and packaging
-
-For this Unix branch, use the complete check/build commands in [UNIX.md](UNIX.md#kiểm-thử-và-đóng-gói). The Windows-specific examples below document inherited architecture and apply only to `main`.
-
-```powershell
+```bash
 npm run check
+npm run check:docs
 npm test
-& ./artifacts/kaggle-sdk-probe/Scripts/python.exe -I test/kaggle-reader-test.py
-npm run smoke
+npm run test:helper
+npm run test:kaggle
 npm run smoke:protocol
+npm run smoke:faults
+npm run smoke:continuity
 npm run smoke:say-hi
-npm run smoke:ui
+npm run smoke:desktop
+```
+
+These checks use synthetic accounts, loopback model replies and disposable data;
+they do not use real inference quota or reset credits. `smoke:continuity` exercises
+both desktop and extension routes, repeated quota fallback, mid-turn steering,
+real disposable tool writes and concurrent clients.
+
+Linux keyring/UI checks need the isolated desktop test session described in
+[UNIX.md](UNIX.md#kiểm-thử-và-đóng-gói). On macOS run `npm run smoke` and
+`npm run smoke:ui` in the desktop session. Existing native Codex discovery is
+required by the protocol checks; CI uses `0.160.0`. Additional local validation
+covers the engines documented in [UNIX-VALIDATION.md](UNIX-VALIDATION.md).
+
+## Build and package
+
+```bash
+npm run build
 npm run dist
-node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
+node scripts/checksums.cjs
+npm run smoke:packaged
 ```
 
-The Python contract check requires an isolated environment. CI creates it with:
+`build` creates an unpacked Unix app. `dist` creates deb/AppImage on Linux or
+DMG/ZIP on macOS, under ignored `dist-unix/`. Use `smoke:installed` after installing
+on a disposable test machine; keep account data isolated. The release workflow
+performs the target-specific sandbox, installation and signing checks.
+See [RELEASING.md](RELEASING.md).
 
-```powershell
-py -3.12 -m venv artifacts/kaggle-sdk-probe
-& ./artifacts/kaggle-sdk-probe/Scripts/python.exe -m pip install 'kaggle==2.2.4' 'kagglesdk==0.1.37'
-```
-
-These checks use fixtures and disposable app data. They do not consume real reset
-credits or require logging into a real account. The packaged smoke check runs after
-`dist` and exercises the ASAR code, helper, connection indicator and tray behavior.
-
-`npm run build` makes `dist/win-unpacked`; `npm run dist` also makes the portable
-`dist/PADSwitcher-<version>-Windows.exe`. GitHub Actions checks and builds on Windows.
-For a release, follow [RELEASING.md](RELEASING.md); a version tag runs the isolated
-checks and publishes the tested executable with its SHA-256 file through GitHub Releases.
-The portable build currently has no code-signing certificate or automatic updater.
-
-## Say hi
-
-`src/core/say-hi.cjs` owns a sequential, user-triggered greeting job with session
-progress and per-account results. Credential lookup uses the existing account
-lock; inference runs outside it in a dedicated ephemeral Codex home, with no
-execution environment, user project instructions or gateway account fallback.
-The job never changes the shared or private client selections. Pending accounts
-are protected from session replacement/removal; normal quota reads and gateway
-work remain available. Stop finishes the current greeting; shutdown interrupts
-only the dedicated backend. Ambiguous outcomes are never resubmitted by the job.
-
-`npm run smoke:say-hi` exercises the real installed Codex binary against loopback
-model responses and synthetic tokens. Account quota reads are fixtures; it does
-not access saved accounts or send real inference requests. Real service-side
-quota activation and the amount charged still require live user acceptance.
-
-For an isolated development build, use
-`npx electron-builder --win portable --config.directories.output=dist/preview`.
-Set `PADSWITCHER_PACKAGED_ROOT` to the absolute path of
-`dist/preview/win-unpacked` when running the packaged smoke script.
-This keeps the ordinary release output separate.
-
-## Optional real-account diagnostics
-
-Run these only when deliberately authorizing access to your own accounts:
-
-- `node scripts/router-native-smoke.cjs --live`: reads local account policy;
-  model responses are local fixtures.
-- `node scripts/router-live-smoke.cjs --live --inference`: makes real model calls
-  and therefore uses quota. Uses a locally injected quota failure for fallback.
-- `npm run smoke:gateway`: also makes a real model call.
-- `node scripts/jetbrains-smoke.cjs --live`: requires the IDE-installed ACP 2.1.1
-  runtime, two saved accounts and the native local model catalog. Uses saved
-  sessions for read-only workspace policy discovery; all model replies and quota
-  failures are local fixtures. Checks ACP chat, permissions, a single tool write
-  and post-tool fallback without consuming inference quota or reset credits.
-  Configuration changes target a disposable `.jetbrains/acp.json`.
-  Add `--split` to verify the stable endpoint dispatching ACP to a separate native
-  backend and router while the shared account remains unchanged.
-- `npm run smoke:recovery`: checks the retained legacy recovery path; it is not
-  the production request-routing flow.
-
-Never test reset consumption with a real account as part of routine checks.
-Do not commit account data, generated connection files, logs or QA directories.
-
-The Kaggle feature has no real-account checks in the routine suite. Its optional
-offline Python contract tests require Python 3.11+, `kaggle>=2.2.4,<3` and
-`kagglesdk>=0.1.37,<1`. Run `python -I test/kaggle-reader-test.py` using an
-interpreter with those packages. See [Kaggle](KAGGLE.md) for the independent
-terminal design, API coverage and the remaining live acceptance checks.
-
-Kaggle preview fixtures accept `?demo=1&kgmany=1` for 20 pinned and 12 recent
-notebooks with synthetic pagination. Electron UI smoke uses this fixture to check
-independent scroll geometry, end-scroll loading and position preservation in both
-themes/languages and window sizes. Additional notebook pages are account-specific
-memory caches; persisted first-page/pinned snapshots keep their existing bounds.
-
-`?demo=1&kgquiet=1` shows three idle accounts with long display names, including
-one matching its username. This checks the compact sidebar without using real
-user identities. The shared `padKaggleUI.instructions()` content powers the
-in-page guide and Help, with technical steps in closed disclosures by default.
-
-Kaggle layout preferences live in renderer localStorage under `pad-kaggle-layout`.
-Window-relative defaults apply until a size is chosen. Native Chromium mouse
-checks cover drag capture through state updates, column/list resizing, reloading
-saved sizes, reset and page-scroll pagination when a custom list fits its rows.
-
-## Layout
+## Source layout
 
 | Folder | Purpose |
-|---|---|
-| `src/core` | Account vault, Codex App Server gateway and model router |
-| `src/helper` | Native CLI/extension bridge source |
-| `src/renderer` | UI, themes and Vietnamese/English strings |
-| `src/assets` | Logo, icons and local fonts |
-| `scripts` | Build, preview and isolated smoke checks |
-| `test` | Unit/integration tests and mock backends |
+| --- | --- |
+| `src/core/` | Vaults, Codex gateway/router, desktop integration and Kaggle |
+| `src/helper/unix/` | Go bridge, terminal supervision and keyring access |
+| `src/renderer/` | UI and Vietnamese/English strings |
+| `src/assets/` | Fonts, icons and generated helper output |
+| `scripts/` | Source setup, build, docs checks and isolated smoke checks |
+| `test/` | Unit/integration tests and fixtures |
+| `docs/architecture/` | Current routing design and boundaries |
+| `docs/archive/` | Historical validation, separate from setup instructions |
 
-See [ROUTING.md](../ROUTING.md) for routing boundaries and
-[VALIDATION.md](../VALIDATION.md) for the release verification scope.
+Keep regression tests and Windows adapters used by shared-core checks. Disabled
+Windows live scripts were removed from this branch; their maintained originals
+remain on `main`. For repository/branch policy and generated-file cleanup, use
+[MAINTENANCE.md](MAINTENANCE.md).

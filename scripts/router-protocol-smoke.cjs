@@ -64,5 +64,5 @@ function respond(res,output,token,contentType=true){
     await rpc.request('account/read',{refreshToken:false});await new Promise(resolve=>setTimeout(resolve,1500));assert.equal(seen.length,4);
     assert.equal(await fs.stat(path.join(home,'auth.json')).then(()=>true,()=>false),false);
     console.log('Native tool follow-ups with/without Content-Type, cache headers, same-turn A/B routing, per-account sticky state, exact retry and two tools executed once: passed.');
-  }finally{await rpc?.close();await router?.stop();upstream.closeAllConnections();await new Promise(resolve=>upstream.close(resolve));}
+  }finally{await rpc?.close();await router?.stop();upstream.closeAllConnections();await new Promise(resolve=>upstream.close(resolve));await fs.rm(home,{recursive:true,force:true});}
 })().catch(error=>{console.error('Native protocol fixture failed:',error.code||error.name,error.message);process.exitCode=1;});

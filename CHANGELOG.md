@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+- Unify Vietnamese/English entry pages, platform-specific setup and contribution guidance.
+- Correct active Unix download links and add documentation consistency checks.
+- Separate current routing/validation from historical reports; remove five disabled
+  Windows-only live scripts from the Unix branch.
+- Update Unix CI to setup-go v7 and test dependency jsdom to 30.1.3. Keep the
+  Electron 44.9.3 runtime and published Windows/Unix installers unchanged.
+
+## 1.19.1-unix.7 — 2026-10-27
+
+- Scope uncertain replay protection to model-step progress so steering input and
+  new tool results can continue within the same conversation.
+- Fix repeated account fallback during native auth synchronization and prevent a
+  delayed login from rolling back a newer routed account.
+- Recognize large data-only completion frames; display auto-switch status/setup
+  on both Accounts and Connections with bilingual steps.
+- Add native desktop/extension continuity coverage: 14 completed turns, 12 quota
+  fallbacks, four steers and 14 unique file writes in each synthetic run.
+
+## 1.19.1-unix.6 — 2026-10-26
+
+- Accept successful SSE without Content-Type and preserve successful tool follow-ups.
+- Expand native omitted-MIME protocol/fault tests. Superseded by Unix.7, which
+  fixes additional progress-blocking and repeated-fallback cases.
+
+## 1.19.1-unix.5 — 2026-10-26
+
+- Preserve plugin-provided desktop MCP transport/current tools sockets when resuming chats.
+- Add bounded automatic-replay protection after uncertain failures and keep slow
+  metadata persistence from holding successful responses.
+- Superseded: later releases fix missing-MIME and whole-turn false replay blocks.
+
+## 1.19.1-unix.4 — 2026-10-26
+
+- Add the local desktop Codex connection with a shared router, existing history,
+  ephemeral native authentication and desktop setup/disconnect guidance.
+- Add native desktop quota/tool/restart fixtures. Superseded after a plugin-only
+  MCP configuration regression was discovered in real conversation resume.
+
 ## 1.19.1-unix.3 — 2026-10-26
 
 - Update Electron to 44.9.3 and refresh vulnerable build/test dependencies.

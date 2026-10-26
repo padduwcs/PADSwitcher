@@ -1,40 +1,65 @@
-# Releasing PADSwitcher
+# Releasing the Unix edition
 
-**Unix branch:** follow [UNIX.md](UNIX.md#github-và-phát-hành). Use only
-`unix-v<package-version>` tags. Unix releases are prereleases with `latest=false`.
-The Windows procedure below applies only to `main` and must not be used here.
-
-Releases are portable Windows executables published from a version tag. The tag, `package.json`, and `package-lock.json` versions must match.
+This guide applies to `feature/cross-platform` only. Windows releases follow
+[the Windows procedure](https://github.com/padduwcs/PADSwitcher/blob/main/docs/RELEASING.md).
+Unix tags use `unix-v…`; releases are previews with `latest=false`.
 
 ## Prepare
 
-1. Update the version with `npm version <version> --no-git-tag-version`.
-2. Update `CHANGELOG.md`, `VALIDATION.md`, and user documentation.
-3. Run the checks in [DEVELOPMENT.md](DEVELOPMENT.md), including the portable build and packaged smoke test.
-4. Confirm `git status` contains only intended source and documentation changes.
+1. Select the next unused `1.19.1-unix.N` version (or the intended new Unix base).
+   Update both package files with `npm version` and `--no-git-tag-version`.
+2. Update the Unix changelog, current install guides, both READMEs and docs index.
+   `npm run check:docs` catches stale active download links.
+3. Update `UNIX-RELEASE-NOTES.md` with user-visible behavior and tested limits.
+   Keep `{{VERSION}}` and `{{TAG}}` placeholders in asset links.
+4. Run the checks and packaging steps in [DEVELOPMENT.md](DEVELOPMENT.md).
+5. Commit only source/docs, then push `feature/cross-platform` and wait for all
+   source CI checks. Do not publish generated local files directly from the checkout.
 
-Do not include generated helpers, `dist`, `artifacts`, credentials, gateway files, logs, or QA app data.
+The release commit must have passed CI and must not contain `[skip ci]`. A tag
+on a skipped commit can skip the tag workflow too. Published tags/releases are
+immutable; choose a new version to fix a published build.
 
 ## Publish
 
-Merge the release commit into `main`, wait for **Windows checks and portable build**, then create and push the matching tag:
+From the tested release commit, derive the tag from the package version:
 
-```powershell
-git tag -a v1.20.0 -m "PADSwitcher 1.20.0"
-git push origin v1.20.0
+```bash
+pad_version=$(node -p "require('./package.json').version")
+pad_tag="unix-v$pad_version"
+pad_commit=$(git rev-parse HEAD)
+git tag "$pad_tag" "$pad_commit"
+git push origin "$pad_tag"
 ```
 
-The **Publish Windows release** workflow repeats the isolated checks, builds the portable executable, verifies the packaged app, generates its SHA-256 file, and publishes both assets to GitHub Releases.
+Only do this after confirming that the tag is unused and `pad_commit` is the
+commit whose CI passed. Use an explicit tested SHA instead of HEAD when later
+documentation commits have been added.
 
-For a curated release description, create the GitHub release for the tag with notes from `CHANGELOG.md` before the workflow finishes. The workflow detects the release and uploads or replaces only the two generated assets.
+The Unix release workflow:
 
-## Verify
+- checks shared-core behavior on Windows and builds/tests Linux x64/ARM64 and
+  macOS Intel/Apple Silicon;
+- verifies native quota/context/tool continuity, sandboxed packaging, installed
+  deb/DMG startup and Mac ZIP signatures;
+- produces eight installers with sidecar SHA-256 files;
+- adds Vietnamese/English installation guides and `SHA256SUMS.txt`;
+- verifies all **19 assets** in a draft against GitHub names, sizes and digests;
+- publishes the prerelease while keeping the Windows **Latest** release intact.
 
-- The GitHub release is public and marked latest.
-- The executable and `.sha256` filenames contain the expected version.
-- `Get-FileHash` matches the published checksum.
-- The release page links to the correct commit/tag.
-- The README release badge and download link resolve to the new version.
-- A clean-machine launch shows the expected version and first-run flow.
+A rerun can resume a draft. The workflow refuses to overwrite a public release.
 
-The executable is currently unsigned. Do not state otherwise until code signing is part of the verified build.
+## Verify the public release
+
+- Confirm all build/publish jobs passed and the release is public, prerelease,
+  and separate from Windows Latest.
+- Check the eight download links anonymously; compare downloaded installer and
+  guide hashes with the catalog and GitHub metadata.
+- Inspect the downloaded package version and relevant runtime sources, and run
+  the packaged smoke check in an isolated app-data root.
+- Record results in [UNIX-VALIDATION.md](UNIX-VALIDATION.md).
+- Mark superseded previews with a link to the current Unix build. Keep published
+  tags/assets for provenance; clean duplicate local downloads instead.
+
+No source build, test or release step should access saved accounts or consume
+model/reset/Kaggle quota. Real-account acceptance is separate and explicitly authorized.

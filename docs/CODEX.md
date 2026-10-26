@@ -1,5 +1,9 @@
 # Dùng Codex với PADSwitcher
 
+Tài liệu bên dưới là tham chiếu bản **Windows**. Với **Linux/macOS**, dùng
+[hướng dẫn Codex, desktop và tự chuyển](UNIX-INSTALL.md).
+For Linux/macOS use the [Unix Codex setup](UNIX-INSTALL.en.md).
+
 [English](#english)
 
 PADSwitcher kết nối Codex trong VS Code, PowerShell và JetBrains AI Assistant với các phiên tài khoản được lưu riêng. Ứng dụng giữ nguyên sandbox, công cụ, bước duyệt và lịch sử do Codex quản lý.

@@ -166,36 +166,13 @@ Bài thử giao diện bỏ qua onboarding trong profile tạm, chọn chat cũ 
 và kiểm tra câu trả lời đã lưu được hiển thị. Tùy chọn này không phải kiểm thử
 app desktop macOS. `npm run smoke:faults` dùng bộ Codex thật qua gateway và
 đếm số yêu cầu model khi giả lập lỗi; không dùng tài khoản hay quota thật.
-Sau lỗi không rõ kết quả, bộ định tuyến chặn gửi lại trong cùng lượt bằng mã
-băm của định danh lượt, kể cả khi Codex thay đổi phần nội dung để phục hồi.
-Lượt mới do người dùng bắt đầu vẫn được phép. Bộ nhớ này có giới hạn, không
+Sau lỗi không rõ kết quả, bộ định tuyến dừng tự gửi lặp bước model đó. Tin nhắn
+bổ sung và kết quả công cụ mới trong cùng lượt được coi là tiến trình mới và
+vẫn được tiếp tục; nội dung assistant phục hồi đơn thuần không mở lại bước lỗi. Bộ nhớ này có giới hạn, không
 lưu nội dung chat; chẩn đoán hiển thị số lần chặn, số lần gửi và cache được báo.
 
 ## GitHub và phát hành
 
-`unix-ci.yml` chạy trên push/PR vào `feature/cross-platform`: unit test lõi dùng chung trên Windows và
-build/test Linux x64, Linux arm64, macOS Intel, macOS Apple Silicon.
-Artifact tải được trong Actions sau khi job tương ứng thành công.
-
-Chỉ phát hành khi các kiểm tra đã qua và chủ động tạo tag:
-
-Tag phải trỏ vào commit đã kiểm tra và không chứa `[skip ci]` trong commit message.
-GitHub có thể bỏ qua cả workflow push tag khi commit mang nhãn này. Với commit
-tài liệu có `[skip ci]` ở đầu nhánh, hãy chỉ định SHA của commit đã qua CI khi tạo tag.
-
-```bash
-git tag unix-v1.19.1-unix.7
-git push origin unix-v1.19.1-unix.7
-```
-
-`unix-release.yml` kiểm tra tag khớp package version và commit thuộc nhánh Unix,
-build các kiến trúc rồi tạo **Pre-release**, đặt `latest=false`.
-Quy trình chạy cả unit test lõi dùng chung trên Windows, cài thử deb, mở app sao chép từ DMG và kiểm chữ ký bản ZIP.
-AppImage giữ Chromium sandbox, không tự thêm `--no-sandbox`.
-Trước khi công khai, script xác nhận đủ tám bộ cài và checksum, thêm hướng dẫn
-Việt/Anh cùng SHA256SUMS, tải lên draft, đối chiếu tên/kích thước/digest SHA-256
-do GitHub trả về cho toàn bộ 19 asset rồi mới bỏ trạng thái draft.
-Rerun có thể tiếp tục draft; không ghi đè release đã công khai.
-Nó không tải artifact lên release Windows. Quy trình Windows trên `main` giữ nguyên.
-
-Giới hạn kiểm chứng và kết quả thực tế được ghi tại [UNIX-VALIDATION.md](UNIX-VALIDATION.md).
+Xem [quy trình phát hành Unix](RELEASING.md). Hai workflow kiểm tra Windows lõi dùng
+chung, Linux x64/ARM64 và macOS Intel/Apple Silicon; tag Unix tạo prerelease riêng
+và giữ nguyên Windows Latest. [Kết quả kiểm chứng](UNIX-VALIDATION.md).

@@ -1,94 +1,84 @@
-<p align="center"><img src="src/assets/padswitcher-emblem.png" width="220" alt="PADSwitcher"></p>
+<p align="center"><img src="src/assets/padswitcher-emblem.png" width="180" alt="PADSwitcher"></p>
 
-# PADSwitcher Unix
+# PADSwitcher
 
-**Profile Account Directory Switcher — bản Linux và macOS độc lập.**
-Quản lý tài khoản Codex/Kaggle, theo dõi quota và kết nối công cụ trên máy.
+Quản lý tài khoản **Codex và Kaggle**, theo dõi quota và tự chuyển tài khoản
+Codex dự phòng khi tài khoản đang dùng hết quota.
 
-Nhánh này là `feature/cross-platform`. Bản Windows ổn định tiếp tục ở
-[`main`](https://github.com/padduwcs/PADSwitcher/tree/main), với mã nguồn, dữ liệu
-và quy trình phát hành riêng. Có thể dùng một thư mục mã nguồn rồi chuyển nhánh
-để làm việc với từng bản.
+[English](README.en.md) · [Hướng dẫn](docs/README.md) · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues/new/choose)
 
-[Tải Linux/macOS](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7) ·
-[Cài đặt và dùng lần đầu](docs/UNIX-INSTALL.md) · [English](README.en.md) ·
-[Tất cả hướng dẫn](docs/README.md)
-
+<a id="downloads"></a>
 ## Tải và cài đặt
 
-Mở [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7),
-chọn `.deb` cho Ubuntu/Debian, `.AppImage` cho Linux tương thích hoặc `.dmg` cho Mac.
-Có đủ Linux x64/ARM64 và Mac Intel/Apple Silicon. Bảng chọn file, hướng dẫn
-Keychain/GNOME Keyring, cập nhật và xử lý lỗi nằm trong
-[hướng dẫn cài đặt tiếng Việt](docs/UNIX-INSTALL.md) và [English](docs/UNIX-INSTALL.en.md).
-Đây là **Pre-release** công khai; xem phạm vi kiểm chứng trước khi sử dụng.
+**Chỉ muốn sử dụng ứng dụng? Chọn bộ cài bên dưới.** Không cần clone mã nguồn,
+cài Node.js hoặc Go. Windows dùng app **PADSwitcher**; Linux/macOS dùng app
+**PADSwitcher Unix**, với tài khoản và dữ liệu riêng.
 
-Linux cần desktop có Secret Service/GNOME Keyring đã mở khóa; macOS dùng Keychain.
-Codex CLI native tương thích được cài riêng. Kaggle cần Python 3.11+ và các SDK
-theo thiết lập trong app. Các gói đã build không cần Node.js hoặc Go.
+| Hệ điều hành | Bản phát hành | Bộ cài | Hướng dẫn |
+| --- | --- | --- | --- |
+| Windows 10/11 x64 | [Ổn định](https://github.com/padduwcs/PADSwitcher/releases/latest) | `Windows.exe` portable | [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/main/docs/WINDOWS-INSTALL.md) |
+| Ubuntu/Debian x64 hoặc ARM64 | [Unix.7 · thử nghiệm](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7) | `.deb` | [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md) |
+| Linux khác tương thích | [Unix.7 · thử nghiệm](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7) | `.AppImage` | [Yêu cầu Linux](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md) |
+| macOS Intel hoặc Apple Silicon | [Unix.7 · thử nghiệm](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.7) | `.dmg` hoặc `.zip` | [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md) |
 
-Release có bộ cài, hướng dẫn Việt/Anh và SHA-256. Các build phát triển vẫn có
-trong Actions. Bản Unix dùng tag `unix-v…`, được phát hành dưới
-dạng **Pre-release** và không thay thế bản Windows ở đường dẫn tải Latest.
-Bản Mac preview ký ad-hoc, chưa có Developer ID/notarization.
+Trong trang release, mở **Assets**, chọn đúng hệ điều hành và kiến trúc CPU.
+File `.sha256` dùng để kiểm tra bộ cài; mục **Source code** dành cho mã nguồn.
+Trên Ubuntu 24.04/26.04, dùng `.deb` thay vì AppImage.
 
-## Clone và chạy trên Linux
+Windows portable chưa ký số. Bản Mac thử nghiệm ký ad-hoc, chưa notarize;
+hướng dẫn cài đặt giải thích bước mở app lần đầu. Bản Unix mới không thay thế
+bản Windows ổn định ở liên kết **Latest**.
 
-Cách này dành cho người muốn chạy mã nguồn; người chỉ muốn dùng app hãy tải `.deb` ở trên.
-Dùng Ubuntu Desktop 24.04/26.04 với một terminal và kho khóa đã mở:
+## Bắt đầu sử dụng
+
+1. Cài/mở ứng dụng, vào **Dịch vụ → Codex** và thêm tài khoản qua trình duyệt.
+2. Vào **Kết nối**, chọn cách dùng: **VS Code**, **CLI** hoặc **JetBrains**.
+   Trên Unix còn có **Mở desktop qua PADSwitcher** cho Codex cục bộ.
+3. Muốn tự đổi khi hết quota: thêm ít nhất hai tài khoản, mở thiết lập tự chuyển,
+   chọn tài khoản dự phòng và lưu. Giữ PADSwitcher chạy khi dùng kết nối này.
+
+Desktop Codex trên Unix dùng thiết lập tự chuyển **Dùng chung**. Extension ở
+chế độ Dùng chung dùng cùng thiết lập; kết nối chọn tài khoản riêng có danh sách
+riêng. [Hướng dẫn bật tự chuyển từng bước](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md#bật-tự-chuyển-tài-khoản-cho-desktop-và-extension).
+
+Tự chuyển áp dụng cho tài khoản Codex cá nhân Free/Plus/Pro và lỗi quota đã
+xác định trước khi có kết quả trả về. Lịch sử ChatGPT thông thường không chuyển
+qua tài khoản khác; tác vụ cloud/remote không thuộc kết nối Codex cục bộ này.
+
+**Kaggle:** chọn **Dịch vụ → Kaggle → Thiết lập**, cài công cụ theo hướng dẫn,
+thêm API token, rồi mở terminal cho tài khoản cần dùng. Mỗi terminal giữ lựa
+chọn tài khoản riêng. [Hướng dẫn Kaggle](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/KAGGLE.md).
+
+<p align="center"><img src="docs/images/light.png" width="49%" alt="Giao diện sáng"><img src="docs/images/dark.png" width="49%" alt="Giao diện tối"></p>
+
+## Clone và phát triển
+
+Repo duy trì hai nhánh. **Chọn đúng nhánh ngay khi clone**:
+
+| Bạn phát triển bản nào? | Nhánh | Thiết lập và chạy |
+| --- | --- | --- |
+| Windows | `main` | [Hướng dẫn Windows](https://github.com/padduwcs/PADSwitcher/blob/main/docs/DEVELOPMENT.md) |
+| Linux/macOS | `feature/cross-platform` | [Hướng dẫn Unix](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/DEVELOPMENT.md) |
+
+Linux/macOS:
 
 ```bash
-sudo apt update
-sudo apt install git python3 python3-venv gnome-keyring
 git clone --branch feature/cross-platform https://github.com/padduwcs/PADSwitcher.git
 cd PADSwitcher
-bash scripts/setup-linux.sh
-# Ubuntu 24.04/26.04: sandbox cho bản chạy từ mã nguồn.
-sudo chown root:root node_modules/electron/dist/chrome-sandbox
-sudo chmod 4755 node_modules/electron/dist/chrome-sandbox
-bash scripts/start-linux.sh
 ```
 
-Hai lệnh `sudo` chỉ đặt quyền cho helper sandbox Electron đã tải về. Chạy lại
-sau mỗi lần `npm ci` thay `node_modules`. Không dùng `--no-sandbox`. Gói `.deb`
-cấu hình sandbox lúc cài nên người tải bộ cài không cần làm bước này.
+Trên Linux, làm theo phần **Linux** của hướng dẫn Unix để chuẩn bị công cụ và
+sandbox. Trên Mac, làm theo phần **macOS**. Windows clone với `--branch main`.
+Clone không kèm `--branch` mặc định lấy mã Windows.
 
-`setup-linux.sh` tải Node.js 24.18.1 và Go 1.27.3 từ nguồn chính thức, kiểm tra
-SHA-256, cài dependency và build helper. Công cụ nằm trong thư mục người dùng;
-script không sửa Node/Go hệ thống hay profile shell. Chạy lại được nếu lần tải
-trước bị gián đoạn. `start-linux.sh` dùng đúng môi trường đã chuẩn bị.
-Có sẵn Node.js 24+ và Go 1.27.3+? Dùng `npm ci` rồi `npm start` như thường.
+Một thư mục mã nguồn là đủ; có thể chuyển nhánh bằng Git sau khi lưu thay đổi.
+Ứng dụng đã cài hoạt động độc lập với thư mục mã nguồn.
+Xem [đóng góp](CONTRIBUTING.md) và [chuyển nhánh trong một thư mục](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/DEVELOPMENT.md#one-folder-and-two-branches).
 
-Trên macOS, cài Node.js 24 và Go 1.27.3+, clone đúng nhánh rồi chạy
-`npm ci` và `npm start`. Với Windows/WSL, xem [hướng dẫn Unix/WSL](docs/UNIX.md).
+## Tài liệu và hỗ trợ
 
-Tài liệu [UNIX.md](docs/UNIX.md) mô tả đầy đủ dependency, thư mục dữ liệu,
-Bash/Zsh, giới hạn WSL, kiểm thử và phát hành. Không sao chép kho DPAPI Windows
-sang bản Unix; thêm/đăng nhập tài khoản lại trong môi trường Unix.
-Xem [phạm vi kiểm chứng](docs/UNIX-VALIDATION.md) và
-[kết quả build trên GitHub](https://github.com/padduwcs/PADSwitcher/actions/workflows/unix-ci.yml?query=branch%3Afeature%2Fcross-platform)
-khi phát triển từ mã nguồn.
-
-## Dùng một thư mục cho cả hai nhánh
-
-Một thư mục `PADSwitcher` là đủ. Mỗi lần chuyển nhánh, Git thay mã nguồn trong
-thư mục đó theo bản bạn chọn:
-
-```bash
-cd PADSwitcher
-git status
-git switch main                    # Mã nguồn bản Windows
-git switch feature/cross-platform  # Mã nguồn bản Linux/macOS
-```
-
-Hai lệnh `git switch` là hai lựa chọn; dùng lệnh tương ứng với bản cần làm việc.
-Commit hoặc stash các thay đổi đang làm trước khi chuyển. Dừng ứng dụng nếu đang
-chạy từ mã nguồn; ứng dụng đã cài bằng bộ cài hoạt động độc lập.
-
-Sau khi đổi nhánh, chuẩn bị lại dependency theo hướng dẫn của nhánh đang chọn.
-Khi quay về Linux, chạy lại `bash scripts/setup-linux.sh` và hai lệnh cấu hình
-sandbox ở trên trước khi chạy từ mã nguồn. Chuyển nhánh không đưa code của nhánh
-này vào nhánh kia. Worktree thứ hai chỉ cần khi muốn mở cả hai nhánh cùng lúc.
-Xem thêm [hướng dẫn phát triển](docs/DEVELOPMENT.md#one-folder-and-two-branches).
+- [Mục lục hướng dẫn](docs/README.md) · [Hỗ trợ](SUPPORT.md) · [Bảo mật](SECURITY.md)
+- [Thay đổi Windows](https://github.com/padduwcs/PADSwitcher/blob/main/CHANGELOG.md) · [Thay đổi Unix](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/CHANGELOG.md)
+- [Kiểm chứng Unix và giới hạn](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-VALIDATION.md)
 
 Phát hành theo [MIT](LICENSE). Dự án độc lập với OpenAI, Kaggle và JetBrains.
