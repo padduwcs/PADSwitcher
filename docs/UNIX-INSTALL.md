@@ -1,7 +1,7 @@
 # Cài đặt PADSwitcher Unix
 
 [English](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md)
-· [Tải bản Unix 1.19.1-unix.4](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)
+· [Tải bản Unix 1.19.1-unix.5](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.5)
 · [Báo lỗi](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix quản lý tài khoản Codex/Kaggle trên Linux và macOS.
@@ -15,12 +15,12 @@ không cần Node.js hoặc Go để mở app.
 
 | Máy của bạn | File tải về |
 | --- | --- |
-| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.4-Linux-amd64.deb` (ưu tiên) |
-| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.4-Linux-arm64.deb` (ưu tiên) |
-| Linux khác, Intel/AMD (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage` |
-| Linux khác, ARM64 (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.4-Linux-arm64.AppImage` |
-| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.4-macOS-arm64.dmg` |
-| Mac Intel | `PADSwitcher-1.19.1-unix.4-macOS-x64.dmg` |
+| Ubuntu/Debian 64-bit Intel hoặc AMD | `PADSwitcher-1.19.1-unix.5-Linux-amd64.deb` (ưu tiên) |
+| Ubuntu/Debian ARM64 | `PADSwitcher-1.19.1-unix.5-Linux-arm64.deb` (ưu tiên) |
+| Linux khác, Intel/AMD (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.5-Linux-x86_64.AppImage` |
+| Linux khác, ARM64 (không dùng cho Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.5-Linux-arm64.AppImage` |
+| Mac Apple Silicon (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.5-macOS-arm64.dmg` |
+| Mac Intel | `PADSwitcher-1.19.1-unix.5-macOS-x64.dmg` |
 
 File `.zip` cho Mac là lựa chọn thay thế cho `.dmg`, cùng kiến trúc.
 Trên Linux, `uname -m` cho biết `x86_64` (Intel/AMD) hoặc `aarch64` (ARM64).
@@ -44,9 +44,9 @@ Mở terminal tại thư mục chứa file tải về. Ví dụ cho Intel/AMD:
 
 ```bash
 # Tải bộ cài và file .sha256 cùng tên vào cùng thư mục.
-sha256sum -c PADSwitcher-1.19.1-unix.4-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.5-Linux-amd64.deb.sha256
 # Chỉ cài khi checksum báo OK.
-sudo apt install ./PADSwitcher-1.19.1-unix.4-Linux-amd64.deb
+sudo apt install ./PADSwitcher-1.19.1-unix.5-Linux-amd64.deb
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.deb`.
@@ -83,8 +83,8 @@ hoặc không tạo được venv, chạy lại lệnh cài `python3-venv` ở t
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.5-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.5-Linux-x86_64.AppImage
 ```
 
 Với ARM64, thay bằng tên file `Linux-arm64.AppImage`.
@@ -171,6 +171,12 @@ realtime/background không thuộc kết nối này.
    Nếu bật tự đổi, bộ định tuyến xử lý lỗi hết quota xác định trước khi phát
    kết quả, không gửi lại thao tác công cụ đã thực hiện.
 
+Khi lỗi mạng/model hoặc câu trả lời bị ngắt, PADSwitcher chặn Codex tự gửi lại
+trong lượt bị lỗi để hạn chế tiêu hao quota lặp. Hãy xem kết quả và các thao tác
+đã thực hiện trước khi gửi một lượt mới. Tự đổi tài khoản chỉ áp dụng cho lỗi
+hết quota rõ ràng, trước khi trả kết quả. Kiểm tra **Chẩn đoán → Hoạt động model**
+để xem số yêu cầu/lần gửi; các số này không phải lượng quota bị trừ.
+
 Desktop dùng **tài khoản chung** với các kết nối CLI/IDE ở chế độ Dùng chung.
 Các kết nối đã chọn tài khoản riêng giữ lựa chọn của chúng. Tài khoản và quota
 Codex đang dùng được xem trong PADSwitcher; menu tài khoản ChatGPT của desktop
@@ -193,16 +199,21 @@ toàn bộ luồng bằng tài khoản thật hoặc app desktop macOS; cập nh
 thể cần điều chỉnh tích hợp. Nếu không xác minh được tài khoản, kết nối desktop
 bị ngắt và PADSwitcher hiển thị lỗi để bạn kiểm tra.
 
+Nếu gặp `invalid transport in mcp_servers.codex_app` sau khi dùng Unix.4,
+cập nhật lên Unix.5, thoát hẳn PADSwitcher và desktop, rồi mở lại PADSwitcher
+và kết nối desktop qua nút trên. Lỗi do cấu hình tạm khi mở chat;
+không cần xóa hội thoại, `config.toml` hoặc đăng nhập lại.
+
 ## 4. Kiểm tra file tải về
 
 Tải file `.sha256` có cùng tên với bộ cài và đặt cạnh bộ cài. Ví dụ:
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.4-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.5-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.4-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.5-macOS-arm64.dmg.sha256
 ```
 
 Chỉ tiếp tục khi kết quả là `OK`. Release cũng có `SHA256SUMS.txt` tổng hợp.

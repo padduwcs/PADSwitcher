@@ -4,7 +4,7 @@ Nhánh `feature/cross-platform` là bản Unix độc lập trong cùng reposito
 `main` tiếp tục là bản Windows ổn định. Không merge nhánh Unix vào `main`
 và không dùng tag `v*` cho bản Unix.
 
-Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)
+Người dùng tải bộ cài từ [Unix Release](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.5)
 và làm theo [hướng dẫn cài đặt](UNIX-INSTALL.md) ([English](UNIX-INSTALL.en.md)).
 Các phần bên dưới dành cho phát triển, kiểm thử và vận hành release.
 
@@ -175,8 +175,8 @@ GitHub có thể bỏ qua cả workflow push tag khi commit mang nhãn này. V�
 tài liệu có `[skip ci]` ở đầu nhánh, hãy chỉ định SHA của commit đã qua CI khi tạo tag.
 
 ```bash
-git tag unix-v1.19.1-unix.4
-git push origin unix-v1.19.1-unix.4
+git tag unix-v1.19.1-unix.5
+git push origin unix-v1.19.1-unix.5
 ```
 
 `unix-release.yml` kiểm tra tag khớp package version và commit thuộc nhánh Unix,

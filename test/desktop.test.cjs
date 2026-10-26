@@ -4,9 +4,9 @@ const {DesktopIntegration,launchEnvironment}=require('../src/core/desktop.cjs');
 const {fixture,auth}=require('./helpers.cjs');
 
 test('desktop launch keeps the conversation home and removes inherited credentials and isolated databases',()=>{
-  const env=launchEnvironment({HOME:'/home/test',DISPLAY:':1',CODEX_HOME:'/wrong',CODEX_SQLITE_HOME:'/wrong-db',CODEX_ELECTRON_USER_DATA_PATH:'/wrong-ui',OPENAI_API_KEY:'fixture-secret',CODEX_ACCESS_TOKEN:'fixture-token',ELECTRON_RUN_AS_NODE:'1',PADSWITCHER_CONNECTION_FILE:'/other/connection'}, {home:'/existing-codex',helper:'/private/PADCodex'});
+  const env=launchEnvironment({HOME:'/home/test',DISPLAY:':1',CODEX_HOME:'/wrong',CODEX_SQLITE_HOME:'/wrong-db',CODEX_ELECTRON_USER_DATA_PATH:'/wrong-ui',CODEX_APP_TOOLS_PIPE_PATH:'/old/desktop.sock',OPENAI_API_KEY:'fixture-secret',CODEX_ACCESS_TOKEN:'fixture-token',ELECTRON_RUN_AS_NODE:'1',PADSWITCHER_CONNECTION_FILE:'/other/connection'}, {home:'/existing-codex',helper:'/private/PADCodex'});
   assert.equal(env.CODEX_HOME,'/existing-codex');assert.equal(env.CODEX_CLI_PATH,'/private/PADCodex');assert.equal(env.DISPLAY,':1');assert.equal(env.PADSWITCHER_CLIENT_KIND,'desktop');
-  for(const k of ['CODEX_SQLITE_HOME','CODEX_ELECTRON_USER_DATA_PATH','OPENAI_API_KEY','CODEX_ACCESS_TOKEN','ELECTRON_RUN_AS_NODE','PADSWITCHER_CONNECTION_FILE'])assert.equal(env[k],undefined);
+  for(const k of ['CODEX_SQLITE_HOME','CODEX_ELECTRON_USER_DATA_PATH','CODEX_APP_TOOLS_PIPE_PATH','OPENAI_API_KEY','CODEX_ACCESS_TOKEN','ELECTRON_RUN_AS_NODE','PADSWITCHER_CONNECTION_FILE'])assert.equal(env[k],undefined);
   assert.equal(env.CODEX_APP_SERVER_FORCE_CLI,'1');assert.equal(env.CODEX_APP_SERVER_USE_LOCAL_DAEMON,'0');
 });
 async function setup(t){

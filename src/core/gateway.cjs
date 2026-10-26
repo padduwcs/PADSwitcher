@@ -12,6 +12,7 @@ const {UserError,publicError}=require('./errors.cjs');
 const {helperSource}=require('./platform.cjs');
 const {Recovery,continuation}=require('./recovery.cjs');
 const {ModelRouter}=require('./model-router.cjs');
+const {DesktopToolsPipe}=require('./desktop-tools.cjs');
 const START_METHODS=new Set(['turn/start','review/start']);
 const AUTH_METHODS=new Set(['account/login/start','account/login/cancel','account/logout']);
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -46,8 +47,9 @@ class Gateway {
       await atomicWrite(path.join(this.root,'backend-capability'),this.backToken);
       await atomicWrite(path.join(this.root,'client-capability'),this.frontToken);
       const port=await freePort();this.backendUrl=`ws://127.0.0.1:${port}`;
-      const env={...process.env,...this.options.environment,CODEX_HOME:this.service.state.settings.desktopHome};
-      for(const name of ['CODEX_SQLITE_HOME','OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','ACCESS_TOKEN','OPENAI_BASE_URL','CODEX_INTERNAL_ORIGINATOR_OVERRIDE'])delete env[name];
+      if(this.options.clientKind==='desktop'&&process.platform!=='win32'){this.desktopTools=new DesktopToolsPipe();this.desktopTools.start();}
+      const env={...process.env,...this.options.environment,CODEX_HOME:this.service.state.settings.desktopHome,...(this.desktopTools?{CODEX_APP_TOOLS_PIPE_PATH:this.desktopTools.path}:{})};
+      for(const name of ['CODEX_SQLITE_HOME','OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','ACCESS_TOKEN','OPENAI_BASE_URL','CODEX_INTERNAL_ORIGINATOR_OVERRIDE','CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY','BROWSER_USE_ACCESS_VERIFYING_IDENTITY'])delete env[name];
       if(this.options.isolatedState)env.CODEX_SQLITE_HOME=this.root;
       if(!this.options.disableRouter){
         const version=this.version.match(/^codex-cli (\d+)\.(\d+)\./);
@@ -197,6 +199,7 @@ class Gateway {
       if(this.options.clientKind==='desktop'){
         c.desktopEnvironment={};
         for(const key of ['CODEX_APP_TOOLS_PIPE_PATH','CODEX_MCP_NODE_PATH']){const value=m.params._padswitcherDesktopEnvironment?.[key];if(typeof value==='string'&&path.isAbsolute(value)&&value.length<=4096&&!value.includes('\0'))c.desktopEnvironment[key]=value;}
+        c.desktopToolsReady=!this.desktopTools||!c.desktopEnvironment.CODEX_APP_TOOLS_PIPE_PATH||this.desktopTools.bind(c.desktopEnvironment.CODEX_APP_TOOLS_PIPE_PATH,!this.turns.size);
         c.desktopConfig={};
         for(const key of ['plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled','plugins.code-review@openai-bundled.mcp_servers.code-review.enabled']){const value=m.params._padswitcherDesktopConfig?.[key];if(typeof value==='boolean')c.desktopConfig[key]=value;}
       }
@@ -209,12 +212,10 @@ class Gateway {
       this.clientError(c,m.id,'PADSwitcher routes the built-in OpenAI provider. Select OpenAI to use this connection.');return;
     }
     if(this.options.clientKind==='desktop'&&['thread/start','thread/resume','thread/fork'].includes(m.method)){
-      // Desktop starts its tools pipe after PAD's backend. Bind MCP tools to
-      // this GUI client per thread, never a pipe inherited from an older app.
+      if(!c.desktopToolsReady){this.clientError(c,m.id,'Desktop tools are not ready. Reopen desktop through PADSwitcher after the current turn finishes.');return;}
+      // Forward desktop policy only. Adding env/enabled under a standalone
+      // mcp_servers entry without a transport makes native thread resume fail.
       const config={...c.desktopConfig,...m.params?.config};
-      if(c.desktopEnvironment?.CODEX_APP_TOOLS_PIPE_PATH)for(const prefix of ['mcp_servers.codex_app','plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app']){
-        config[prefix+'.enabled']??=true;config[prefix+'.env']={...config[prefix+'.env'],...c.desktopEnvironment};
-      }
       m.params={...m.params,config};
     }
     if(['thread/start','thread/resume','thread/fork'].includes(m.method)&&m.id!=null)c.threadPending.set(m.id,m.params?.ephemeral===true||m.params?.threadSource==='thread_title');
@@ -290,6 +291,7 @@ class Gateway {
     if(this.wss)await new Promise(r=>this.wss.close(r));this.wss=null;
     if(this.http)await new Promise(r=>this.http.close(r));this.http=null;
     if(this.backend&&this.backend.exitCode===null){const ended=new Promise(r=>this.backend.once('close',r));this.backend.kill();await Promise.race([ended,pause(3000)]);}this.backend=null;
+    this.desktopTools?.stop();this.desktopTools=null;
     this.turns.clear();this.knownTurns.clear();this.profileId=null;this.pendingId=null;this.changing=false;this.status='stopped';
     for(const file of ['connection.json','client-capability','backend-capability'])await fs.unlink(path.join(this.root,file)).catch(()=>{});
     this.changed();

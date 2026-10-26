@@ -5,7 +5,44 @@ Implementation is confined to `feature/cross-platform`. Validation initially use
 a separate worktree; normal development can use [one checkout and switch branches](DEVELOPMENT.md#one-folder-and-two-branches).
 The Windows baseline stayed unchanged during development.
 
+## 1.19.1-unix.5 — 2026-10-26
+
+- Fixes a Unix.4 regression: per-thread desktop overrides invented a standalone
+  `mcp_servers.codex_app` entry without a transport. Plugin-only configurations
+  could not resume chats. Desktop tools now use a private, current-GUI socket
+  alias inherited by the native server; plugin transport/policy is preserved.
+  No user config, original auth or conversation migration is required.
+- A production-gateway fault fixture reproduced native automatic retries:
+  `0.163.0-alpha.11.1` sent 30 requests for one persistent 503/disconnect/stall,
+  and six after a partial response. This is synthetic evidence of a risk,
+  not an attribution of an earlier Windows user's quota incident.
+- The failed-turn guard limits each tested failure to one upstream request.
+  Native `0.160.0`, desktop `0.163.0-alpha.11.1` and extension
+  `0.164.0-alpha.11.1` pass loopback fault cases for 503, generic 429,
+  disconnect, partial stream, incomplete EOF, explicit SSE failure and inactivity.
+  A new user turn in the same conversation still succeeds. Numeric diagnostics
+  include blocked retries; no prompts, credentials or native identifiers are saved.
+- Native plugin-only fixtures pass opening/resuming history, quota fallback with
+  identical bytes, manual switching, one-time tools and a fresh tools socket
+  after backend restart. The user config has no standalone Codex MCP entry.
+- Slow or failed routing-metadata persistence cannot hold a successful stream.
+  Dedicated regressions cover uncertain failures with changed recovery bodies,
+  completed streams, large completion frames and new-turn recovery.
+- Ubuntu 26.04 x64: 242 Node tests (238 passed, four Windows-only skips),
+  syntax and packaged Electron startup, sandbox, IPC,
+  service navigation and isolated storage checks passed. Linux amd64 deb and
+  x86_64 AppImage builds completed. Full real-account inference and the actual
+  macOS desktop GUI remain manual acceptance checks; tests use synthetic
+  accounts and loopback model responses, without consuming account quota.
+- Windows `main` and its published stable release remain unchanged. The guard
+  above is shipped on the Unix branch, not applied to the existing Windows app.
+
 ## 1.19.1-unix.4 — 2026-10-26
+
+**Superseded by Unix.5:** the original MCP fixture declared a standalone
+transport and missed the plugin-only configuration regression reported by the
+user. Its successful native tests did not establish real GUI chat-resume support.
+
 
 - Local Ubuntu 26.04 x64: 236 Node tests (232 passed, four Windows-only skips),
   Go helper tests, syntax checks and six official Kaggle SDK contracts passed.

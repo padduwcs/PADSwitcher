@@ -197,10 +197,45 @@ test('numeric diagnostics distinguish native requests, quota retries and reporte
   const f=await fixture(t,(req,res,entry)=>{if(entry.account==='a'){res.writeHead(429,{'Content-Type':'application/json'});res.end(JSON.stringify(quota));}else{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(payload);}});
   const body={model:'gpt-fixture',reasoning:{effort:'medium'},input:[{role:'user',content:'Private prompt must not appear in diagnostics'}],stream:true};
   assert.equal(await (await f.call(body)).text(),payload);assert.equal(await (await f.call(body)).text(),payload);
-  assert.deepEqual(f.r.usage,{requests:2,attempts:3,quotaRetries:1,authRefreshes:0,completed:2,inputTokens:200,cachedInputTokens:180,outputTokens:20,lastModel:'gpt-fixture',lastEffort:'medium'});
+  assert.deepEqual(f.r.usage,{requests:2,attempts:3,quotaRetries:1,authRefreshes:0,blockedReplays:0,completed:2,inputTokens:200,cachedInputTokens:180,outputTokens:20,lastModel:'gpt-fixture',lastEffort:'medium'});
   assert(!JSON.stringify(f.r.usage).includes('Private prompt'));assert(!JSON.stringify(f.g.service.state).includes('cachedInputTokens'));
   assert(f.seen[0].bytes.equals(f.seen[1].bytes));
   const invalid=await fixture(t,(req,res)=>{res.writeHead(400,{'Content-Type':'application/json'});res.end('{"error":{"type":"invalid_request"}}');});
   for(const value of [null,'invalid-top-level',{model:{toString:'not-a-function'}}]){const response=await invalid.call(value);assert.equal(response.status,400);await response.text();}
   assert.equal(invalid.r.usage.attempts,3);assert.equal(invalid.r.usage.lastModel,null);
+});
+
+test('uncertain failure blocks native recovery even when its body changes; an explicit new turn remains usable',async t=>{
+  const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(completed);}});
+  const headers=turn=>({'thread-id':'fixture-thread','x-codex-turn-metadata':JSON.stringify({turn_id:turn})});
+  const first=await f.call({input:[{role:'user',content:'private prompt'}]},headers('first'));assert.equal(first.status,502);await first.text();
+  const repeat=await f.call({input:[{role:'user',content:'private prompt'},{role:'assistant',content:'partial recovery'}]},headers('first'));assert.equal(repeat.status,400);assert.equal((await repeat.json()).error.code,'model_replay_blocked');assert.equal(f.seen.length,1);
+  assert.equal(await (await f.call({input:[{role:'user',content:'private prompt'}]},headers('second'))).text(),completed);assert.equal(f.seen.length,2);
+  assert(!JSON.stringify([...f.r.failedRequests]).includes('private prompt'));assert.equal(f.r.failedRequests.size,1);assert.equal(f.r.usage.blockedReplays,1);
+  await f.r.stop();assert.equal(f.r.failedRequests.size,0);
+});
+
+test('partial SSE ending normally or failing explicitly blocks a retry, while successful tool follow-ups remain allowed',async t=>{
+  for(const end of ['',event('response.failed',{response:{error:{type:'server_error'}}})]){
+    const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(event('response.output_text.delta',{delta:'partial'})+end);});
+    const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
+    await (await f.call({input:[]},headers)).text();assert.equal((await f.call({input:[{role:'assistant',content:'partial'}]},headers)).status,400);assert.equal(f.seen.length,1);
+  }
+  const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(completed);});
+  const headers={'x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
+  for(let i=0;i<3;i++)assert.equal(await (await f.call({input:[]},headers)).text(),completed);assert.equal(f.seen.length,3);
+});
+
+test('a stalled metadata write cannot hold successful inference or create another attempt',async t=>{
+  const f=await fixture(t,(req,res,entry)=>{res.writeHead(entry.account==='a'?429:200,{'Content-Type':entry.account==='a'?'application/json':'text/event-stream'});res.end(entry.account==='a'?JSON.stringify(quota):completed);});
+  f.g.service.save=()=>new Promise(()=>{});
+  const text=await Promise.race([f.call({input:[],stream:true}).then(r=>r.text()),new Promise((_,reject)=>setTimeout(()=>reject(Error('Metadata write stalled the stream')),1000))]);
+  assert.equal(text,completed);assert.deepEqual(f.seen.map(x=>x.account),['a','b']);assert.equal(f.r.active,0);
+});
+
+test('a connection reset after response.completed does not block successful tool follow-ups',async t=>{
+  const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.write(completed);setTimeout(()=>res.destroy(),30);});
+  const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
+  for(let i=0;i<2;i++){const response=await f.call({input:[]},headers);await response.text().catch(()=>{});}
+  assert.equal(f.seen.length,2);assert.equal(f.r.failedRequests.size,0);
 });

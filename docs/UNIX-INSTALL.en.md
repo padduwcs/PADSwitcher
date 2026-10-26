@@ -1,7 +1,7 @@
 # Install PADSwitcher Unix
 
 [Tiếng Việt](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md)
-· [Download Unix 1.19.1-unix.4](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)
+· [Download Unix 1.19.1-unix.5](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.5)
 · [Report a problem](https://github.com/padduwcs/PADSwitcher/issues)
 
 PADSwitcher Unix manages Codex/Kaggle accounts on Linux and macOS. This is a
@@ -14,12 +14,12 @@ Electron and the native helper are included.
 
 | Computer | Download |
 | --- | --- |
-| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.4-Linux-amd64.deb` (recommended) |
-| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.4-Linux-arm64.deb` (recommended) |
-| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage` |
-| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.4-Linux-arm64.AppImage` |
-| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.4-macOS-arm64.dmg` |
-| Intel Mac | `PADSwitcher-1.19.1-unix.4-macOS-x64.dmg` |
+| Ubuntu/Debian, Intel or AMD 64-bit | `PADSwitcher-1.19.1-unix.5-Linux-amd64.deb` (recommended) |
+| Ubuntu/Debian, ARM64 | `PADSwitcher-1.19.1-unix.5-Linux-arm64.deb` (recommended) |
+| Other Linux desktops, Intel/AMD (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.5-Linux-x86_64.AppImage` |
+| Other Linux desktops, ARM64 (not Ubuntu 24.04+) | `PADSwitcher-1.19.1-unix.5-Linux-arm64.AppImage` |
+| Apple Silicon Mac (M1/M2/M3/M4…) | `PADSwitcher-1.19.1-unix.5-macOS-arm64.dmg` |
+| Intel Mac | `PADSwitcher-1.19.1-unix.5-macOS-x64.dmg` |
 
 Mac `.zip` files are alternatives to the DMG for the same architecture.
 On Linux, `uname -m` shows `x86_64` (Intel/AMD) or `aarch64` (ARM64).
@@ -43,9 +43,9 @@ Open a terminal in the download folder. For Intel/AMD:
 
 ```bash
 # Download the installer and matching .sha256 into this folder.
-sha256sum -c PADSwitcher-1.19.1-unix.4-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.5-Linux-amd64.deb.sha256
 # Continue only when the checksum reports OK.
-sudo apt install ./PADSwitcher-1.19.1-unix.4-Linux-amd64.deb
+sudo apt install ./PADSwitcher-1.19.1-unix.5-Linux-amd64.deb
 ```
 
 On ARM64, use the `Linux-arm64.deb` filename instead. Launch **PADSwitcher Unix**
@@ -81,8 +81,8 @@ Do not use `sudo pip` or `--break-system-packages`.
 ### Linux: AppImage
 
 ```bash
-chmod +x PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage
-./PADSwitcher-1.19.1-unix.4-Linux-x86_64.AppImage
+chmod +x PADSwitcher-1.19.1-unix.5-Linux-x86_64.AppImage
+./PADSwitcher-1.19.1-unix.5-Linux-x86_64.AppImage
 ```
 
 On ARM64, use the `Linux-arm64.AppImage` filename. Data is stored in your user
@@ -171,6 +171,12 @@ and realtime/background sessions are outside this connection's scope.
    enabled, the router handles explicit quota rejections before returning model
    output, without repeating tool actions that have already run.
 
+After a network/model error or interrupted response, PADSwitcher blocks native
+automatic replay within the failed turn to limit repeated quota consumption.
+Inspect the result and tool actions before starting a new turn. Account fallback
+only handles explicit quota rejection before output. **Diagnostics → Model activity**
+shows request/attempt counts; these are not quota charges.
+
 Desktop uses the **shared account** alongside CLI/IDE connections in Shared mode.
 Connections configured with a separate account keep their own selection.
 Check PADSwitcher for the active Codex account and quota; the desktop's ChatGPT
@@ -193,16 +199,21 @@ Full real-account workflows and the macOS desktop app have not been verified;
 desktop updates may require integration changes. A failed account verification
 disconnects desktop and reports an error for inspection.
 
+If Unix.4 reports `invalid transport in mcp_servers.codex_app`, upgrade to
+Unix.5, fully quit PADSwitcher and desktop, then reopen PADSwitcher and connect
+desktop using the button above. The error comes from temporary per-chat config;
+do not delete conversations, `config.toml` or sign in again to repair it.
+
 ## 4. Verify a download
 
 Download the installer's matching `.sha256` file into the same folder:
 
 ```bash
 # Linux
-sha256sum -c PADSwitcher-1.19.1-unix.4-Linux-amd64.deb.sha256
+sha256sum -c PADSwitcher-1.19.1-unix.5-Linux-amd64.deb.sha256
 
 # macOS
-shasum -a 256 -c PADSwitcher-1.19.1-unix.4-macOS-arm64.dmg.sha256
+shasum -a 256 -c PADSwitcher-1.19.1-unix.5-macOS-arm64.dmg.sha256
 ```
 
 Continue only if it reports `OK`. A combined `SHA256SUMS.txt` is also provided.

@@ -50,16 +50,16 @@ test('runtime account verification failure closes desktop transport without stop
   for(let i=0;i<50&&hub.desktop.clients.size;i++)await pause(10);
   assert.equal(hub.desktop.clients.size,0);
 });
-test('desktop tools bind to the current GUI pipe per thread without exposing local transport metadata to Codex',async t=>{
+test('desktop tool policy does not invent a standalone transport or override explicit user policy',async t=>{
   const f=await setup(t),{hub}=f;await hub.startDesktop({home:f.desktop,executable:'fixture-codex'});
   const c=new WsRpc(await connect(hub.desktop.url,hub.desktop.frontToken));t.after(()=>c.close());
-  await c.request('initialize',{clientInfo:{name:'Codex Desktop'},_padswitcherDesktopEnvironment:{CODEX_APP_TOOLS_PIPE_PATH:'/tmp/current-desktop.sock',CODEX_MCP_NODE_PATH:'/runtime/node',OPENAI_API_KEY:'fixture-secret'},_padswitcherDesktopConfig:{'plugins.code-review@openai-bundled.mcp_servers.code-review.enabled':true,'model_provider':'fixture-invalid'}});
+  await c.request('initialize',{clientInfo:{name:'Codex Desktop'},_padswitcherDesktopEnvironment:{CODEX_MCP_NODE_PATH:'/runtime/node',OPENAI_API_KEY:'fixture-secret'},_padswitcherDesktopConfig:{'plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled':true,'plugins.code-review@openai-bundled.mcp_servers.code-review.enabled':true,'model_provider':'fixture-invalid'}});
   const client=[...hub.desktop.clients][0];assert.equal(client.desktopEnvironment.OPENAI_API_KEY,undefined);
   // Observe what the native backend receives after decoration.
   const request=client.back.send.bind(client.back);let sent;
   client.back.send=data=>{sent=JSON.parse(data);return request(data);};
   await c.request('thread/resume',{threadId:'existing',config:{'mcp_servers.other.enabled':true}});
-  assert.equal(sent.params.config['mcp_servers.codex_app.env'].CODEX_APP_TOOLS_PIPE_PATH,'/tmp/current-desktop.sock');assert.equal(sent.params.config['mcp_servers.other.enabled'],true);
+  assert(!Object.keys(sent.params.config).some(k=>k.startsWith('mcp_servers.codex_app')));assert.equal(sent.params.config['plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.env'],undefined);assert.equal(sent.params.config['mcp_servers.other.enabled'],true);
   assert.equal(sent.params.config['plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled'],true);
   assert.equal(sent.params.config['plugins.code-review@openai-bundled.mcp_servers.code-review.enabled'],true);assert.equal(sent.params.config.model_provider,undefined);
   await c.request('thread/fork',{threadId:'existing',config:{'plugins.code-review@openai-bundled.mcp_servers.code-review.enabled':false}});assert.equal(sent.params.config['plugins.code-review@openai-bundled.mcp_servers.code-review.enabled'],false);

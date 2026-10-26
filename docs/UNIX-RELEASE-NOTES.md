@@ -10,6 +10,13 @@ below. No source build, Node.js or Go is needed to run the application.
 
 ### Có gì mới / What's new
 
+- Sửa lỗi Unix.4 `invalid transport in mcp_servers.codex_app` khi mở chat cũ.
+  Giữ transport của plugin và kết nối công cụ với phiên desktop hiện tại.
+  Fix Unix.4 conversation resume with plugin-provided desktop tools.
+- Chặn Codex tự gửi lại sau lỗi mạng/model hoặc ngắt câu trả lời; lượt mới do
+  người dùng bắt đầu vẫn hoạt động. Kiểm tra bằng bộ Codex thật và máy chủ giả,
+  không dùng quota thật. Block native automatic recovery after uncertain failures;
+  new user turns remain available. Native loopback fault tests verify request counts.
 - Kết nối Codex cục bộ trong ChatGPT/Codex desktop qua tài khoản chung, giữ
   cùng kho hội thoại và dự án; đổi thủ công chờ lượt đang chạy hoàn tất.
   Local desktop Codex can use the shared account while keeping conversation
