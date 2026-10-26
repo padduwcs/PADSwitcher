@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: 24.18.1
           cache: npm
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: src/helper/unix/go.mod
           cache-dependency-path: src/helper/unix/go.sum
