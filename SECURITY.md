@@ -1,48 +1,61 @@
 # Security and privacy
 
-## Supported versions
+## Supported editions
 
-Security fixes are shipped in the latest GitHub release. Older portable builds and
-untagged development snapshots are not supported; upgrade before reporting a problem
-that may already be fixed.
+Use the current **stable Windows release** or the current **Unix prerelease**
+linked from the [README](README.en.md#downloads). Windows Latest and Unix previews
+are separate channels; an older Unix preview is not current because Windows
+Latest has a different version number. Historical builds are retained for provenance.
 
-PADSwitcher keeps account sessions on your Windows user account using DPAPI.
-The local gateway listens only on loopback and uses a fresh capability at startup.
-Model requests go to the fixed Codex upstream; PADSwitcher does not operate a hosted proxy.
-It does not record prompts or credentials in its own logs. Codex may save conversation
-history according to your Codex settings.
+## Local storage
 
-Windows user permissions protect local data; software running as the same user
-can still access it. Do not share the app data directory, gateway connection files,
-auth files, tokens, or diagnostic archives containing these files.
+| Edition | Credential protection | Local data |
+| --- | --- | --- |
+| Windows | Windows DPAPI and private user permissions | `%APPDATA%/PADSwitcher/data` |
+| Linux/macOS | AES-256-GCM vault; per-root key in Secret Service/Keychain | Separate `PADSwitcher-Unix/data` app-data root |
 
-The Kaggle feature stores each API token in a separate Windows DPAPI vault.
-The read-only bridge uses explicit credentials; account terminals receive their
-token through process-local environment variables after decryption, without
-changing the machine’s default Kaggle credentials. Tokens are not included in
-renderer snapshots, command arguments, setup commands or app logs. A terminal
-retains its token until closed, even after removing an account or updating its
-token in PADSwitcher. Revoke the token on Kaggle to invalidate it everywhere.
-See [Kaggle boundaries](docs/KAGGLE.md) for monitoring coverage and storage details.
+Unix refuses locked/unavailable keyrings and has no plaintext-key fallback.
+Private directories use 0700 and secret files 0600; the helper rejects unsafe
+credential links/permissions. Do not copy Windows DPAPI vaults into Unix.
 
-The optional `padkaggle` PowerShell command decrypts the same DPAPI vault in the
-calling terminal. Copied commands and profile blocks contain a script path and
-account selector, never a token. Selecting an account changes process-local
-Kaggle variables and PATH only. `off` restores the prior Kaggle environment;
-children already started retain their inherited credentials. Profile setup is
-explicit and modifies a marked block without replacing other settings or
-bypassing PowerShell execution policy.
+Software running as the same OS user can access that user's process data.
+Encryption at rest does not isolate credentials from programs running as you.
+Never share auth files, vaults, app-data archives or gateway connection files.
 
-Automatic switching is opt-in, limited to supported personal accounts and confirmed
-quota failures before response output. Reset credits always require explicit confirmation.
-See [routing boundaries](ROUTING.md) and [validation limits](VALIDATION.md).
+## Codex
 
-To report a vulnerability, use [GitHub private vulnerability reporting](https://github.com/padduwcs/PADSwitcher/security/advisories/new)
-if it is available. Include the affected version, impact, reproduction steps and a
-minimal proof of concept with all credentials removed. Please allow a reasonable time
-for confirmation and a coordinated fix before public disclosure.
+The local gateway listens on loopback with fresh capabilities. Model requests
+use the fixed Codex upstream; PADSwitcher does not operate a hosted proxy.
+PAD diagnostics do not record prompts, responses, credentials or capability URLs.
+Native Codex can retain its conversation history according to its own settings.
+Sandboxing and tool approvals stay with native Codex.
 
-Otherwise open an issue asking for a private contact, without posting exploit details,
-account identifiers or credentials. For ordinary bugs, use
-[GitHub Issues](https://github.com/padduwcs/PADSwitcher/issues) with the app version,
-Windows version and steps to reproduce; redact personal information from screenshots.
+Account fallback is opt-in, limited to supported personal accounts and confirmed
+quota rejection before output. Reset credits require explicit confirmation.
+See [Windows routing](https://github.com/padduwcs/PADSwitcher/blob/main/ROUTING.en.md)
+and [Unix routing](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/architecture/ROUTING.en.md)
+for edition-specific behavior and validation.
+
+## Kaggle terminals
+
+Tokens are encrypted in the edition's local vault. The Python reader receives
+explicit credentials through stdin; copied setup/account commands do not contain
+tokens. Each selected terminal holds its token in memory/environment, and children
+inherit it. Removing/replacing a saved token does not revoke open terminal copies;
+close those terminals and revoke the token with Kaggle for immediate invalidation.
+
+Shell setup is explicit: Windows uses a marked PowerShell profile block; Unix
+uses Bash/Zsh startup blocks. Existing unrelated profile content is preserved.
+The app does not bypass execution policy or alter default Kaggle credentials.
+
+## Report a vulnerability
+
+Use [GitHub private vulnerability reporting](https://github.com/padduwcs/PADSwitcher/security/advisories/new)
+when available. Include the affected edition/version, impact, reproduction and a
+minimal proof with credentials removed. Allow time for coordinated remediation.
+If private reporting is unavailable, open an issue requesting a private contact
+without publishing exploit details or account data.
+
+Ordinary bugs go to [GitHub Issues](https://github.com/padduwcs/PADSwitcher/issues/new/choose).
+Include app version, operating system/architecture and steps to reproduce; redact
+screenshots. See [Support](SUPPORT.md).
