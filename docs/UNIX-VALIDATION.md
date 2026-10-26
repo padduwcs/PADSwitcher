@@ -31,6 +31,22 @@ The Windows baseline stayed unchanged during development.
   ChatGPT sign-in/history, cloud/remote and realtime/background sessions are
   outside this feature. See the bilingual installation guides for first-use,
   history folder selection and returning to the original login.
+- All five [source CI jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40255076550)
+  and all six [release jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40255078745)
+  passed for final source commit `1bfbb185e0b350cbe36a97e87e752301cce2bcaa`.
+  Both Linux architectures and both Mac architectures passed installed-package
+  checks, including the new native desktop protocol fixture.
+- [Unix.4 is public](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.4)
+  with 19 verified assets. Anonymous requests reached all eight installers;
+  the downloaded amd64 deb and both installation guides matched GitHub's SHA-256
+  metadata. Extracted public desktop source matches the reviewed final source.
+- The local machine was upgraded to `1.19.1~unix.4`; installed startup, sandbox,
+  IPC, launcher and AppImage layout checks passed. The old idle PAD process was
+  restarted into the new installed executable. The current ChatGPT conversation
+  stayed open; no real desktop account switch was attempted during this chat.
+- Windows `main` remains `e16cf98b909d528362a15a2aa2d9a86e2e15ed1a`.
+  Windows `v1.19.1` retains Latest; its release/asset IDs, sizes, SHA-256 digests
+  and update timestamps are unchanged.
 
 ## 1.19.1-unix.3 — 2026-10-26
 
