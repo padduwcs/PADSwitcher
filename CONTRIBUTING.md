@@ -1,84 +1,72 @@
 # Contributing to PADSwitcher
 
-Thank you for helping improve PADSwitcher. Small, focused changes are easiest to review and safest for users who rely on their saved sessions.
+[Documentation](docs/README.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
 
-## Before you start
+## Choose the edition first
 
-- Search existing [issues](https://github.com/padduwcs/PADSwitcher/issues) before opening a new one.
-- Use a feature request issue before starting a large UI, architecture, dependency, or protocol change.
-- Never include real Codex sessions, Kaggle tokens, account identifiers, app-data folders, gateway files, or unredacted screenshots.
-- Do not run live inference, consume reset credits, or submit Kaggle jobs unless a maintainer explicitly asks for that acceptance test.
+| Change targets | Base branch | Development guide |
+| --- | --- | --- |
+| Windows | `main` | [Windows setup](https://github.com/padduwcs/PADSwitcher/blob/main/docs/DEVELOPMENT.md) |
+| Linux/macOS | `feature/cross-platform` | [Unix setup](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/DEVELOPMENT.md) |
 
-By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Create a topic branch from the appropriate base and target that same branch in
+your pull request. Do not merge the Unix app into Windows to update shared docs.
+A source clone without an explicit branch defaults to the Windows edition.
 
-## Development setup
+One checkout is enough for either edition; save work before switching, then
+prepare the selected branch's dependencies. Installed apps have separate data
+and run independently of source checkouts.
 
-Requirements:
+## Before changing code
 
-- Windows 10/11 x64
-- Node.js 24 LTS and Git
-- .NET Framework 4.8
-- Python 3.11+ only for the optional Kaggle SDK contract checks
+- Search [issues](https://github.com/padduwcs/PADSwitcher/issues) and existing pull requests.
+- Discuss a large feature, protocol change or runtime major upgrade in an issue first.
+- Keep changes focused and update Vietnamese/English text together.
+- Update the appropriate changelog for user-visible behavior changes.
+- Never commit accounts, tokens, `auth.json`, vaults, connection files or test app data.
 
-```powershell
-git clone https://github.com/padduwcs/PADSwitcher.git
-cd PADSwitcher
-npm ci
-npm start
-```
+## Verify the change
 
-The native helper is generated automatically and must not be committed. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for architecture, fixtures, packaging, and optional checks.
+Both editions require Node.js 24+ and use these basic checks:
 
-## Making a change
-
-1. Create a branch from the latest `main`.
-2. Keep the change focused; avoid unrelated formatting or refactors.
-3. Add or update tests for changed behavior.
-4. Update Vietnamese and English UI/documentation together.
-5. Document user-visible changes in `CHANGELOG.md` under the intended release.
-
-Security-sensitive rules:
-
-- Preserve Windows DPAPI storage and private ACL handling.
-- Keep gateways on loopback with capability checks.
-- Never log credentials, prompts, response bodies, account IDs, or capability URLs.
-- Do not weaken Codex sandboxing or tool approvals.
-- Preserve byte-identical model request retry boundaries and stop retrying after output.
-
-## Checks
-
-Run at least:
-
-```powershell
+```bash
 npm run check
 npm test
-npm run smoke
+```
+
+On Unix also run `npm run check:docs` for documentation/structure changes.
+For transport/account changes run the applicable native loopback checks:
+
+```bash
 npm run smoke:protocol
 npm run smoke:say-hi
-npm run smoke:ui
 ```
 
-For packaging changes, also run:
+Unix account routing additionally has `smoke:faults`, `smoke:continuity` and
+`smoke:desktop`. Follow the selected edition's development guide for the keyring,
+UI, Python contract and packaged checks; platform-specific commands differ.
+Packaging changes need a build and that edition's packaged smoke checks.
 
-```powershell
-npm run dist
-node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
-```
+Routine checks use synthetic accounts, local model replies and disposable homes.
+They must not consume real inference quota, reset credits or Kaggle compute.
+Live checks require explicit maintainer authorization and are outside routine CI.
 
-The routine suite uses fixtures and disposable data. It must not access saved accounts or consume model/Kaggle quota.
+## Preserve the existing boundaries
 
-## Pull requests
+- Windows uses DPAPI; Unix uses an authenticated vault backed by Keychain/Secret Service.
+- Keep local gateways on loopback with capability checks.
+- Preserve Codex sandboxing and tool approvals.
+- Never log prompts, responses, credentials, account IDs or capability URLs.
+- Quota fallback preserves request bytes and only happens before model output.
+- An uncertain model step must not be automatically repeated or lock later user input.
 
-Include:
+## Submit a pull request
 
-- what changed and why;
-- screenshots for visible UI changes;
-- checks you ran and their results;
-- known limits or follow-up work;
-- a statement that no live credentials or quota were used, when applicable.
+Describe the concrete problem, resulting behavior, checks run and relevant limits.
+Include screenshots for UI changes. For docs-only work, state that no runtime
+code changed. Generated helpers, installers, logs and screenshots from private
+account sessions do not belong in the commit.
 
-Keep generated directories (`dist`, `artifacts`, `.preview`, `node_modules`) out of commits. Maintainers may ask to split large pull requests.
-
-## Reporting problems
-
-Use the issue templates for bugs and feature requests. For security vulnerabilities, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+For security reports, use [SECURITY.md](SECURITY.md). For ordinary bugs, use the
+[issue templates](https://github.com/padduwcs/PADSwitcher/issues/new/choose) and
+include your app version, OS/architecture and reproduction steps.
