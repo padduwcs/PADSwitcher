@@ -188,6 +188,17 @@ func TestRestorePathKeepsLaterAdditions(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+func TestDesktopConfigPreservesOnlyDesktopToolEnablement(t *testing.T) {
+	app := "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled"
+	review := "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled"
+	config := desktopConfig([]string{"app-server", "-c", app + "=true", "--config", review + "=false", "-c", "model_provider=other", "-c", "cli_auth_credentials_store=\"file\""})
+	if len(config) != 2 || !config[app] || config[review] {
+		t.Fatal("desktop tool configuration was not preserved")
+	}
+	if len(desktopConfig([]string{"-c", app + "=invalid"})) != 0 {
+		t.Fatal("invalid desktop tool enablement was accepted")
+	}
+}
 func TestTerminalSocketWorksWithLongSystemTempPath(t *testing.T) {
 	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), strings.Repeat("long-system-temp-", 8)))
 	dir, err := terminalTempDir()

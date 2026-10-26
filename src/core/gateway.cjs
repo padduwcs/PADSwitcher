@@ -197,19 +197,22 @@ class Gateway {
       if(this.options.clientKind==='desktop'){
         c.desktopEnvironment={};
         for(const key of ['CODEX_APP_TOOLS_PIPE_PATH','CODEX_MCP_NODE_PATH']){const value=m.params._padswitcherDesktopEnvironment?.[key];if(typeof value==='string'&&path.isAbsolute(value)&&value.length<=4096&&!value.includes('\0'))c.desktopEnvironment[key]=value;}
+        c.desktopConfig={};
+        for(const key of ['plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled','plugins.code-review@openai-bundled.mcp_servers.code-review.enabled']){const value=m.params._padswitcherDesktopConfig?.[key];if(typeof value==='boolean')c.desktopConfig[key]=value;}
       }
       delete m.params._padswitcherClient;
       delete m.params._padswitcherDesktopEnvironment;
+      delete m.params._padswitcherDesktopConfig;
     }
     if(m.method==='initialized'){c.initializedReceived=true;c.initialized=!!c.initializeAccepted;this.changed();}
     if(this.router&&['thread/start','thread/resume','thread/fork','turn/start'].includes(m.method)&&m.params?.modelProvider&&m.params.modelProvider!=='openai'){
       this.clientError(c,m.id,'PADSwitcher routes the built-in OpenAI provider. Select OpenAI to use this connection.');return;
     }
-    if(this.options.clientKind==='desktop'&&['thread/start','thread/resume','thread/fork'].includes(m.method)&&c.desktopEnvironment?.CODEX_APP_TOOLS_PIPE_PATH){
+    if(this.options.clientKind==='desktop'&&['thread/start','thread/resume','thread/fork'].includes(m.method)){
       // Desktop starts its tools pipe after PAD's backend. Bind MCP tools to
       // this GUI client per thread, never a pipe inherited from an older app.
-      const config={...m.params?.config};
-      for(const prefix of ['mcp_servers.codex_app','plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app']){
+      const config={...c.desktopConfig,...m.params?.config};
+      if(c.desktopEnvironment?.CODEX_APP_TOOLS_PIPE_PATH)for(const prefix of ['mcp_servers.codex_app','plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app']){
         config[prefix+'.enabled']??=true;config[prefix+'.env']={...config[prefix+'.env'],...c.desktopEnvironment};
       }
       m.params={...m.params,config};

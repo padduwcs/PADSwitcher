@@ -288,6 +288,7 @@ func bridge(c connection, token string) error {
 							}
 						}
 						p["_padswitcherDesktopEnvironment"] = environment
+						p["_padswitcherDesktopConfig"] = desktopConfig(os.Args[1:])
 					}
 					line, _ = json.Marshal(m)
 				}
@@ -320,6 +321,22 @@ func bridge(c connection, token string) error {
 		}
 	}()
 	return <-done
+}
+func desktopConfig(args []string) map[string]bool {
+	config := map[string]bool{}
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] != "-c" && args[i] != "--config" {
+			continue
+		}
+		key, value, ok := strings.Cut(args[i+1], "=")
+		if !ok || (key != "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled" && key != "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled") {
+			continue
+		}
+		if value == "true" || value == "false" {
+			config[key] = value == "true"
+		}
+	}
+	return config
 }
 func cleanCodexEnv(env []string) []string {
 	var out []string
