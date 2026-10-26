@@ -38,6 +38,13 @@ The Windows baseline stayed unchanged during development.
   x86_64 AppImage builds completed. Full real-account inference and the actual
   macOS desktop GUI remain manual acceptance checks; tests use synthetic
   accounts and loopback model responses, without consuming account quota.
+- All five [source CI jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40260642002)
+  and all six [release jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40260675798)
+  passed for tag source `f2f3643f8abc9dce5e3d3057b27d9ffce8adf46a`.
+  [Unix.5 is public](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.5)
+  with 19 verified assets. Anonymous checks reached all eight installer URLs;
+  the downloaded amd64 deb, both guides and checksum catalog matched GitHub's
+  SHA-256 metadata. The published guides match the reviewed source.
 - Windows `main` and its published stable release remain unchanged. The guard
   above is shipped on the Unix branch, not applied to the existing Windows app.
 
