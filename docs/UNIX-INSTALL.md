@@ -193,7 +193,8 @@ thoát desktop → **Gỡ kết nối desktop** trong PADSwitcher → mở ChatG
 menu hệ thống. Tệp đăng nhập cũ và lịch sử được giữ nguyên.
 
 Đây là tích hợp thử nghiệm sử dụng cơ chế chọn Codex runtime của desktop.
-Đã kiểm tra bắt tay với app Linux `26.1016.61520` bằng dữ liệu giả và kiểm tra
+Đã kiểm tra mở và hiển thị lại chat cũ trên app Linux `26.1016.61520`
+bằng dữ liệu giả trong phiên thử riêng và kiểm tra
 Codex native giữ ngữ cảnh/công cụ qua đổi tài khoản và mở lại. Chưa xác nhận
 toàn bộ luồng bằng tài khoản thật hoặc app desktop macOS; cập nhật desktop có
 thể cần điều chỉnh tích hợp. Nếu không xác minh được tài khoản, kết nối desktop

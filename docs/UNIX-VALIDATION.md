@@ -25,6 +25,10 @@ The Windows baseline stayed unchanged during development.
 - Native plugin-only fixtures pass opening/resuming history, quota fallback with
   identical bytes, manual switching, one-time tools and a fresh tools socket
   after backend restart. The user config has no standalone Codex MCP entry.
+- Installed Linux ChatGPT `26.1016.61520` passed an actual UI check in an
+  isolated headless profile: onboarding dismissed, the existing synthetic chat
+  selected from Recents, native thread resume accepted, and the previous answer
+  rendered without the invalid-transport error. The user's real app stayed open.
 - Slow or failed routing-metadata persistence cannot hold a successful stream.
   Dedicated regressions cover uncertain failures with changed recovery bodies,
   completed streams, large completion frames and new-turn recovery.

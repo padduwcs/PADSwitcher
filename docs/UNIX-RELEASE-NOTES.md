@@ -26,9 +26,9 @@ below. No source build, Node.js or Go is needed to run the application.
   và hướng dẫn cài đặt. Desktop MCP tools and native account verification are
   covered; the original sign-in file is preserved.
 - Kiểm thử offline dùng Codex native cho đổi quota trong cùng chat, tool chỉ
-  chạy một lần và mở lại chat cũ. Bắt tay app Linux `26.1016.61520` đã kiểm tra
-  bằng phiên thử riêng; luồng tài khoản thật và desktop macOS chưa được xác nhận.
-  Offline native protocol and isolated installed Linux handshake checked;
+  chạy một lần và mở lại chat cũ. App Linux `26.1016.61520` đã hiển thị lại
+  chat giả trong phiên thử riêng; luồng tài khoản thật và desktop macOS chưa được xác nhận.
+  Offline native protocol and isolated installed Linux chat resume/display checked;
   full real-account workflows and the macOS desktop app are not yet verified.
 - Electron **44.9.3**, helper Go **1.27.3** và các dependency đã vá;
   `npm audit` không còn cảnh báo tại thời điểm kiểm tra.

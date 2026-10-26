@@ -193,8 +193,9 @@ original setup: quit desktop → **Disconnect desktop** in PADSwitcher → open
 ChatGPT/Codex from the system menu. Original credentials and history are preserved.
 
 This experimental integration uses the desktop's runtime override mechanism.
-The installed Linux app `26.1016.61520` was checked with an isolated synthetic
-handshake, and native Codex retained context/tools across switching and restart.
+The installed Linux app `26.1016.61520` reopened and displayed an existing
+synthetic conversation in an isolated UI; native Codex retained context/tools
+across switching and restart.
 Full real-account workflows and the macOS desktop app have not been verified;
 desktop updates may require integration changes. A failed account verification
 disconnects desktop and reports an error for inspection.
