@@ -47,7 +47,7 @@ qua tài khoản khác; tác vụ cloud/remote không thuộc kết nối Codex 
 
 **Kaggle:** chọn **Dịch vụ → Kaggle → Thiết lập**, cài công cụ theo hướng dẫn,
 thêm API token, rồi mở terminal cho tài khoản cần dùng. Mỗi terminal giữ lựa
-chọn tài khoản riêng. [Hướng dẫn Kaggle](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/KAGGLE.md).
+chọn tài khoản riêng. Hướng dẫn Kaggle: [Windows](https://github.com/padduwcs/PADSwitcher/blob/main/docs/KAGGLE.md) · [Linux/macOS](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/KAGGLE.md).
 
 <p align="center"><img src="docs/images/light.png" width="49%" alt="Giao diện sáng"><img src="docs/images/dark.png" width="49%" alt="Giao diện tối"></p>
 

@@ -48,7 +48,7 @@ cloud/remote jobs are outside this local Codex connection.
 
 **Kaggle:** open **Services → Kaggle → Setup**, install the tools shown, add your
 API token and open a terminal for the account you want. Each terminal keeps its
-own account selection. [Kaggle guide](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/KAGGLE.en.md).
+own account selection. Kaggle guides: [Windows](https://github.com/padduwcs/PADSwitcher/blob/main/docs/KAGGLE.en.md) · [Linux/macOS](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/KAGGLE.en.md).
 
 <p align="center"><img src="docs/images/light.png" width="49%" alt="Light theme"><img src="docs/images/dark.png" width="49%" alt="Dark theme"></p>
 
