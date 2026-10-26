@@ -111,6 +111,7 @@ npm run check
 npm test
 npm run test:helper
 npm run smoke:protocol
+npm run smoke:faults
 npm run smoke:say-hi
 npm run smoke:desktop
 ```
@@ -145,8 +146,8 @@ Desktop dùng backend native đi kèm ứng dụng đã cài, với `CODEX_HOME`
 `~/.codex` để đọc lại lịch sử. Backend này chia sẻ bộ định tuyến tài khoản chung
 với PAD, nhưng không dùng cơ sở dữ liệu riêng của gateway CLI/IDE. Đăng nhập
 được cấp trong bộ nhớ và xác minh bằng `getAuthStatus`; không ghi đè auth.json
-hay sửa binary/launcher của desktop. Công cụ MCP được gắn với pipe của phiên
-desktop hiện tại theo từng thread, không dùng pipe cũ kế thừa từ PAD.
+hay sửa binary/launcher của desktop. Công cụ MCP dùng alias socket riêng của backend, trỏ tới phiên desktop
+hiện tại; cấu hình transport của plugin được giữ nguyên.
 
 `desktop-integration.json` chỉ lưu bật/tắt và đường dẫn lịch sử. PAD truyền
 `CODEX_CLI_PATH` và chế độ stdio khi người dùng mở desktop từ nút kết nối.
@@ -160,7 +161,14 @@ sử tạm: đổi do quota, retry giữ nguyên request, thao tác công cụ �
 đổi thủ công, restart/resume và MCP. Không cần tài khoản OpenAI thật.
 Trên Linux có desktop đã cài, `PADSWITCHER_DESKTOP_SMOKE_APP=1 npm run smoke:desktop`
 kiểm tra thêm app thật chạy headless với userData tạm và proxy chặn mạng.
-Tùy chọn headless này không phải kiểm thử giao diện app macOS.
+Bài thử giao diện bỏ qua onboarding trong profile tạm, chọn chat cũ từ Recents
+và kiểm tra câu trả lời đã lưu được hiển thị. Tùy chọn này không phải kiểm thử
+app desktop macOS. `npm run smoke:faults` dùng bộ Codex thật qua gateway và
+đếm số yêu cầu model khi giả lập lỗi; không dùng tài khoản hay quota thật.
+Sau lỗi không rõ kết quả, bộ định tuyến chặn gửi lại trong cùng lượt bằng mã
+băm của định danh lượt, kể cả khi Codex thay đổi phần nội dung để phục hồi.
+Lượt mới do người dùng bắt đầu vẫn được phép. Bộ nhớ này có giới hạn, không
+lưu nội dung chat; chẩn đoán hiển thị số lần chặn, số lần gửi và cache được báo.
 
 ## GitHub và phát hành
 
