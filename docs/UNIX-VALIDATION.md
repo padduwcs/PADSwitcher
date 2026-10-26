@@ -24,6 +24,17 @@ The Windows baseline stayed unchanged during development.
   `0.164.0-alpha.11.1` protocol checks cover the corrected stream handling.
   The installed Linux ChatGPT app again resumed and displayed the synthetic
   conversation, and all nine native fault/success cases passed without MIME.
+- All five [source CI jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40283334360)
+  and all six [release jobs](https://github.com/padduwcs/PADSwitcher/actions/runs/40283337248)
+  passed for `9227bd822f9197ec2fe3cba09d8f555e20ce3180`.
+  [Unix.6 is public](https://github.com/padduwcs/PADSwitcher/releases/tag/unix-v1.19.1-unix.6)
+  with 19 verified assets. All eight anonymous installer links responded;
+  the downloaded amd64 installer, both guides and catalog match GitHub SHA-256
+  metadata. The published runtime contains the reviewed headerless-stream fix.
+- The user's machine is upgraded to `1.19.1~unix.6`. Installed runtime/source
+  comparison, sandboxed startup, IPC and package integrity checks passed in an
+  isolated test. PAD's real connection remains off until the user reconnects
+  after this repair conversation; no real-account inference was used for tests.
 - The fix is restricted to the Unix branch. User conversation/configuration
   files and the stable Windows edition are unchanged. The real PAD connection
   remains off during repair; full real-account acceptance follows installation.
