@@ -46,7 +46,7 @@ class DesktopIntegration {
   view() {
     const gateway = this.hub.desktop;
     const connected = gateway?.view().connected.desktop || 0;
-    return { configuration: this.configured ? 'configured' : 'notConfigured', available: this.available, running: this.running, launching: !!this.flight, connected, profileId: gateway?.router?.profileId || gateway?.profileId || null, pendingId: this.hub.shared.pendingId || gateway?.pendingId || null, home: this.record.home, lastError: this.error || gateway?.error || null };
+    return { configuration: this.configured ? 'configured' : 'notConfigured', available: this.available, running: this.running, launching: !!this.flight, connected, profileId: gateway?.router?.profileId || gateway?.profileId || null, pendingId: this.hub.shared.pendingId || gateway?.pendingId || null, home: this.record.home, lastError: gateway?.error || (!connected ? this.error : null) || null };
   }
   async status() {
     try {
