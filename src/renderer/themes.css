@@ -256,6 +256,6 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
   .quota-window { padding:7px 12px; }
   .detail-actions { margin-top:10px; }
   .detail-actions > .button { min-height:44px; }
-  .reset-panel { margin-top:10px; padding-block:8px; }
+  .reset-panel { margin-top:8px; padding-block:8px; }
   .detail-management { margin-top:12px; padding-top:10px; }
 }
