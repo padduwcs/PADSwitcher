@@ -6,6 +6,7 @@ const electron=process.versions.electron?require('electron'):null;
 let fixtureError;
 if(electron){const sync=require('node:fs'),parent=path.resolve('artifacts/desktop-protocol-harness');sync.mkdirSync(parent,{recursive:true});const profile=sync.mkdtempSync(path.join(parent,'run-'));electron.app.disableHardwareAcceleration();electron.app.setPath('userData',profile);process.on('uncaughtException',error=>{console.error(error.stack);electron.app.exit(1);});}
 const {spawn}=require('node:child_process');
+const {assertFixtureHome}=require('./native-fixture.cjs');
 const packaged=process.env.PADSWITCHER_DESKTOP_PACKAGED_ROOT;
 if(packaged&&!process.versions.electron)throw Error('Use the Electron runner to exercise packaged ASAR modules.');
 const fixtureNode=process.versions.electron?process.env.PADSWITCHER_TEST_NODE:process.execPath;
@@ -60,7 +61,8 @@ async function until(fn,label,timeout=120000){const deadline=Date.now()+timeout;
   const open=async()=>{
     const pipe=sockets[Math.min(generation++,1)];
     const r=new CodexRpc(hub.desktop.helper,home,{spawn:(exe,args,opts)=>spawn(exe,args,{...opts,env:{...opts.env,PADSWITCHER_CLIENT_KIND:'desktop',CODEX_APP_TOOLS_PIPE_PATH:pipe,CODEX_MCP_NODE_PATH:fixtureNode}})});
-    await r.initialize({experimentalApi:true});
+    const initialized=await r.request('initialize',{clientInfo:{name:'padswitcher',title:'PADSwitcher',version:require('../package.json').version},capabilities:{experimentalApi:true}});
+    await assertFixtureHome(initialized,home,root);r.send({method:'initialized',params:{}});
     r.listeners.add((method,p)=>{if(method==='turn/completed'){if(p.turn.status==='completed')completed++;else failed++;}});
     const receive=r.receive.bind(r);r.receive=line=>{let m;try{m=JSON.parse(line);}catch{return;}if(m.error)console.error('Synthetic fixture RPC error:',m.error.code,String(m.error.message).slice(0,500));if(m.method==='item/tool/call'&&m.id!=null){tools++;r.send({id:m.id,result:{success:true,contentItems:[{type:'inputText',text:'Desktop fixture marker executed once.'}]}});return;}receive(line);};
     return r;

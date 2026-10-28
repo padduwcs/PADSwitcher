@@ -67,9 +67,13 @@ Native auth is ephemeral and verified before the desktop endpoint becomes ready.
 Desktop MCP uses a user/SYSTEM-only named pipe bound to the current GUI transport.
 
 Uncertain model-step replay is blocked in bounded process memory, keyed by a
-hash of request route, native thread/turn and user/tool-result progress. Partial
+hash of request route, native thread/turn and user/tool/agent-result progress. Partial
 assistant recovery alone cannot authorize another attempt; new user/steering
-input and completed tool results can continue. Successful data-only or large
+input, completed tool results and new agent messages can continue. Agent delivery
+timestamps alone do not count as progress. Explicit HTTP rejection and early SSE
+failure before output retain the native client's retry policy; they are not
+classified as an interrupted accepted stream. The relay itself only rotates on
+structured quota rejection. Successful data-only or large
 SSE terminal events are recognized even without a Content-Type header.
 
 Automatic auth synchronization follows the newest routing decision and does not

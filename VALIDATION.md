@@ -1,4 +1,52 @@
-# PADSwitcher 1.20.1 — validation
+# PADSwitcher 1.20.2 — validation
+
+## Retry and fixture isolation repair — 2026-10-28
+
+The reported `model_replay_blocked` text originates in PADSwitcher's replay guard.
+Audit reproduced false blocking after definite HTTP rejection, early SSE failure
+before output and new native `agent_message` progress. The router now preserves
+native retry for definite rejection and hashes agent content/identity rather than
+delivery timestamps. Unknown transport outcomes and partial output still block
+automatic replay. This shared router serves both extension and desktop.
+
+An earlier development fixture left `codex-app-tools@desktop-fixture` enabled in
+the maintainer's real Codex home, pointing to a deleted temporary MCP program.
+Native logs showed plugin conflicts and failed MCP handshakes. The fixture was
+uninstalled through native RPC after a DPAPI-encrypted configuration backup;
+parsed configuration comparison confirmed all other settings were preserved.
+Installed-plugin inspection confirmed its removal. The initial upstream cause
+of every interrupted user turn cannot be reconstructed from the final guard
+error, and local token counters cannot establish billed quota loss.
+
+Gateway smoke fixtures now assert the actual `initialize.codexHome` resolves to
+the expected disposable home before any plugin install or model turn. Unit
+coverage rejects wrong, missing and out-of-root identities. This closes the
+validation gap that allowed the earlier fixture contamination.
+
+- Regression suite: 247 tests, 246 passed locally; the PowerShell 7 check is
+  skipped locally and covered by hosted Windows CI.
+- Native wire inspection confirms `agent_message` input reaches the router as
+  that type. It uses a synthetic injected item, not a real delegated task.
+- Fault checks distinguish native retry after 503 / early SSE failure from
+  uncertain replay. Generic 429 remains a native failure, with no account rotate.
+  Connection drop, partial output, EOF and inactivity timeout each retain one
+  upstream attempt; subsequent user turns remain usable.
+- The fault matrix and 14-turn continuity checks pass on native `0.160.0`,
+  extension `0.164.0-alpha.11.1` and desktop `0.165.0-alpha.1.2`. Each continuity
+  run verifies 12 quota fallbacks, four steers, 14 unique real marker writes and
+  40 upstream attempts, with zero blocked legitimate steps or duplicate writes.
+- The installed desktop passes visible-window/startup/handshake, thread resume,
+  MCP and quota fallback checks with a disposable profile. Portable build,
+  packaged ASAR/helper, actual unpacked/portable executables, VI/EN UI checks,
+  six offline Kaggle contracts and production dependency audit pass.
+- The first parallel Say hi check found a residual temporary directory after
+  the native process closed; the standalone recheck passed. Its assertion now
+  includes synthetic job error details for future diagnosis; no cleanup check
+  was removed and no inference retry was added.
+
+All model traffic in these repair checks uses synthetic credentials and loopback
+responses. No real quota exhaustion or reset consumption is attempted. Existing
+processes must restart to load the patch and clear old in-memory replay blocks.
 
 ## Desktop startup repair — 2026-10-28
 
@@ -52,7 +100,8 @@ settings and authentication/history are retained.
   14 unique disposable file writes and 40 upstream attempts; no duplicate tool
   writes or blocked legitimate model steps. Both desktop and extension share
   the production router and finish concurrent work in their existing threads.
-- Nine native success/fault scenarios each make one loopback upstream attempt;
+- At the time, nine native success/fault scenarios each made one loopback attempt;
+  this incorrectly included definite rejection and is corrected in 1.20.2.
   later user turns remain usable. Missing MIME and incomplete/data-only/large
   SSE, uncertain recovery, slow metadata and delayed auth synchronization have
   regression coverage.
@@ -81,7 +130,8 @@ fails; a failed optional desktop startup does not stop existing shared clients.
 The live GUI's tool approvals and real-account quota exhaustion were not tested.
 
 An initial development fixture exposed the old helper's global fallback path;
-it could attach to the default running gateway. That attempt is not counted as
+it could attach to the default running gateway and left a fixture plugin behind;
+the 1.20.2 repair above removes that residue. That attempt is not counted as
 isolated validation. The helper now requires its adjacent connection and sibling
 capability; the native fixtures were rerun after that repair. No reset credits
 or Kaggle jobs were submitted during this work.

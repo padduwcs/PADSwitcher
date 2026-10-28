@@ -115,7 +115,10 @@ class ModelRouter {
     // is not progress and must not authorize another uncertain inference.
     if(turn){
       const input=body?.input;
-      const progress=Array.isArray(input)?input.filter(item=>item?.role==='user'||['function_call_output','custom_tool_call_output','tool_search_output'].includes(item?.type)):input;
+      const progress=Array.isArray(input)?input.flatMap(item=>{
+        if(item?.type==='agent_message')return [{type:item.type,id:item.id,author:item.author,recipient:item.recipient,content:item.content}];
+        return item?.role==='user'||['function_call_output','custom_tool_call_output','tool_search_output'].includes(item?.type)?[item]:[];
+      }):input;
       hash.update(JSON.stringify(progress)??'');
     }else hash.update(bytes);
     return hash.digest('hex');
@@ -168,11 +171,14 @@ class ModelRouter {
           if(track){this.usage.attempts++;if(lastQuota&&!refreshed)this.usage.quotaRetries++;}
           inferenceStarted=track;
           const response=await (this.options.fetch||fetch)(new URL(suffix,this.upstream),{method:req.method,headers:this.headers(req.headers,bundle,id),body:req.method==='POST'?bytes:undefined,redirect:'error',signal:controller.signal});touch();
+          // An explicit HTTP rejection is a known outcome. Leave its retry
+          // policy to native Codex; it is not an interrupted accepted stream.
+          if(!response.ok)inferenceStarted=false;
           if(response.status===401&&!refreshed){await response.body?.cancel();refreshed=true;if(track)this.usage.authRefreshes++;continue;}
           let prefix=[],quota=null,streamReader=null;
           if(!response.ok){
             const reader=response.body?.getReader();let length=0;
-            if(reader)for(;;){const {done,value}=await reader.read();if(done)break;touch();length+=value.length;if(length>MAX_ERROR){await reader.cancel();this.blockReplay(requestKey);this.error(res,502,'upstream_error','Upstream error body is too large.');return;}prefix.push(Buffer.from(value));}
+            if(reader)for(;;){const {done,value}=await reader.read();if(done)break;touch();length+=value.length;if(length>MAX_ERROR){await reader.cancel();this.error(res,502,'upstream_error','Upstream error body is too large.');return;}prefix.push(Buffer.from(value));}
             try{const value=JSON.parse(Buffer.concat(prefix).toString());if(response.status===429&&quotaError(value))quota=value;}catch{}
           }else if(['responses','responses/lite'].includes(route)&&(body?.stream===true||/text\/event-stream/.test(response.headers.get('content-type')||''))){
             // Native Codex accepts SSE without Content-Type. Decide from the
@@ -180,6 +186,7 @@ class ModelRouter {
             // A missing MIME header is not an inference failure.
             sse=true;
             const peek=await this.peek(response,controller,touch);prefix=peek.prefix;quota=peek.quota;streamReader=peek.reader;
+            if(quota||peek.rejected)inferenceStarted=false;
             if(!quota){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);await this.forward(response,res,prefix,peek.reader,touch,observe);return;}
           }
           const personal=personalProfile(this.g.service.state.profiles.find(p=>p.id===first))&&['free','plus','pro'].includes(String(bundle.chatgptPlanType||'').toLowerCase());
@@ -192,7 +199,6 @@ class ModelRouter {
           if(quota&&!canReplay)this.note('blocked','Yêu cầu dùng trạng thái riêng của tài khoản; không tự phát lại.');
           if(quota&&this.g.service.state.autoSwitch?.enabled&&!personal)this.note('blocked','Tự đổi chỉ hỗ trợ tài khoản cá nhân Free, Plus và Pro đã xác định.');
           if(response.ok){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);}
-          if(!response.ok)this.blockReplay(requestKey);
           await this.forward(response,res,prefix,streamReader,touch,observe);return;
         }
       }
@@ -220,7 +226,12 @@ class ModelRouter {
         const raw=event.split(/\r?\n/).filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trimStart()).join('\n');
         if(!raw)continue;
         let value;try{value=JSON.parse(raw);}catch{return {prefix,reader,quota:null};}
-        if(['response.failed','error'].includes(value.type)&&quotaError(value)){await reader.cancel();return {prefix,reader:{read:async()=>({done:true})},quota:value};}
+        if(['response.failed','error'].includes(value.type)){
+          if(quotaError(value)){await reader.cancel();return {prefix,reader:{read:async()=>({done:true})},quota:value};}
+          // Reached before any output item: a definitive rejection, not partial
+          // generation. A failure after output never reaches this peek branch.
+          return {prefix,reader,quota:null,rejected:true};
+        }
         if(!PRELUDE.has(value.type))return {prefix,reader,quota:null};
       }
       if(controller.signal.aborted)break;

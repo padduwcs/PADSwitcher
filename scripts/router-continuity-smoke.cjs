@@ -3,6 +3,7 @@
 // loopback inference only. Marker files are real, disposable tool side effects.
 const fs=require('node:fs/promises'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
+const {assertFixtureHome}=require('./native-fixture.cjs');
 const {GatewayHub}=require('../src/core/gateway-hub.cjs');
 const {defaults}=require('../src/core/client-routes.cjs');
 const {createPlatform}=require('../src/core/platform.cjs');
@@ -46,7 +47,8 @@ async function until(fn,label){for(let i=0;i<400;i++){if(fn())return;await pause
   const open=async(kind)=>{
     const r=new CodexRpc(kind==='desktop'?hub.desktop.helper:hub.helper,kind==='desktop'?home:sharedHome,{spawn:(exe,args,opts)=>spawn(exe,args,{...opts,env:{...opts.env,PADSWITCHER_CLIENT_KIND:kind}})});
     const c={rpc:r,kind,status:null,turnId:null};clients.push(c);
-    await r.request('initialize',{clientInfo:{name:kind==='desktop'?'Codex Desktop':'codex_vscode',version:'fixture'},capabilities:{experimentalApi:true}});r.send({method:'initialized',params:{}});
+    const initialized=await r.request('initialize',{clientInfo:{name:kind==='desktop'?'Codex Desktop':'codex_vscode',version:'fixture'},capabilities:{experimentalApi:true}});
+    await assertFixtureHome(initialized,kind==='desktop'?home:sharedHome,root);r.send({method:'initialized',params:{}});
     r.listeners.add((m,p)=>{if(m==='turn/started')c.turnId=p.turn.id;if(m==='error')c.lastError=p.error;if(m==='turn/completed'){c.status=p.turn.status;c.lastError=p.turn.error||c.lastError;}});
     const receive=r.receive.bind(r);r.receive=line=>{
       let m;try{m=JSON.parse(line);}catch{return;}
