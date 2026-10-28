@@ -57,6 +57,7 @@ async function until(fn,label){for(let i=0;i<400;i++){if(fn())return;await pause
           r.send({id:m.id,result:{success:true,contentItems:[{type:'inputText',text:'Marker '+value.marker+' committed once.'}]}});
         })().catch(e=>asyncError=e);return;
       }
+      if(m.error)console.error('Continuity RPC error:',JSON.stringify({round,kind:c.kind,code:m.error.code,message:String(m.error.message).slice(0,500),shared:hub.shared.profileId,desktop:hub.desktop.profileId,route:hub.shared.router.profileId,active:hub.shared.router.active,sharedChanging:hub.shared.changing,desktopChanging:hub.desktop.changing}));
       receive(line);
     };
     c.threadId=(await r.request('thread/start',{cwd:root,model:'gpt-5.4',approvalPolicy:'never',sandbox:'read-only',dynamicTools:[{type:'function',name:'write_marker',description:'Write a disposable verification marker once.',inputSchema:{type:'object',properties:{marker:{type:'number'}},required:['marker'],additionalProperties:false}}]})).thread.id;
@@ -70,7 +71,12 @@ async function until(fn,label){for(let i=0;i<400;i++){if(fn())return;await pause
     for(round=0;round<12;round++){
       state.quotaCooldowns={}; // Simulate a fresh quota window without real accounts.
       await turn(round%2?desktop:vscode,'CONTINUITY_ORIGINAL_CONTEXT — fixture round '+round);
-      await until(()=>!hub.turns.size&&!hub.shared.changing&&!hub.desktop.changing&&!hub.shared.pendingId&&!hub.desktop.pendingId,'account synchronization');
+      // Empty pending flags can precede the periodic native account sync. Wait
+      // for both actual backend identities and final HTTP settlement as well.
+      await until(()=>!hub.turns.size&&!hub.shared.router.active&&hub.shared.profileId===hub.shared.router.profileId&&hub.desktop.profileId===hub.shared.router.profileId&&!hub.shared.changing&&!hub.desktop.changing&&!hub.shared.pendingId&&!hub.desktop.pendingId,'account synchronization');
+      // Exercise the poll boundary before the next user turn. A settled account
+      // must not start another native login when a periodic poll fires here.
+      hub.shared.syncRoute();hub.desktop.syncRoute();assert.equal(hub.shared.changing,false);assert.equal(hub.desktop.changing,false);
     }
     quotaEnabled=false;round=-1;state.quotaCooldowns={};
     await Promise.all([turn(vscode,'CONTINUITY_ORIGINAL_CONTEXT — parallel extension'),turn(desktop,'CONTINUITY_ORIGINAL_CONTEXT — parallel desktop')]);
