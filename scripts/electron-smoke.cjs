@@ -7,6 +7,21 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname,'../artifacts/electron-qa');
 app.disableHardwareAcceleration();
 let timeout;
+async function armPointerRelease(preview) {
+  await preview.webContents.executeJavaScript("window.padSmokePointerRelease=new Promise(resolve=>window.addEventListener('pointerup',resolve,{capture:true,once:true}));true");
+}
+async function waitPointerRelease(preview) {
+  // Sending native input does not acknowledge renderer delivery. Observe the
+  // actual release, then let its resize handler and layout frames finish.
+  await preview.webContents.executeJavaScript(`(async()=>{
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(Error('Native pointer release did not arrive')),5000);
+      window.padSmokePointerRelease.then(()=>{clearTimeout(timer);resolve();});
+    });
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    delete window.padSmokePointerRelease;
+  })()`);
+}
 async function captureFixture(preview,filename) {
   // Offscreen resize/layout acknowledgement precedes the compositor's full paint.
   await new Promise(resolve=>setTimeout(resolve,160));
@@ -252,15 +267,18 @@ async function checkCodexActions(preview) {
           assert.equal(paging.calls,1);assert.equal(paging.recent,24);assert.equal(paging.pinned,20);assert.equal(paging.pinnedTop,40);assert.equal(paging.after,paging.top);
           // Send real Chromium mouse input, including pointer capture across a refresh.
           const handle=await preview.webContents.executeJavaScript("(()=>{const el=document.querySelector('[data-kg-resize=recent]');el.scrollIntoView({block:'center'});const r=el.getBoundingClientRect(),y=Math.round(r.y+r.height/2);return {x:Math.round(r.x+r.width/2),y,delta:y+140<innerHeight?140:-140,height:document.querySelector('#kg-notebooks-recent').clientHeight};})()");
+          await armPointerRelease(preview);
           preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y});preview.webContents.sendInputEvent({type:'mouseDown',x:handle.x,y:handle.y,button:'left',clickCount:1});
           preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+handle.delta/140*120,button:'left'});
           await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#kg-refresh-one').click();await new Promise(r=>setTimeout(r,60));return true;})()");
           preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+handle.delta,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:handle.x,y:handle.y+handle.delta,button:'left',clickCount:1});
-          await preview.webContents.executeJavaScript("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
+          await waitPointerRelease(preview);
           const resized=await preview.webContents.executeJavaScript("({height:document.querySelector('#kg-notebooks-recent').clientHeight,saved:JSON.parse(localStorage.getItem('pad-kaggle-layout')),cursor:document.body.classList.contains('kg-resizing-height')})");
           assert.equal(resized.height,handle.height+handle.delta);assert(Math.abs(resized.saved.recent-resized.height)<=1);assert.equal(resized.cursor,false);
           const column=await preview.webContents.executeJavaScript("(()=>{window.scrollTo(0,0);const r=document.querySelector('[data-kg-resize=width]').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),width:document.querySelector('#kg-list').clientWidth};})()");
+          await armPointerRelease(preview);
           preview.webContents.sendInputEvent({type:'mouseMove',x:column.x,y:column.y});preview.webContents.sendInputEvent({type:'mouseDown',x:column.x,y:column.y,button:'left',clickCount:1});preview.webContents.sendInputEvent({type:'mouseMove',x:column.x+80,y:column.y,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:column.x+80,y:column.y,button:'left',clickCount:1});
+          await waitPointerRelease(preview);
           const columnWidth=await preview.webContents.executeJavaScript("document.querySelector('#kg-list').clientWidth");assert(Math.abs(columnWidth-column.width-80)<=1);
           await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1&kgmany=1'});await preview.webContents.executeJavaScript("navigate('kaggle')");
           assert.equal(await preview.webContents.executeJavaScript("document.querySelector('#kg-notebooks-recent').clientHeight"),resized.height);
