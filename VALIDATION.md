@@ -14,7 +14,16 @@ the maintainer's real Codex home, pointing to a deleted temporary MCP program.
 Native logs showed plugin conflicts and failed MCP handshakes. The fixture was
 uninstalled through native RPC after a DPAPI-encrypted configuration backup;
 parsed configuration comparison confirmed all other settings were preserved.
-Installed-plugin inspection confirmed its removal. The initial upstream cause
+Installed-plugin inspection confirmed its removal. A subsequent history audit
+found two development-fixture threads in the real home. One fault-smoke turn at
+2026-10-28 03:42:05 UTC had reached the real backend: native usage reports 16,722
+input tokens (13,440 cached), 73 output tokens and 16,795 total. That earlier
+test was not isolated and did consume real inference usage. These counters do
+not establish billed quota percentage. Both positively identified fixture
+threads were backed up with DPAPI and archived through native RPC; ordinary user
+threads were excluded. They remain recoverable rather than deleted.
+
+The initial upstream cause
 of every interrupted user turn cannot be reconstructed from the final guard
 error, and local token counters cannot establish billed quota loss.
 
@@ -24,7 +33,7 @@ coverage rejects wrong, missing and out-of-root identities. This closes the
 validation gap that allowed the earlier fixture contamination.
 
 - Regression suite: 247 tests, 246 passed locally; the PowerShell 7 check is
-  skipped locally and covered by hosted Windows CI.
+  skipped locally. Hosted Windows CI passes all 247, with zero skipped tests.
 - Native wire inspection confirms `agent_message` input reaches the router as
   that type. It uses a synthetic injected item, not a real delegated task.
 - Fault checks distinguish native retry after 503 / early SSE failure from
@@ -129,8 +138,9 @@ The connection remains opt-in and fails closed when native auth verification
 fails; a failed optional desktop startup does not stop existing shared clients.
 The live GUI's tool approvals and real-account quota exhaustion were not tested.
 
-An initial development fixture exposed the old helper's global fallback path;
-it could attach to the default running gateway and left a fixture plugin behind;
+Initial development fixtures exposed the old helper's global fallback path;
+they could attach to the default running gateway, left a fixture plugin behind
+and sent one real fault-smoke model turn, as disclosed in the 1.20.2 audit above;
 the 1.20.2 repair above removes that residue. That attempt is not counted as
 isolated validation. The helper now requires its adjacent connection and sibling
 capability; the native fixtures were rerun after that repair. No reset credits
