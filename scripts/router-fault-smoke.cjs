@@ -49,5 +49,5 @@ const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.string
       await pause(200);
     }
     assert.equal(counts.get('idle')||0,0);await pause(500);console.log('Native fault checks completed without real model inference.');
-  }finally{await rpc?.close();await gateway?.stop(true);upstream.closeAllConnections();await new Promise(r=>upstream.close(r));assert.equal(path.dirname(path.resolve(root)).toLowerCase(),path.resolve(require('node:os').tmpdir()).toLowerCase());assert(path.basename(root).startsWith('pad-router-faults-'));await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+  }finally{await rpc?.close();await gateway?.stop(true);upstream.closeAllConnections();await new Promise(r=>upstream.close(r));assert.equal((await fs.realpath(path.dirname(path.resolve(root)))).toLowerCase(),(await fs.realpath(require('node:os').tmpdir())).toLowerCase());assert(path.basename(root).startsWith('pad-router-faults-'));await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 })().catch(e=>{console.error('Native fault fixture failed:',e.code||e.name,e.message);process.exitCode=1;});
