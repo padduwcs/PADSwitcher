@@ -26,6 +26,8 @@
   stdio backends with Windows Job Objects and flush protocol traffic promptly.
 - Keep reset controls visible in compact windows and wait for Chromium input
   processing before checking native drag geometry.
+- Accept the exact packaged renderer through Windows short/full path aliases;
+  preserve gateway network settings when starting the desktop backend.
 
 ### Changed
 

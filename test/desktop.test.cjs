@@ -37,6 +37,7 @@ test('a native Codex backend is not mistaken for a running desktop GUI',async t=
 });
 test('account selection on a connected desktop keeps the same instance and waits for active turns',async t=>{
   const f=await setup(t);f.hub.desktop={profileId:f.p.id,pendingId:'next',view:()=>({connected:{desktop:1}})};f.hub.shared.pendingId='next';
+  f.desktop.error='Previous startup timeout';assert.equal(f.desktop.view().lastError,null);
   const result=await f.desktop.launch(f.p.id);assert.equal(result.launched,false);assert.equal(result.connected,true);assert.equal(result.pending,true);assert.deepEqual(f.calls,[['start',f.p.id]]);
 });
 test('desktop startup failure restores configuration and stops only the new desktop endpoint',async t=>{

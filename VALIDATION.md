@@ -7,12 +7,12 @@ retaining DPAPI, Windows ACLs, the C# helper, PowerShell and the existing data
 namespace. New data defaults to the user's home workspace; existing saved
 settings and authentication/history are retained.
 
-- Node regression suite: 236 tests, 235 passed, one PowerShell 7 check skipped
+- Node regression suite: 239 tests, 238 passed, one PowerShell 7 check skipped
   locally because that shell is not installed. Windows CI includes PowerShell 7.
 - Six official Kaggle SDK contract tests pass. Syntax and dependency audit pass;
   the resolved dependency tree has no reported npm vulnerabilities at validation.
-- Real Windows Codex engines: pinned CI `0.160.0`, extension `0.164.0-alpha.11.1`
-  and installed desktop engine `0.163.0`; all inference replies and credentials are synthetic fixtures.
+- Real Windows Codex engines: pinned CI `0.160.0`, extension and installed desktop
+  builds of `0.164.0-alpha.11.1`; all inference replies and credentials are synthetic fixtures.
 - Native continuity: 14 completed turns, 12 quota fallbacks, four accepted steers,
   14 unique disposable file writes and 40 upstream attempts; no duplicate tool
   writes or blocked legitimate model steps. Both desktop and extension share
@@ -33,6 +33,9 @@ settings and authentication/history are retained.
 - Portable build, ASAR/helper smoke and actual unpacked/portable executable
   startup pass with disposable app data, sandboxed renderer, preload IPC and
   desktop UI. Release CI repeats these checks before publishing.
+- Portable IPC accepts the same renderer file through Windows short/full paths
+  while rejecting other files, network URLs, queries and fragments. Desktop
+  backends inherit gateway network settings alongside their runtime overrides.
 
 The existing Windows desktop GUI was left running. A second isolated GUI did
 not establish a desktop handshake, so ordinary installed-GUI launch and visual

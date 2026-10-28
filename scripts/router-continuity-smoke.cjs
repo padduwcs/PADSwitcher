@@ -75,8 +75,11 @@ async function until(fn,label){for(let i=0;i<400;i++){if(fn())return;await pause
     quotaEnabled=false;round=-1;state.quotaCooldowns={};
     await Promise.all([turn(vscode,'CONTINUITY_ORIGINAL_CONTEXT — parallel extension'),turn(desktop,'CONTINUITY_ORIGINAL_CONTEXT — parallel desktop')]);
     const markers=(await fs.readFile(marker,'utf8')).trim().split('\n');assert.equal(markers.length,14);assert.equal(new Set(markers).size,14);assert.equal(toolCount,14);assert.equal(steers,4);
+    // Native completion may arrive before the final HTTP response closes and
+    // its usage parser settles. Check the final counters after both streams end.
+    await until(()=>!hub.shared.router.active,'final router settlement');
     assert.equal(steps.size,14);assert.equal(seen.length,40);assert.equal(hub.shared.router.usage.quotaRetries,12);assert.equal(hub.shared.router.usage.blockedReplays,0);assert.equal(hub.shared.router.usage.completed,28);
     for(const c of clients){const read=await c.rpc.request('thread/read',{threadId:c.threadId,includeTurns:true});assert.equal(read.thread.turns.length,7);}
     console.log(JSON.stringify({nativeEngine:hub.shared.version.trim(),clients:['desktop','vscode'],completedTurns:14,quotaSwitches:12,acceptedSteers:steers,realMarkerWrites:toolCount,duplicateWrites:0,upstreamRequests:seen.length,blockedLegitimateSteps:0}));
-  }catch(error){console.error("Continuity primary error:",error.stack);throw error;}finally{await Promise.all(clients.map(c=>c.rpc.close()));await hub?.stop(true);upstream.closeAllConnections();await new Promise(r=>upstream.close(r));assert.equal(path.dirname(path.resolve(root)).toLowerCase(),path.resolve(require('node:os').tmpdir()).toLowerCase());assert(path.basename(root).startsWith('pad-continuity-'));await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+  }catch(error){console.error("Continuity primary error:",error.stack);throw error;}finally{await Promise.all(clients.map(c=>c.rpc.close()));await hub?.stop(true);upstream.closeAllConnections();await new Promise(r=>upstream.close(r));assert.equal((await fs.realpath(path.dirname(path.resolve(root)))).toLowerCase(),(await fs.realpath(require('node:os').tmpdir())).toLowerCase());assert(path.basename(root).startsWith('pad-continuity-'));await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 })().catch(e=>{console.error('Continuity fixture failed:',e.code||e.name,e.stack||e.message);process.exitCode=1;});

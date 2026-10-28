@@ -112,6 +112,6 @@ async function until(fn,label){for(let i=0;i<1200;i++){const value=await fn();if
     }
   }catch(error){console.error("Desktop primary error:",error.stack);throw error;}finally{
     if(appChild?.pid&&appChild.exitCode===null){try{require('node:child_process').execFileSync('taskkill.exe',['/PID',String(appChild.pid),'/T','/F'],{windowsHide:true,stdio:'ignore'});}catch{}await pause(500);}
-    await rpc?.close();await hub?.stop(true);upstream.closeAllConnections();await new Promise(r=>upstream.close(r));for(const s of pipeServers)await new Promise(r=>s.close(r));assert.equal(path.dirname(path.resolve(root)).toLowerCase(),path.resolve(require('node:os').tmpdir()).toLowerCase());assert(path.basename(root).startsWith('pad-desktop-smoke-'));await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});
+    await rpc?.close();await hub?.stop(true);upstream.closeAllConnections();await new Promise(r=>upstream.close(r));for(const s of pipeServers)await new Promise(r=>s.close(r));assert.equal((await fs.realpath(path.dirname(path.resolve(root)))).toLowerCase(),(await fs.realpath(require('node:os').tmpdir())).toLowerCase());assert(path.basename(root).startsWith('pad-desktop-smoke-'));await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});
   }
 })().catch(e=>{console.error('Desktop protocol fixture failed:',e.code||e.name,e.stack||e.message);process.exitCode=1;});
