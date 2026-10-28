@@ -1,6 +1,6 @@
 {
   "name": "padswitcher",
-  "version": "1.19.1",
+  "version": "1.20.0",
   "description": "Profile Account Directory Switcher — Codex and Kaggle account manager for Windows",
   "private": true,
   "main": "src/main.cjs",
@@ -42,12 +42,17 @@
     "prebuild": "node scripts/build-helper.cjs",
     "predist": "node scripts/build-helper.cjs",
     "build": "electron-builder --win dir",
-    "dist": "electron-builder --win portable"
+    "dist": "electron-builder --win portable",
+    "smoke:faults": "node scripts/router-fault-smoke.cjs",
+    "smoke:continuity": "node scripts/router-continuity-smoke.cjs",
+    "smoke:desktop": "node scripts/desktop-protocol-smoke.cjs",
+    "smoke:executables": "node scripts/windows-executable-smoke.cjs",
+    "release:verify": "node scripts/verify-windows-release.cjs"
   },
   "devDependencies": {
-    "electron": "44.5.1",
+    "electron": "44.9.3",
     "electron-builder": "26.15.3",
-    "jsdom": "30.1.1"
+    "jsdom": "30.1.3"
   },
   "overrides": {
     "@electron/get": "5.1.0"

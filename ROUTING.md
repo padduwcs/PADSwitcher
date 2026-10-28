@@ -56,3 +56,22 @@ trong cùng chế độ vẫn chờ tác vụ của nhóm đó rồi đổi, gi�
 - `node scripts/router-native-smoke.cjs --live`: native Codex 0.160.0 + model fixture cục bộ; policy discovery read-only bằng phiên thật. Initial và post-tool đều một turn completed, không failed turn; tool ghi marker đúng một lần; request A/B giống từng byte; không thêm continuation; auth chung giữ nguyên hash.
 - `node scripts/router-live-smoke.cjs --live --inference`: đã kiểm chứng bằng hai phản hồi ngắn thật với model mặc định do Codex trả về (`gpt-6.1-sol`). A trả marker; quota được chèn **cục bộ** trước lần gọi tiếp theo; B nhận request y hệt và nhớ marker. Hai turn completed trong cùng thread, không phát sinh continuation. Không ép tài khoản hết quota, không tiêu thụ reset hay sửa dự án người dùng.
 - Giao diện được xem và kiểm thử Electron sáng/tối, Việt/Anh, cửa sổ thường và 1000 × 680. Ảnh dùng dữ liệu mẫu trong `artifacts/electron-qa`.
+
+
+## Windows 1.20 routing additions
+
+Local Codex desktop uses its bundled native engine and existing conversation
+home through a separate backend sharing the common model router. It follows the
+Shared account and policy; VS Code/CLI/JetBrains private routes remain separate.
+Native auth is ephemeral and verified before the desktop endpoint becomes ready.
+Desktop MCP uses a user/SYSTEM-only named pipe bound to the current GUI transport.
+
+Uncertain model-step replay is blocked in bounded process memory, keyed by a
+hash of request route, native thread/turn and user/tool-result progress. Partial
+assistant recovery alone cannot authorize another attempt; new user/steering
+input and completed tool results can continue. Successful data-only or large
+SSE terminal events are recognized even without a Content-Type header.
+
+Automatic auth synchronization follows the newest routing decision and does not
+block further quota fallback. Slow account/cooldown persistence does not hold the
+response stream; metadata is still serialized and flushed on normal shutdown.

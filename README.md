@@ -33,11 +33,11 @@ bản Windows ổn định ở liên kết **Latest**.
 
 1. Cài/mở ứng dụng, vào **Dịch vụ → Codex** và thêm tài khoản qua trình duyệt.
 2. Vào **Kết nối**, chọn cách dùng: **VS Code**, **CLI** hoặc **JetBrains**.
-   Trên Unix còn có **Mở desktop qua PADSwitcher** cho Codex cục bộ.
+   Windows 1.20 và Unix có **Mở desktop qua PADSwitcher** cho Codex cục bộ.
 3. Muốn tự đổi khi hết quota: thêm ít nhất hai tài khoản, mở thiết lập tự chuyển,
    chọn tài khoản dự phòng và lưu. Giữ PADSwitcher chạy khi dùng kết nối này.
 
-Desktop Codex trên Unix dùng thiết lập tự chuyển **Dùng chung**. Extension ở
+Desktop Codex dùng thiết lập tự chuyển **Dùng chung**. Extension ở
 chế độ Dùng chung dùng cùng thiết lập; kết nối chọn tài khoản riêng có danh sách
 riêng. [Hướng dẫn bật tự chuyển từng bước](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md#bật-tự-chuyển-tài-khoản-cho-desktop-và-extension).
 

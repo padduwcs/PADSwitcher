@@ -17,6 +17,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -34,6 +36,8 @@ jobs:
           if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
             throw "Tag $env:GITHUB_REF_NAME does not match package version $packageVersion."
           }
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw 'Windows releases must be commits on main.' }
 
       - run: npm ci
 
@@ -53,14 +57,19 @@ jobs:
       - run: npm run smoke
       - run: npm run smoke:protocol
       - run: npm run smoke:say-hi
+      - run: npm run smoke:faults
+      - run: npm run smoke:continuity
+      - run: npm run smoke:desktop
       - run: npm run smoke:ui
       - run: npm run dist
       - run: node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
+      - run: npm run smoke:executables
 
       - name: Create SHA-256 file
         shell: pwsh
         run: |
-          $releaseFile = Get-ChildItem -LiteralPath dist -Filter 'PADSwitcher-*-Windows.exe' | Select-Object -First 1
+          $version = node -p "require('./package.json').version"
+          $releaseFile = Get-Item -LiteralPath "dist/PADSwitcher-$version-Windows.exe"
           if (-not $releaseFile) { throw 'Portable executable was not produced.' }
           $releaseHash = (Get-FileHash -LiteralPath $releaseFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           [IO.File]::WriteAllText(
@@ -69,17 +78,26 @@ jobs:
             [Text.UTF8Encoding]::new($false)
           )
 
-      - name: Create or update GitHub release
+      - name: Verify uploaded draft assets and publish
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $releaseFile = Get-ChildItem -LiteralPath dist -Filter 'PADSwitcher-*-Windows.exe' | Select-Object -First 1
+          $version = node -p "require('./package.json').version"
+          $releaseFile = Get-Item -LiteralPath "dist/PADSwitcher-$version-Windows.exe"
           $assets = @($releaseFile.FullName, "$($releaseFile.FullName).sha256")
-          gh release view $env:GITHUB_REF_NAME *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $env:GITHUB_REF_NAME --verify-tag --title "PADSwitcher $($env:GITHUB_REF_NAME.TrimStart('v'))" --generate-notes @assets
-          } else {
+          $draft = gh release view $env:GITHUB_REF_NAME --json isDraft --jq '.isDraft' 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if ($draft -ne 'true') { throw 'Refusing to overwrite a public release.' }
             gh release upload $env:GITHUB_REF_NAME --clobber @assets
+          } else {
+            gh release create $env:GITHUB_REF_NAME --verify-tag --draft --title "PADSwitcher $version" --notes-file "docs/releases/v$version.md" @assets
           }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { throw 'Draft upload failed.' }
+          $api = gh release view $env:GITHUB_REF_NAME --json apiUrl --jq '.apiUrl'
+          gh api $api > release-metadata.json
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read draft metadata.' }
+          node scripts/verify-windows-release.cjs release-metadata.json
+          if ($LASTEXITCODE -ne 0) { throw 'Asset verification failed; release remains draft.' }
+          gh release edit $env:GITHUB_REF_NAME --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Publication failed.' }

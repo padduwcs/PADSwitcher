@@ -188,7 +188,7 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
 #accounts-page .detail-actions > .button { border-radius:10px; line-height:20px; }
 #accounts-page #say-hi-one > .icon { width:17px; height:17px; }
 #accounts-page #say-hi-one:disabled { background:var(--surface); color:var(--muted); opacity:.45; }
-.connection-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.connection-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 .integration-card { min-width:0; display:flex; flex-direction:column; }
 .integration-card > .button, .integration-card > .integration-actions { align-self:flex-start; margin-bottom:20px; }
 .integration-card .button { white-space:normal; }
@@ -234,17 +234,17 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
 }
 @media (max-height:760px) and (min-width:851px) {
   .sidebar { height:72px; }
-  .page { padding-top:18px; }
+  .page { padding-top:10px; }
   h1 { font-size:30px; }
-  .page-heading { margin-bottom:14px; }
+  .page-heading { margin-bottom:10px; }
   .list-heading { margin-top:8px; }
   .session-grid { margin-bottom:8px; }
-  .toolbar { margin-bottom:12px; }
+  .toolbar { margin-bottom:8px; }
   .search input { height:36px; }
   #accounts-page .toolbar-right .toolbar-action { min-height:38px; padding:8px 12px; }
   #accounts-page .account-target select { height:38px; }
-  .detail { padding:20px; top:92px; }
-  .detail-top { margin:-20px -20px 12px; padding:14px 60px 14px 20px; min-height:74px; }
+  .detail { padding:18px; top:92px; }
+  .detail-top { margin:-18px -18px 10px; padding:10px 60px 10px 18px; min-height:66px; }
   .detail-meta { top:20px; right:17px; }
   .detail-profile .avatar { width:44px; height:44px; }
   .detail-top h2 { font-size:19px; }
@@ -254,8 +254,8 @@ h1 { font-size:34px; font-weight:600; letter-spacing:-1.25px; }
   .quota-window .progress { margin-top:5px; }
   .quota-window .quota-reset { margin-top:4px; }
   .quota-window { padding:7px 12px; }
-  .detail-actions { margin-top:12px; }
+  .detail-actions { margin-top:10px; }
   .detail-actions > .button { min-height:44px; }
-  .reset-panel { margin-top:12px; padding-block:9px; }
+  .reset-panel { margin-top:10px; padding-block:8px; }
   .detail-management { margin-top:12px; padding-top:10px; }
 }

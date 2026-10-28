@@ -1,5 +1,7 @@
 # Dùng Kaggle với PADSwitcher
 
+
+Khi để tự tìm Python, lệnh cài tạo venv riêng trong `%APPDATA%\PADSwitcher\data\kaggle\venv`; ứng dụng ưu tiên `Scripts\python.exe` trong venv này. Python riêng do bạn chọn vẫn được giữ. Lệnh cài cần bạn chạy trong PowerShell, ứng dụng không tự cài package.
 Mở **Dịch vụ → Kaggle**. Bạn lưu các tài khoản một lần, chọn tài khoản cho từng terminal và xem giờ GPU/TPU còn lại cùng trạng thái notebook.
 
 ## Bắt đầu trong 3 bước

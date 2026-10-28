@@ -3,6 +3,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
 const {parse,modify,applyEdits}=require('jsonc-parser');
 const {atomicWrite,readLimited,assertDirectory,exists}=require('./files.cjs');
 const {UserError}=require('./errors.cjs');
+const {helperSource}=require('./platform.cjs');
 const AGENT='Codex · PADSwitcher';
 const equal=require('node:util').isDeepStrictEqual;
 function settings(text){
@@ -13,9 +14,10 @@ function settings(text){
 async function dirs(root){try{await assertDirectory(root);return (await fs.readdir(root,{withFileTypes:true})).filter(x=>x.isDirectory()&&!x.isSymbolicLink()).map(x=>path.join(root,x.name));}catch{return [];}}
 async function discover(local=process.env.LOCALAPPDATA||''){
   const roots=[];
-  for(const vendor of ['Google','JetBrains'])for(const ide of await dirs(path.join(local,vendor)))if(/(?:AndroidStudio|IntelliJIdea|IdeaIC|PyCharm|WebStorm|Rider|CLion|GoLand|RustRover|PhpStorm)/i.test(path.basename(ide)))roots.push(path.join(ide,'acp-agents','.runtimes','node'));
+  const bases=local?[local]:process.platform==='darwin'?[path.join(os.homedir(),'Library','Caches'),path.join(os.homedir(),'Library','Application Support')]:[process.env.XDG_CACHE_HOME||path.join(os.homedir(),'.cache'),process.env.XDG_DATA_HOME||path.join(os.homedir(),'.local','share')];
+  for(const base of bases)for(const vendor of ['Google','JetBrains'])for(const ide of await dirs(path.join(base,vendor)))if(/(?:AndroidStudio|IntelliJIdea|IdeaIC|PyCharm|WebStorm|Rider|CLion|GoLand|RustRover|PhpStorm)/i.test(path.basename(ide)))roots.push(path.join(ide,'acp-agents','.runtimes','node'));
   for(const root of roots)for(const runtime of (await dirs(root)).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}))){
-    const node=path.join(runtime,'bin','node.exe');if(!await exists(node))continue;
+    const node=path.join(runtime,'bin',local||process.platform==='win32'?'node.exe':'node');if(!await exists(node))continue;
     for(const cache of await dirs(path.join(runtime,'npm-cache','_npx'))){
       const pkg=path.join(cache,'node_modules','@agentclientprotocol','codex-acp');
       try{
@@ -40,7 +42,7 @@ class JetBrainsIntegration{
     try{
       const config=settings(await this.text()),record=await exists(this.record)?JSON.parse((await readLimited(this.record)).toString('utf8')):null;
       const configured=!!record&&record.file===this.file&&equal(config.agent_servers?.[AGENT],record.entry);
-      const runtimePresent=configured&&await exists(record.entry.command)&&await exists(path.join(this.runtime,'codex-acp.mjs'))&&await exists(path.join(this.runtime,'PADJetBrains.exe'))&&await exists(path.join(this.runtime,'launcher.cjs'))&&await exists(path.join(this.runtime,'runtime.json'));
+      const runtimePresent=configured&&await exists(record.entry.command)&&await exists(path.join(this.runtime,'codex-acp.mjs'))&&await exists(path.join(this.runtime,this.service.platform.jetbrainsHelperName))&&await exists(path.join(this.runtime,'launcher.cjs'))&&await exists(path.join(this.runtime,'runtime.json'));
       return {configuration:configured?'configured':'notConfigured',runtimePresent};
     }catch{return {configuration:'unknown',runtimePresent:false};}
   }
@@ -56,9 +58,11 @@ class JetBrainsIntegration{
     await this.service.platform.protectDirectory(this.runtime);
     await atomicWrite(path.join(this.runtime,'codex-acp.mjs'),await readLimited(adapter.script,8*1024*1024));
     await atomicWrite(path.join(this.runtime,'LICENSE-codex-acp.txt'),await readLimited(adapter.license));
-    await atomicWrite(path.join(this.runtime,'PADJetBrains.exe'),await readLimited(path.join(__dirname,'../assets/PADCodex.exe'),2*1024*1024));
+    const bridge=path.join(this.runtime,this.service.platform.jetbrainsHelperName);
+    await atomicWrite(bridge,await readLimited(helperSource(this.service.platform),32*1024*1024));
+    if(this.service.platform.kind==='unix')await fs.chmod(bridge,0o700);
     await atomicWrite(path.join(this.runtime,'launcher.cjs'),await readLimited(path.join(__dirname,'jetbrains-launcher.cjs')));
-    await atomicWrite(path.join(this.runtime,'runtime.json'),JSON.stringify({version:adapter.version,helper:path.join(this.runtime,'PADJetBrains.exe'),connection:path.join(this.service.root,'gateway','connection.json')}));
+    await atomicWrite(path.join(this.runtime,'runtime.json'),JSON.stringify({version:adapter.version,helper:bridge,connection:path.join(this.service.root,'gateway','connection.json')}));
     const entry={command:adapter.node,args:[path.join(this.runtime,'launcher.cjs')],env:{}};
     const next=applyEdits(original,modify(original,['agent_servers',AGENT],entry,{formattingOptions:{insertSpaces:true,tabSize:2,eol:original.includes('\r\n')?'\r\n':'\n'}}));
     if(await this.text()!==original)throw new UserError('JetBrains vừa thay đổi acp.json. Hãy thiết lập lại.', 'JETBRAINS_CHANGED');

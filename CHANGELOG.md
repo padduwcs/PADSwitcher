@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.20.0 — 2026-10-28
+
+### Added
+
+- Windows Codex desktop integration: shared account routing, existing conversation
+  home, verified ephemeral native authentication, disconnect and restart/resume.
+- A private Windows named-pipe bridge for current desktop MCP tools, preserving
+  plugin startup policy and keeping transport data out of saved configuration.
+- Managed Kaggle virtual-environment setup and automatic environment discovery.
+- Codex discovery in VS Code Insiders, Cursor and Windsurf, and a stable home-folder
+  workspace default for new installations.
+- Native desktop, repeated-fallback, steering and uncertain-stream fixtures;
+  smoke tests for the actual unpacked and portable Windows executables.
+
+### Fixed
+
+- Block automatic replay of uncertain model steps while permitting new user input,
+  steering and completed tool results in the existing conversation.
+- Keep repeated quota fallback working during native authentication synchronization;
+  delayed login cannot restore an older routed account.
+- Recognize successful and failed SSE without Content-Type and large data-only
+  completion events; slow metadata writes no longer hold successful responses.
+- Bind each helper to its adjacent gateway and capability file; supervise native
+  stdio backends with Windows Job Objects and flush protocol traffic promptly.
+- Keep reset controls visible in compact windows and wait for Chromium input
+  processing before checking native drag geometry.
+
+### Changed
+
+- Show auto-switch state and setup on Accounts and Connections, with desktop
+  connection guidance in Vietnamese and English.
+- Update Electron to 44.9.3, jsdom to 30.1.3 and patched transitive dependencies.
+- Publish verified draft assets only after SHA-256, size and filename checks;
+  published releases cannot be overwritten by a rerun.
+
+Desktop GUI acceptance on a closed, ordinary Windows installation remains a
+manual check. Native desktop routing, account verification, history/resume and
+MCP named-pipe fixtures are automated. See VALIDATION.md for exact coverage.
+
 Notable changes to PADSwitcher are documented here. The project follows [Semantic Versioning](https://semver.org/); detailed test evidence and known limits are in [VALIDATION.md](VALIDATION.md).
 
 ## 1.19.1 — 2026-10-11

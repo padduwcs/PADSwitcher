@@ -5,8 +5,8 @@ Releases are portable Windows executables published from a version tag. The tag,
 ## Prepare
 
 1. Update the version with `npm version <version> --no-git-tag-version`.
-2. Update `CHANGELOG.md`, `VALIDATION.md`, and user documentation.
-3. Run the checks in [DEVELOPMENT.md](DEVELOPMENT.md), including the portable build and packaged smoke test.
+2. Update `CHANGELOG.md`, `VALIDATION.md`, user documentation and bilingual release notes in `docs/releases/v<version>.md`.
+3. Run the checks in [DEVELOPMENT.md](DEVELOPMENT.md), including the portable build, ASAR smoke and `npm run smoke:executables`.
 4. Confirm `git status` contains only intended source and documentation changes.
 
 Do not include generated helpers, `dist`, `artifacts`, credentials, gateway files, logs, or QA app data.
@@ -22,7 +22,12 @@ git push origin v1.20.0
 
 The **Publish Windows release** workflow repeats the isolated checks, builds the portable executable, verifies the packaged app, generates its SHA-256 file, and publishes both assets to GitHub Releases.
 
-For a curated release description, create the GitHub release for the tag with notes from `CHANGELOG.md` before the workflow finishes. The workflow detects the release and uploads or replaces only the two generated assets.
+The workflow creates or resumes a draft, checks both uploaded assets against local
+SHA-256 digests, sizes and names, then publishes it as Latest. A rerun refuses to
+overwrite a published release. The tag must point to a commit on main.
+
+For curated notes, edit the draft before publication or edit the public release
+notes afterward; do not pre-create a public release before asset verification.
 
 ## Verify
 

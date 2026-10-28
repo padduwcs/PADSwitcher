@@ -135,3 +135,24 @@ PADSwitcher does not replay after response output, network errors, non-quota err
 - The portable build is unsigned and has no automatic updater.
 
 See [security](../SECURITY.md), [routing boundaries](../ROUTING.en.md), and [validation scope](../VALIDATION.md).
+
+
+## Windows 1.20: Codex desktop
+
+**Tiếng Việt:** Mở Kết nối → Codex trong desktop. Lưu công việc và thoát hẳn
+desktop lần đầu, chọn tài khoản chung rồi Mở desktop qua PADSwitcher. Chờ trạng
+thái Đang kết nối trước khi tiếp tục chat cũ. Giữ nguyên thư mục hội thoại đã có;
+chọn thư mục khác chỉ khi desktop đã đóng. Desktop dùng cùng chính sách tự chuyển
+với các kết nối Dùng chung, giữ tools/plugin và không thay file đăng nhập gốc.
+
+**English:** Open Connections → Codex in desktop. Save work and fully quit the
+existing desktop for the first connection, choose the Shared account and open
+desktop through PADSwitcher. Wait for Connected before resuming an existing chat.
+Desktop shares the common fallback policy and preserves plugin tools and original
+authentication files. Quit desktop before changing its conversation home or
+disconnecting. GUI acceptance on a closed ordinary Windows installation remains
+manual; see VALIDATION.md for automated native protocol coverage.
+
+Uncertain native recovery is blocked per model step. A new user message, steering
+input or completed tool result can continue in the same chat. A new message may
+be needed after an interrupted step whose outcome cannot be established.

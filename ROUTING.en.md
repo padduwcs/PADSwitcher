@@ -51,3 +51,22 @@ The automated suite covers:
 `npm run smoke:protocol` runs a real compatible Codex binary against local model fixtures and synthetic credentials. It verifies initial and post-tool fallback in one turn, byte-identical A/B requests, preserved cache metadata, and tools executed once. Optional live diagnostics are documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md); they are not part of routine checks.
 
 See [VALIDATION.md](VALIDATION.md) for the current release evidence and known limits.
+
+
+## Windows 1.20 routing additions
+
+Local Codex desktop uses its bundled native engine and existing conversation
+home through a separate backend sharing the common model router. It follows the
+Shared account and policy; VS Code/CLI/JetBrains private routes remain separate.
+Native auth is ephemeral and verified before the desktop endpoint becomes ready.
+Desktop MCP uses a user/SYSTEM-only named pipe bound to the current GUI transport.
+
+Uncertain model-step replay is blocked in bounded process memory, keyed by a
+hash of request route, native thread/turn and user/tool-result progress. Partial
+assistant recovery alone cannot authorize another attempt; new user/steering
+input and completed tool results can continue. Successful data-only or large
+SSE terminal events are recognized even without a Content-Type header.
+
+Automatic auth synchronization follows the newest routing decision and does not
+block further quota fallback. Slow account/cooldown persistence does not hold the
+response stream; metadata is still serialized and flushed on normal shutdown.

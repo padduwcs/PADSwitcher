@@ -20,11 +20,11 @@ class ProfileService extends EventEmitter {
     super(); this.root = path.resolve(root); this.profilesRoot = path.join(this.root, 'profiles');
     this.metadataFile = path.join(this.root, 'accounts.json'); this.rollbackFile = path.join(this.root, 'desktop-rollback.dpapi');
     this.journalFile = path.join(this.root, 'desktop-journal.json');
-    this.platform = { ...windows, ...adapters };
+    this.platform = require('./platform.cjs').createPlatform(this.root,adapters);
     this.rpcFactory = adapters.rpcFactory || ((exe,home,opts) => new CodexRpc(exe,home,opts));
     this.running = new Map(); this.busy = false; this.login = null;
     this.sayHi = new SayHiService(this, adapters.sayHiOptions);
-    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), workspace: process.cwd(), autoRefresh: true }, activeDesktopId: null, rollback: null };
+    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), workspace: os.homedir(), autoRefresh: true }, activeDesktopId: null, rollback: null };
     this.state.autoSwitch={enabled:false,order:[]};this.state.quotaCooldowns={};
     this.state.clientRoutes=routeDefaults();
   }
@@ -61,8 +61,10 @@ class ProfileService extends EventEmitter {
   }
   view() {
     return {
+      platform: this.platform.kind,
+      desktop: this.desktopIntegration?.view() || {configuration:'notConfigured',available:false,connected:0},
       version: require('../../package.json').version, profiles: this.state.profiles.map(p => ({ ...p, running: this.running.has(p.id), desktopActive: p.id === this.state.activeDesktopId })),
-      settings: { ...this.state.settings }, busy: this.busy||!!this.gateway?.flight, login: this.login ? { profileId: this.login.profileId } : null,
+      settings: { ...this.state.settings }, busy: this.busy||!!this.gateway?.flight||!!this.desktopIntegration?.flight, login: this.login ? { profileId: this.login.profileId } : null,
       sayHi: this.sayHi.view(),
       autoSwitch:{...this.state.autoSwitch,order:[...this.state.autoSwitch.order]},
       clientRoutes:JSON.parse(JSON.stringify(this.state.clientRoutes)),
@@ -581,7 +583,7 @@ class ProfileService extends EventEmitter {
     const modelUsage=routes.filter(([,v])=>v?.usage).map(([scope,v])=>({scope,...v.usage}));
     return { codex: executable, version: /^codex-cli [\w.+-]+$/.test(version) ? version : 'Codex CLI', blockers: [...new Set(blocked.map(p => p.Name))], storage: this.root, loginRecovery: await exists(path.join(this.root,'login','auth.json')),modelUsage };
   }
-  async close() { this.cancelLogin(); await this.sayHi.shutdown(); }
+  async close() { this.cancelLogin(); clearTimeout(this.desktopIntegration?.launchTimer); await this.sayHi.shutdown(); await this.saveFlight?.catch(()=>{}); }
 }
 function cleanText(value,max) { if (typeof value !== 'string') return ''; return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'').trim().slice(0,max); }
 function hash(bytes) { return bytes ? crypto.createHash('sha256').update(bytes).digest('hex') : null; }

@@ -8,6 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Runtime.InteropServices;
+using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 // Native launcher and newline JSON <-> WebSocket transport. It does not implement Codex tools.
 internal static class PADCodex {
@@ -40,15 +43,28 @@ internal static class PADCodex {
                 string executable = args[2];
                 if (!Path.IsPathRooted(executable) || !String.Equals(Path.GetFileName(executable), "codex.exe", StringComparison.OrdinalIgnoreCase)) throw new IOException();
                 var rest = new List<string>(args); rest.RemoveRange(0, 3);
-                using (var child = Process.Start(new ProcessStartInfo(executable, String.Join(" ", rest.ConvertAll(Quote).ToArray())) { UseShellExecute = false, CreateNoWindow = true })) {
+                bool relay = args[0] == "--host-stdio";
+                using (var child = Process.Start(new ProcessStartInfo(executable, String.Join(" ", rest.ConvertAll(Quote).ToArray())) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = relay, RedirectStandardOutput = relay, RedirectStandardError = relay })) {
                     if (!AssignProcessToJobObject(job, child.Handle)) { child.Kill(); child.WaitForExit(); throw new IOException(); }
+                    Task output = null, error = null;
+                    if (relay) {
+                        output = Pump(child.StandardOutput.BaseStream, Console.OpenStandardOutput());
+                        error = Pump(child.StandardError.BaseStream, Console.OpenStandardError());
+                        Task.Run(async () => { try { await Pump(Console.OpenStandardInput(), child.StandardInput.BaseStream); child.StandardInput.Close(); } catch { } });
+                    }
                     while (!child.WaitForExit(100)) {
                         if (owner.HasExited) return 1; // finally closes the job and kills Codex descendants.
                     }
+                    if (relay) Task.WaitAll(output, error);
                     return child.ExitCode;
                 }
             } finally { CloseHandle(job); }
         }
+    }
+    static async Task Pump(Stream input, Stream output) {
+        byte[] buffer = new byte[65536]; int count;
+        try { while ((count = await input.ReadAsync(buffer, 0, buffer.Length)) != 0) { await output.WriteAsync(buffer, 0, count); await output.FlushAsync(); } }
+        finally { Array.Clear(buffer, 0, buffer.Length); }
     }
     static string Quote(string value) {
         var output = new StringBuilder("\""); int slashes = 0;
@@ -65,9 +81,11 @@ internal static class PADCodex {
         if (new FileInfo(file).Length > limit) throw new IOException();
         return File.ReadAllText(file, Utf8);
     }
+    static string configurationFile;
     static Dictionary<string, object> Configuration() {
         string file = Environment.GetEnvironmentVariable("PADSWITCHER_CONNECTION_FILE");
-        if (String.IsNullOrEmpty(file)) file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PADSwitcher", "data", "gateway", "connection.json");
+        if (String.IsNullOrEmpty(file)) file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "connection.json");
+        configurationFile = Path.GetFullPath(file);
         return new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(ReadPrivate(file, 16384));
     }
     static string StringValue(Dictionary<string, object> config, string key) { return (string)config[key]; }
@@ -81,12 +99,22 @@ internal static class PADCodex {
                     var reader = new StreamReader(Console.OpenStandardInput(), Utf8, false, 8192);
                     while (ws.State == WebSocketState.Open) {
                         string line = await reader.ReadLineAsync(); if (line == null) break;
-                        if (Environment.GetEnvironmentVariable("PADSWITCHER_CLIENT_KIND") == "jetbrains") {
+                        string clientKind = Environment.GetEnvironmentVariable("PADSWITCHER_CLIENT_KIND");
+                        if (clientKind == "jetbrains" || clientKind == "desktop") {
                             var serializer = new JavaScriptSerializer(); serializer.MaxJsonLength = MaxFrame;
                             var message = serializer.Deserialize<Dictionary<string, object>>(line);
                             if (message.ContainsKey("method") && (string)message["method"] == "initialize") {
                                 var parameters = (Dictionary<string, object>)message["params"];
-                                parameters["_padswitcherClient"] = "jetbrains";
+                                parameters["_padswitcherClient"] = clientKind;
+                                if (clientKind == "desktop") {
+                                    var environment = new Dictionary<string, object>();
+                                    foreach (string key in new [] { "CODEX_APP_TOOLS_PIPE_PATH", "CODEX_MCP_NODE_PATH" }) {
+                                        string value = Environment.GetEnvironmentVariable(key);
+                                        if (!String.IsNullOrEmpty(value)) environment[key] = value;
+                                    }
+                                    parameters["_padswitcherDesktopEnvironment"] = environment;
+                                    parameters["_padswitcherDesktopConfig"] = DesktopConfig(Environment.GetCommandLineArgs());
+                                }
                                 line = serializer.Serialize(message);
                             }
                         }
@@ -117,12 +145,86 @@ internal static class PADCodex {
             }
         }
     }
+    static Dictionary<string, object> DesktopConfig(string[] args) {
+        var result = new Dictionary<string, object>();
+        for (int i = 0; i < args.Length; i++) {
+            string value = null;
+            if ((args[i] == "-c" || args[i] == "--config") && i + 1 < args.Length) value = args[++i];
+            else if (args[i].StartsWith("--config=", StringComparison.Ordinal)) value = args[i].Substring(9);
+            if (value == null) continue;
+            int equal = value.IndexOf('='); if (equal < 0) continue;
+            string key = value.Substring(0, equal).Trim(), setting = value.Substring(equal + 1).Trim();
+            if ((key == "plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled" || key == "plugins.code-review@openai-bundled.mcp_servers.code-review.enabled") && (setting == "true" || setting == "false")) result[key] = setting == "true";
+        }
+        return result;
+    }
+    static volatile string toolsTarget;
+    static bool PipeName(string value) {
+        return value != null && System.Text.RegularExpressions.Regex.IsMatch(value, @"^\\\\\.\\pipe\\[A-Za-z0-9_.{}-]{1,200}$");
+    }
+    [DllImport("kernel32.dll", SetLastError = true)] static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint pid);
+    [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+    [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+    static bool SameUser(NamedPipeClientStream pipe) {
+        uint pid; if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out pid)) return false;
+        IntPtr process = OpenProcess(0x1000, false, pid); if (process == IntPtr.Zero) return false;
+        try {
+            IntPtr token; if (!OpenProcessToken(process, 8, out token)) return false;
+            try { using (var identity = new WindowsIdentity(token)) return identity.User.Equals(WindowsIdentity.GetCurrent().User); }
+            finally { CloseHandle(token); }
+        } finally { CloseHandle(process); }
+    }
+    static async Task RelayTools(NamedPipeServerStream front) {
+        using (front) {
+            try {
+                string target = toolsTarget;
+                if (!PipeName(target)) return;
+                using (var back = new NamedPipeClientStream(".", target.Substring(9), PipeDirection.InOut, PipeOptions.Asynchronous)) {
+                    await back.ConnectAsync(5000);
+                    if (!SameUser(back)) return;
+                    Task input = front.CopyToAsync(back), output = back.CopyToAsync(front);
+                    await Task.WhenAny(input, output);
+                    front.Dispose(); back.Dispose();
+                    try { await Task.WhenAll(input, output); } catch { }
+                }
+            } catch { } // Pipe paths and tool payloads never enter logs.
+        }
+    }
+    static int ToolsPipe(string[] args) {
+        if (!PipeName(args[2]) || !args[2].Substring(9).StartsWith("PADSwitcher-tools-", StringComparison.Ordinal)) throw new IOException();
+        using (var owner = Process.GetProcessById(Int32.Parse(args[1]))) {
+            var handle = owner.Handle; if (owner.HasExited) return 1;
+            var security = new PipeSecurity(); security.SetAccessRuleProtection(true, false);
+            var user = WindowsIdentity.GetCurrent().User; security.SetOwner(user);
+            foreach (var sid in new [] {user, new SecurityIdentifier("S-1-5-18")}) security.AddAccessRule(new PipeAccessRule(sid, PipeAccessRights.FullControl, AccessControlType.Allow));
+            Task.Run(() => { while (!owner.WaitForExit(200)) { } Environment.Exit(0); });
+            Task.Run(async () => {
+                for (;;) {
+                    NamedPipeServerStream front = null;
+                    try {
+                        front = new NamedPipeServerStream(args[2].Substring(9), PipeDirection.InOut, 16, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 65536, 65536, security);
+                        await front.WaitForConnectionAsync();
+                        var serving = RelayTools(front); front = null;
+                    } catch { if (front != null) front.Dispose(); }
+                    await Task.Delay(10);
+                }
+            });
+            string line;
+            while ((line = Console.ReadLine()) != null) {
+                if (!PipeName(line) || line == args[2]) return 1;
+                toolsTarget = line;
+            }
+            return 0;
+        }
+    }
     public static int Main(string[] args) {
         try {
-            if (args.Length > 0 && args[0] == "--host") return Host(args);
+            if (args.Length > 0 && (args[0] == "--host" || args[0] == "--host-stdio")) return Host(args);
+            if (args.Length == 3 && args[0] == "--tools-pipe") return ToolsPipe(args);
             var config = Configuration(); var url = new Uri(StringValue(config, "url"));
             if (url.Scheme != "ws" || url.Host != "127.0.0.1" || url.Port < 1 || url.UserInfo != "" || url.AbsolutePath != "/") throw new IOException();
             string tokenFile = StringValue(config, "tokenFile");
+            if (!String.Equals(Path.GetFullPath(tokenFile), Path.Combine(Path.GetDirectoryName(configurationFile), "client-capability"), StringComparison.OrdinalIgnoreCase)) throw new IOException();
             string token = ReadPrivate(tokenFile, 256).Trim();
             if (!System.Text.RegularExpressions.Regex.IsMatch(token, "^[a-f0-9]{64}$")) throw new IOException();
             bool server = Array.IndexOf(args, "app-server") >= 0;

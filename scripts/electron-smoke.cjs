@@ -34,7 +34,7 @@ async function checkCodexActions(preview) {
 }
 (async () => {
   await fs.mkdir(root,{recursive:true}); app.setPath('appData',root); app.setPath('userData',path.join(root,'browser')); app.setName('PADSwitcher QA');
-  timeout = setTimeout(() => {console.error('Electron UI verification timed out.'); app.exit(1);},45000);
+  timeout = setTimeout(() => {console.error('Electron UI verification timed out.'); app.exit(1);},90000);
   app.once('browser-window-created',(_event,win) => {
     win.webContents.once('did-finish-load',async () => {
       try {
@@ -151,7 +151,7 @@ async function checkCodexActions(preview) {
           await preview.webContents.executeJavaScript("document.querySelector('[data-page=connections]').click()");
           await new Promise(resolve=>setTimeout(resolve,200));
           const connections=await preview.webContents.executeJavaScript("({overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,count:document.querySelectorAll('.integration-card').length,live:document.querySelector('#jetbrains-live').textContent})");
-          assert.equal(connections.overflow,false);assert.equal(connections.count,3);assert(connections.live.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
+          assert.equal(connections.overflow,false);assert.equal(connections.count,4);assert(connections.live.includes(variant.endsWith('en')?'Connected':'Đang kết nối'));
           const connectionsFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
           await fs.writeFile(path.join(root,'connections-'+variant+'.png'),connectionsFrame);
           await preview.webContents.executeJavaScript("document.querySelector('[data-page=accounts]').click()");
@@ -256,6 +256,7 @@ async function checkCodexActions(preview) {
           preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+handle.delta/140*120,button:'left'});
           await preview.webContents.executeJavaScript("(async()=>{document.querySelector('#kg-refresh-one').click();await new Promise(r=>setTimeout(r,60));return true;})()");
           preview.webContents.sendInputEvent({type:'mouseMove',x:handle.x,y:handle.y+handle.delta,button:'left'});preview.webContents.sendInputEvent({type:'mouseUp',x:handle.x,y:handle.y+handle.delta,button:'left',clickCount:1});
+          await preview.webContents.executeJavaScript("new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
           const resized=await preview.webContents.executeJavaScript("({height:document.querySelector('#kg-notebooks-recent').clientHeight,saved:JSON.parse(localStorage.getItem('pad-kaggle-layout')),cursor:document.body.classList.contains('kg-resizing-height')})");
           assert.equal(resized.height,handle.height+handle.delta);assert(Math.abs(resized.saved.recent-resized.height)<=1);assert.equal(resized.cursor,false);
           const column=await preview.webContents.executeJavaScript("(()=>{window.scrollTo(0,0);const r=document.querySelector('[data-kg-resize=width]').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),width:document.querySelector('#kg-list').clientWidth};})()");

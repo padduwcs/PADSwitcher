@@ -15,3 +15,10 @@ test('invalid or oversized telemetry cannot reject the response stream or fabric
  const second=createUsage();observeUsage(second)(Buffer.from('data: '+JSON.stringify({type:'response.completed',response:{usage:{input_tokens:-1,output_tokens:'100',input_tokens_details:{cached_tokens:100}}}})+'\n\n'));
  assert.equal(second.inputTokens,0);assert.equal(second.cachedInputTokens,0);assert.equal(second.outputTokens,0);
 });
+
+test('large completion frames retain a terminal signal without exposing their content in diagnostics',()=>{
+ const usage=createUsage(),terminal=[],observe=observeUsage(usage,ok=>terminal.push(ok));
+ const bytes=Buffer.from('event: response.completed\ndata: '+JSON.stringify({type:'response.completed',response:{output:[{text:'x'.repeat(2*1024*1024)}]}})+'\n\n');
+ for(let i=0;i<bytes.length;i+=65536)observe(bytes.subarray(i,i+65536));
+ assert.deepEqual(terminal,[true]);assert.equal(usage.inputTokens,0);
+});

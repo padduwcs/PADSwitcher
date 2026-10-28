@@ -11,12 +11,13 @@ function settingsValue(text){
   return obj;
 }
 class Integration{
-  constructor(service,file=path.join(process.env.APPDATA||'', 'Code','User','settings.json')){this.service=service;this.file=file;this.record=path.join(service.root,'vscode-integration.json');}
+  constructor(service,file=service.platform.vscodeSettings?.()||path.join(process.env.APPDATA||'', 'Code','User','settings.json')){this.service=service;this.file=file;this.record=path.join(service.root,'vscode-integration.json');}
   async text(){await assertDirectory(path.dirname(this.file));return await exists(this.file)?(await readLimited(this.file,4*1024*1024)).toString('utf8'):'{}';}
   async status(){
     try {
-      const value=settingsValue(await this.text())[KEY],helper=path.join(this.service.root,'gateway','PADCodex.exe');
-      const configured=typeof value==='string'&&path.normalize(value).toLowerCase()===path.normalize(helper).toLowerCase();
+      const value=settingsValue(await this.text())[KEY],helper=path.join(this.service.root,'gateway',this.service.platform.helperName);
+      const normalize=p=>this.service.platform.kind==='windows'?path.normalize(p).toLowerCase():path.normalize(p);
+      const configured=typeof value==='string'&&normalize(value)===normalize(helper);
       return {configuration:configured?'configured':'notConfigured',helperPresent:configured&&await exists(helper)};
     } catch { return {configuration:'unknown',helperPresent:false}; }
   }

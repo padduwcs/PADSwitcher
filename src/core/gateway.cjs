@@ -9,8 +9,10 @@ const {WebSocketServer,WebSocket}=require('ws');
 const {connect,WsRpc,MAX_FRAME}=require('./ws-rpc.cjs');
 const {atomicWrite,assertDirectory,assertRegular}=require('./files.cjs');
 const {UserError,publicError}=require('./errors.cjs');
+const {helperSource}=require('./platform.cjs');
 const {Recovery,continuation}=require('./recovery.cjs');
 const {ModelRouter}=require('./model-router.cjs');
+const {DesktopToolsPipe}=require('./desktop-tools.cjs');
 const START_METHODS=new Set(['turn/start','review/start']);
 const AUTH_METHODS=new Set(['account/login/start','account/login/cancel','account/logout']);
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -19,12 +21,12 @@ function validBearer(value,token){const bytes=Buffer.from(String(value||''));con
 class Gateway {
   constructor(service,options={}) {
     this.service=service;this.root=options.root||path.join(service.root,'gateway');this.options=options;
-    this.status='stopped';this.profileId=null;this.pendingId=null;this.changing=false;this.clients=new Set();this.turns=new Map();this.error=null;this.refreshFlight=null;this.generation=0;
+    this.status='stopped';this.profileId=null;this.pendingId=null;this.pendingSource=null;this.changing=false;this.clients=new Set();this.turns=new Map();this.error=null;this.refreshFlight=null;this.generation=0;
     service.gateway=this;
     this.recovery=new Recovery(this);
     this.knownTurns=new Map();
   }
-  view(){const connected={vscode:0,cli:0,jetbrains:0,other:0};for(const c of this.clients)if(c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',usage:this.router?{...this.router.usage}:null,lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
+  view(){const connected={vscode:0,cli:0,jetbrains:0,desktop:0,other:0};for(const c of this.clients)if(c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',usage:this.router?{...this.router.usage}:null,lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
   changed(){this.service.changed();}
   async start(id){
     this.service.get(id);
@@ -36,21 +38,24 @@ class Gateway {
       await fs.mkdir(this.root,{recursive:true});await assertDirectory(this.root);await this.service.platform.protectDirectory(this.root);
       this.executable=this.options.executable||await this.service.platform.findGatewayCodex?.(this.service.state.settings.codexPath)||await this.service.executable();
       this.version=await this.service.platform.run(this.executable,['--version']);
-      this.helper=path.join(this.root,'PADCodex.exe');
-      const helperBytes=await fs.readFile(this.options.helperSource||path.join(__dirname,'../assets/PADCodex.exe'));
+      this.helper=path.join(this.root,this.service.platform.helperName);
+      const helperBytes=await fs.readFile(this.options.helperSource||helperSource(this.service.platform));
       const oldHelper=await (async()=>{try{await assertRegular(this.helper);return await fs.readFile(this.helper);}catch(e){if(e.code==='ENOENT')return null;throw e;}})();
       if(!oldHelper?.equals(helperBytes))await atomicWrite(this.helper,helperBytes);
+      if(this.service.platform.kind==='unix')await fs.chmod(this.helper,0o700);
       this.frontToken=crypto.randomBytes(32).toString('hex');this.backToken=crypto.randomBytes(32).toString('hex');
       await atomicWrite(path.join(this.root,'backend-capability'),this.backToken);
       await atomicWrite(path.join(this.root,'client-capability'),this.frontToken);
       const port=await freePort();this.backendUrl=`ws://127.0.0.1:${port}`;
-      const env={...process.env,CODEX_HOME:this.service.state.settings.desktopHome};
-      for(const name of ['CODEX_SQLITE_HOME','OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','ACCESS_TOKEN','OPENAI_BASE_URL','CODEX_INTERNAL_ORIGINATOR_OVERRIDE'])delete env[name];
+      if(this.options.clientKind==='desktop'){this.desktopTools=new DesktopToolsPipe();this.desktopTools.start();}
+      const env={...process.env,...this.options.environment,CODEX_HOME:this.service.state.settings.desktopHome,...(this.desktopTools?{CODEX_APP_TOOLS_PIPE_PATH:this.desktopTools.path}:{})};
+      for(const name of ['CODEX_SQLITE_HOME','OPENAI_API_KEY','CODEX_API_KEY','CODEX_ACCESS_TOKEN','ACCESS_TOKEN','OPENAI_BASE_URL','CODEX_INTERNAL_ORIGINATOR_OVERRIDE','CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY','BROWSER_USE_ACCESS_VERIFYING_IDENTITY'])delete env[name];
       if(this.options.isolatedState)env.CODEX_SQLITE_HOME=this.root;
       if(!this.options.disableRouter){
         const version=this.version.match(/^codex-cli (\d+)\.(\d+)\./);
         if(!version||(+version[1]===0&&+version[2]<160))throw new UserError('Cần Codex 0.160.0 trở lên cho bộ định tuyến model. Cập nhật extension Codex rồi thử lại.', 'GATEWAY_ROUTER_VERSION');
-        this.router=new ModelRouter(this,this.options.routerOptions);await this.router.start();this.router.select(id);
+        this.router=this.options.sharedRouter||new ModelRouter(this,this.options.routerOptions);
+        if(!this.options.sharedRouter){await this.router.start();this.router.select(id);}
       }
       const backendArgs=['app-server','--listen',this.backendUrl,'--ws-auth','capability-token','--ws-token-file',path.join(this.root,'backend-capability'),'-c','cli_auth_credentials_store="ephemeral"','-c','features.code_mode_host=true','-c','analytics.enabled=false',...(this.router?['-c','model_provider="openai"','-c','openai_base_url="'+this.router.baseUrl+'"']:[]),...(this.options.backendArgs||[])];
       const spawnOptions={env,cwd:this.service.state.settings.workspace,stdio:'ignore',windowsHide:true};
@@ -82,32 +87,43 @@ class Gateway {
     } catch(e){await this.stop(true);this.status='error';this.error=publicError(e).message;this.changed();throw e;}
   }
   syncRoute(){
+    // A later automatic rotation may supersede an auth sync waiting behind an
+    // active desktop/IDE turn. Retarget the sync, never treat it as a user choice.
+    if(this.pendingId&&this.pendingSource==='route'&&this.router?.profileId)this.pendingId=this.router.profileId;
     if(this.router?.profileId&&this.router.profileId!==this.profileId&&!this.router.active&&!this.turns.size&&!this.pendingId&&!this.changing&&this.status==='ready'){
-      this.pendingId=this.router.profileId;this.applyPending().catch(()=>{});
+      this.pendingId=this.router.profileId;this.pendingSource='route';this.applyPending().catch(()=>{});
     }
   }
-  backendFailed(){this.recovery.cancel();this.router?.cancel();this.status='error';this.error='Codex gateway đã dừng. Mở lại gateway để kết nối.';for(const c of this.clients)c.front.close(1011,'Codex backend stopped');this.changed();}
+  backendFailed(){this.recovery.cancel();if(!this.options.sharedRouter)this.router?.cancel();this.status='error';this.error='Codex gateway đã dừng. Mở lại gateway để kết nối.';for(const c of this.clients)c.front.close(1011,'Codex backend stopped');this.changed();}
   async select(id){
     this.service.get(id);if(this.status!=='ready')throw new UserError('Hãy bật gateway trước.', 'GATEWAY_STOPPED');
     this.recovery.cancel(this.recovery.busy?'Bạn đã chọn tài khoản thủ công; đã hủy tự tiếp tục.':null);
-    this.pendingId=id;this.error=null;this.changed();await this.applyPending();
+    this.pendingId=id;this.pendingSource='manual';this.error=null;this.changed();await this.applyPending();
   }
   async applyPending(){
-    if(!['ready','starting'].includes(this.status)||this.changing||this.refreshFlight||this.turns.size||this.router?.active||!this.pendingId)return;
-    this.changing=true;this.changed();const id=this.pendingId,generation=this.generation,control=this.control;
+    if(!['ready','starting'].includes(this.status)||this.changing||this.refreshFlight||this.turns.size||this.router?.active||this.options.canChange?.()===false||!this.pendingId)return;
+    if(this.options.sharedRouter&&this.pendingId!==this.router.profileId)return;
+    this.changing=true;this.changed();const id=this.pendingId,source=this.pendingSource,generation=this.generation,control=this.control;
     try {
       await this.reconcile();
-      if(this.generation!==generation||this.turns.size)return;
+      if(this.generation!==generation||this.turns.size||this.options.canChange?.()===false)return;
       const bundle=await this.bundle(id);
-      if(this.generation!==generation||this.pendingId!==id||!['ready','starting'].includes(this.status))return;
+      if(this.generation!==generation||this.pendingId!==id||this.options.canChange?.()===false||!['ready','starting'].includes(this.status))return;
       if(this.router&&!['free','plus','pro'].includes(String(bundle.chatgptPlanType||'').toLowerCase()))throw new UserError('Bộ định tuyến hiện hỗ trợ tài khoản cá nhân Free, Plus và Pro. Tài khoản tổ chức cần luồng kết nối riêng.', 'GATEWAY_ROUTER_PLAN');
       await control.request('account/login/start',{type:'chatgptAuthTokens',...bundle});
+      if(this.options.verifyAccount){
+        const auth=await control.request('getAuthStatus',{includeToken:true,refreshToken:false});
+        const hash=value=>crypto.createHash('sha256').update(String(value||'')).digest();
+        if(!['chatgpt','chatgptAuthTokens'].includes(auth.authMethod)||!crypto.timingSafeEqual(hash(auth.authToken),hash(bundle.accessToken)))throw new UserError('Chưa xác minh được tài khoản desktop. Giữ hội thoại và kiểm tra lại kết nối.', 'DESKTOP_AUTH_VERIFY');
+      }
       if(this.generation!==generation)return;
-      this.profileId=id;if(this.pendingId===id)this.pendingId=null;
-      this.router?.select(id);
-      this.service.state.gatewayProfileId=id;await this.service.save();this.error=null;
-    }catch(e){if(this.generation===generation){this.pendingId=null;this.error=publicError(e).message;}throw e;}
-    finally{if(this.generation===generation){this.changing=false;this.changed();}}
+      this.profileId=id;if(this.pendingId===id&&this.pendingSource===source)this.pendingId=null;
+      // Synchronization follows the router. A slow native login must never
+      // roll back a newer model-account selection made while it was pending.
+      if(!this.options.sharedRouter&&source!=='route')this.router?.select(id);
+      this.service.state.gatewayProfileId=source==='route'?this.router.profileId:id;await this.service.save();this.error=null;
+    }catch(e){if(this.generation===generation){this.pendingId=null;this.pendingSource=null;this.error=publicError(e).message;if(this.options.verifyAccount){this.status='error';for(const c of this.clients)c.front.close(1011,'Desktop account verification failed');}}throw e;}
+    finally{if(this.generation===generation){this.changing=false;if(!this.pendingId)this.pendingSource=null;this.changed();}}
     if(this.pendingId)await this.applyPending();
   }
   async reconcile(){
@@ -182,18 +198,34 @@ class Gateway {
     if(m.method==='initialize'){
       if(c.initializeId===undefined&&!c.initializeAccepted&&m.id!=null){
         const name=m.params?.clientInfo?.name;
-        c.kind=m.params?._padswitcherClient==='jetbrains'?'jetbrains':['codex_vscode','codex_vscode_copilot'].includes(name)?'vscode':['codex_cli_rs','codex_cli'].includes(name)?'cli':'other';c.initializeId=m.id;
+        c.kind=this.options.clientKind||(['jetbrains','desktop'].includes(m.params?._padswitcherClient)?m.params._padswitcherClient:['codex_vscode','codex_vscode_copilot'].includes(name)?'vscode':['codex_cli_rs','codex_cli'].includes(name)?'cli':'other');c.initializeId=m.id;
       }
       m.params={...m.params,capabilities:{...m.params?.capabilities,experimentalApi:true}};
+      if(this.options.clientKind==='desktop'){
+        c.desktopEnvironment={};
+        for(const key of ['CODEX_APP_TOOLS_PIPE_PATH','CODEX_MCP_NODE_PATH']){const value=m.params._padswitcherDesktopEnvironment?.[key];if(typeof value==='string'&&path.isAbsolute(value)&&value.length<=4096&&!value.includes('\0'))c.desktopEnvironment[key]=value;}
+        c.desktopToolsReady=!this.desktopTools||!c.desktopEnvironment.CODEX_APP_TOOLS_PIPE_PATH||this.desktopTools.bind(c.desktopEnvironment.CODEX_APP_TOOLS_PIPE_PATH,!this.turns.size);
+        c.desktopConfig={};
+        for(const key of ['plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled','plugins.code-review@openai-bundled.mcp_servers.code-review.enabled']){const value=m.params._padswitcherDesktopConfig?.[key];if(typeof value==='boolean')c.desktopConfig[key]=value;}
+      }
       delete m.params._padswitcherClient;
+      delete m.params._padswitcherDesktopEnvironment;
+      delete m.params._padswitcherDesktopConfig;
     }
-    if(m.method==='initialized'&&c.initializeAccepted){c.initialized=true;this.changed();}
+    if(m.method==='initialized'){c.initializedReceived=true;c.initialized=!!c.initializeAccepted;this.changed();}
     if(this.router&&['thread/start','thread/resume','thread/fork','turn/start'].includes(m.method)&&m.params?.modelProvider&&m.params.modelProvider!=='openai'){
       this.clientError(c,m.id,'PADSwitcher routes the built-in OpenAI provider. Select OpenAI to use this connection.');return;
     }
+    if(this.options.clientKind==='desktop'&&['thread/start','thread/resume','thread/fork'].includes(m.method)){
+      if(!c.desktopToolsReady){this.clientError(c,m.id,'Desktop tools are not ready. Reopen desktop through PADSwitcher after the current turn finishes.');return;}
+      // Forward desktop policy only. Adding env/enabled under a standalone
+      // mcp_servers entry without a transport makes native thread resume fail.
+      const config={...c.desktopConfig,...m.params?.config};
+      m.params={...m.params,config};
+    }
     if(['thread/start','thread/resume','thread/fork'].includes(m.method)&&m.id!=null)c.threadPending.set(m.id,m.params?.ephemeral===true||m.params?.threadSource==='thread_title');
     if(START_METHODS.has(m.method)){
-      if(c.routeChanging||this.pendingId||this.changing||this.recovery.busy||this.status!=='ready'){this.clientError(c,m.id,'PADSwitcher is switching accounts. Wait for the current turn to finish, then retry.');return;}
+      if(c.routeChanging||this.pendingId||this.changing||this.options.canStart?.()===false||this.recovery.busy||this.status!=='ready'){this.clientError(c,m.id,'PADSwitcher is switching accounts. Wait for the current turn to finish, then retry.');return;}
       if(m.id==null){c.front.close(1007);return;}
       if(c.pending.has(m.id)){this.clientError(c,m.id,'Duplicate active request ID.');return;}
       if(this.knownTurns.size>=256){this.clientError(c,m.id,'Too many tracked turns. Stop and restart the gateway.');return;}
@@ -203,7 +235,7 @@ class Gateway {
   }
   fromBackend(c,data){
     let m;try{m=JSON.parse(data.toString());}catch{c.front.close(1007);return;}
-    if(m.id!=null&&!m.method&&c.initializeId===m.id){c.initializeAccepted=!m.error;if(c.kind==='jetbrains')c.initialized=c.initializeAccepted;delete c.initializeId;this.changed();}
+    if(m.id!=null&&!m.method&&c.initializeId===m.id){c.initializeAccepted=!m.error;c.initialized=c.initializeAccepted&&(['jetbrains','desktop'].includes(c.kind)||!!c.initializedReceived);delete c.initializeId;this.changed();}
     if(m.id!=null&&!m.method&&c.threadPending.has(m.id)){const auxiliary=c.threadPending.get(m.id);c.threadPending.delete(m.id);if(m.result?.thread?.id&&auxiliary)c.auxThreads.add(m.result.thread.id);}
     if(m.id!=null&&!m.method&&c.internal.has(m.id)){const p=c.internal.get(m.id);c.internal.delete(m.id);if(m.error)p.reject(new UserError('Codex chưa nhận lượt tiếp tục.', 'RECOVERY_START'));else p.resolve(m.result);this.trackStart(c,m);return;}
     if(m.id!=null&&!m.method&&typeof m.id==='string'&&m.id.startsWith('pad-auto-')){this.trackStart(c,m);return;}
@@ -259,12 +291,13 @@ class Gateway {
     clearInterval(this.pollTimer);this.pollTimer=null;
     this.recovery.cancel();
     this.generation++;this.status='stopping';this.pendingId=null;this.changed();
-    await this.router?.stop();this.router=null;
+    if(!this.options.sharedRouter)await this.router?.stop();this.router=null;
     for(const c of this.clients){c.front.terminate();c.back?.terminate();}this.clients.clear();this.control?.close();this.control=null;
     if(this.wss)await new Promise(r=>this.wss.close(r));this.wss=null;
     if(this.http)await new Promise(r=>this.http.close(r));this.http=null;
     if(this.backend&&this.backend.exitCode===null){const ended=new Promise(r=>this.backend.once('close',r));this.backend.kill();await Promise.race([ended,pause(3000)]);}this.backend=null;
-    this.turns.clear();this.knownTurns.clear();this.profileId=null;this.pendingId=null;this.changing=false;this.status='stopped';
+    this.desktopTools?.stop();this.desktopTools=null;
+    this.turns.clear();this.knownTurns.clear();this.profileId=null;this.pendingId=null;this.pendingSource=null;this.changing=false;this.status='stopped';
     for(const file of ['connection.json','client-capability','backend-capability'])await fs.unlink(path.join(this.root,file)).catch(()=>{});
     this.changed();
   }

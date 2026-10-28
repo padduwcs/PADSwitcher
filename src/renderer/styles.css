@@ -72,8 +72,11 @@ p { font-size: 13px; line-height: 1.8; color: var(--muted); margin: 0; }
 .status-dot { width: 7px; height: 7px; background: #b6c3cf; border-radius: 50%; flex-shrink: 0; }
 .status-dot.ready { background: #60a68b; box-shadow: 0 0 0 4px #60a68b12; }
 .status-dot.error { background: #d29153; }
-.auto-control { border: 0; display: flex; align-items: center; gap: 9px; background: none; color: #69839a; font-size: 12px; padding: 7px 0; }
+.auto-control { border: 1px solid currentColor; border-radius: 8px; display: flex; align-items: center; gap: 9px; background: none; color: #69839a; font-size: 13px; font-weight: 600; padding: 9px 12px; }
 .auto-control .icon { width: 16px; height: 16px; color: #8199b0; }
+.auto-summary { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:20px; }
+.auto-summary p { margin:5px 0 0; font-size:12px; }
+.auto-summary .button { flex-shrink:0; }
 .switch-track { width: 29px; height: 17px; background: #d9e1eb; border-radius: 12px; position: relative; margin-left: 3px; }
 .switch-track::after { content: ''; position: absolute; width: 11px; height: 11px; top: 3px; left: 3px; background: #fff; border-radius: 50%; transition: transform .22s; box-shadow: 0 1px 3px #16375313; }
 .recovery-panel.enabled .switch-track { background: #4597eb; }

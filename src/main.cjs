@@ -8,8 +8,9 @@ const { createQuotaRefresher } = require('./core/quota-refresh.cjs');
 const { GatewayHub } = require('./core/gateway-hub.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { JetBrainsIntegration } = require('./core/jetbrains.cjs');
+const { DesktopIntegration } = require('./core/desktop.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
-let window, service, kaggle, gateway, integration, jetbrains, tray, timer, kaggleTimer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
+let window, service, kaggle, gateway, integration, jetbrains, desktop, tray, timer, kaggleTimer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
 let uiLocale='vi';
 const text=(vi,en)=>uiLocale==='en'?en:vi;
 function updateTray() {
@@ -17,6 +18,7 @@ function updateTray() {
   tray.setToolTip(text('PADSwitcher — quản lý phiên Codex','PADSwitcher — Codex account manager'));
   tray.setContextMenu(Menu.buildFromTemplate([{label:text('Mở PADSwitcher','Open PADSwitcher'),click:()=>{if(window.isMinimized())window.restore();window.show();window.focus();}},{type:'separator'},{label:text('Thoát PADSwitcher','Quit PADSwitcher'),click:()=>app.quit()}]));
 }
+if(process.env.PADSWITCHER_APPDATA_DIR){if(!path.isAbsolute(process.env.PADSWITCHER_APPDATA_DIR))throw Error('PADSWITCHER_APPDATA_DIR must be absolute.');app.setPath('appData',process.env.PADSWITCHER_APPDATA_DIR);app.setPath('userData',path.join(process.env.PADSWITCHER_APPDATA_DIR,'PADSwitcher'));}
 const rendererFile = path.join(__dirname,'renderer','index.html');
 const rendererUrl = pathToFileURL(rendererFile).href;
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -36,8 +38,8 @@ async function start() {
   try{await kaggle.init();}catch(error){kaggle.initError=publicError(error);}
   service.kaggle = kaggle;
   kaggle.on('change',()=>service.changed());
-  gateway=new GatewayHub(service);integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);
-  const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const [next,jb]=await Promise.all([integration.status(),jetbrains.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)){service.vscode=next;service.jetbrains=jb;service.changed();}})().finally(()=>{integrationFlight=null;}));
+  gateway=new GatewayHub(service);integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);desktop=new DesktopIntegration(service,gateway);await desktop.init();
+  const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const [next,jb,dt]=await Promise.all([integration.status(),jetbrains.status(),desktop.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)||JSON.stringify(service.desktopStatus)!==JSON.stringify(dt)){service.vscode=next;service.jetbrains=jb;service.desktopStatus=dt;service.changed();}})().finally(()=>{integrationFlight=null;}));
   await checkIntegration();
   window = new BrowserWindow({ width: 1260, height: 840, minWidth: 1000, minHeight: 680, title: 'PADSwitcher', icon:path.join(__dirname,'assets','padswitcher.ico'), backgroundColor:'#F6F8FB', autoHideMenuBar:true, show:false, webPreferences: { preload:path.join(__dirname,'preload.cjs'), nodeIntegration:false, contextIsolation:true, sandbox:true, webSecurity:true, devTools:!app.isPackaged } });
   window.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
@@ -70,7 +72,7 @@ async function start() {
         case 'kaggleSetupCopy': {
           const tool=await kaggle.checkTools();
           const python=tool.executable||kaggle.state.settings.pythonPath;
-          clipboard.writeText((python?"& '"+python.replaceAll("'","''")+"'":"py -3")+" -m pip install 'kaggle>=2.2.4,<3' 'kagglesdk>=0.1.37,<1'");break;
+          clipboard.writeText(require('./core/kaggle-setup.cjs').installCommand({root:kaggle.root,python,custom:kaggle.state.settings.pythonPath}));break;
         }
         case 'kaggleOpen': {
           const urls={settings:'https://www.kaggle.com/settings',docs:'https://github.com/Kaggle/kaggle-cli',python:'https://www.python.org/downloads/windows/'};
@@ -107,6 +109,9 @@ async function start() {
         case 'restoreVSCode': await integration.restore();await checkIntegration();break;
         case 'configureJetBrains': result=await service.exclusive(()=>jetbrains.configure(gateway.helper));await checkIntegration();break;
         case 'restoreJetBrains': await service.exclusive(()=>jetbrains.restore());await checkIntegration();break;
+        case 'desktopLaunch': result=await desktop.launch(args.id);await checkIntegration();break;
+        case 'desktopDisconnect': await desktop.disconnect();await checkIntegration();break;
+        case 'desktopHome': await desktop.setHome(args.home);await checkIntegration();break;
         case 'copyCLI': {
           if(gateway.status!=='ready')throw new UserError('Bật gateway trước.', 'GATEWAY_STOPPED');
           clipboard.writeText('& "'+gateway.helper.replace(/"/g,'""')+'"');break;
@@ -128,7 +133,7 @@ async function start() {
         case 'settings': result = await service.settings(args); break;
         case 'diagnostics': result = await service.diagnostics(); break;
         case 'pick': {
-          if (!['codexPath','workspace','desktopHome','kaggleWorkspace','kagglePython'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
+          if (!['codexPath','workspace','desktopHome','kaggleWorkspace','kagglePython','desktopCodexHome'].includes(args.kind)) throw new UserError('Loại đường dẫn không hợp lệ.');
           const executable=['codexPath','kagglePython'].includes(args.kind);
           const selected = await dialog.showOpenDialog(window,{ title: args.kind === 'kagglePython' ? text('Chọn Python 3.11+ (python.exe)','Choose Python 3.11+ (python.exe)') : executable ? text('Chọn codex.exe chính thức','Choose official codex.exe') : text('Chọn thư mục','Choose folder'), properties: executable ? ['openFile'] : ['openDirectory'], ...(executable ? { filters:[{name:'Executable',extensions:['exe']}] } : {}) });
           result = selected.canceled ? null : selected.filePaths[0]; break;
@@ -147,9 +152,9 @@ async function start() {
     } catch(error) { return { ok:false,error:publicError(error),state:service.view() }; }
   });
   await window.loadFile(rendererFile); window.show();
-  tray=new Tray(path.join(__dirname,'assets','padswitcher.ico'));tray.setToolTip('PADSwitcher — quản lý phiên Codex');
+  try{tray=new Tray(path.join(__dirname,'assets','padswitcher.ico'));tray.setToolTip('PADSwitcher — quản lý phiên Codex');}catch{tray=null;}
   const showWindow=()=>{if(window.isMinimized())window.restore();window.show();window.focus();};
-  tray.on('double-click',showWindow);
+  tray?.on('double-click',showWindow);
   updateTray();
   if(service.state.gatewayEnabled&&service.state.profiles.some(p=>p.id===service.state.gatewayProfileId)){
     await gateway.start(service.state.gatewayProfileId).catch(error=>{if(!window.isDestroyed())window.webContents.send('pad:refresh-error',publicError(error));});
@@ -167,8 +172,8 @@ async function start() {
   refreshKaggle(); kaggleTimer=setInterval(refreshKaggle,120000);
   window.on('close',event => {
     if (quitting) return;
-    if(['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}
-    if ((service.busy && !service.login)||kaggle.editing) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:text('Thao tác đang hoàn tất','Operation in progress'),detail:text('Hãy chờ lưu tài khoản xong trước khi đóng PADSwitcher.','Wait for the account operation to finish before closing PADSwitcher.')}); return; }
+    if(tray&&['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}
+    if ((service.busy && !service.login)||desktop.flight||kaggle.editing) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:text('Thao tác đang hoàn tất','Operation in progress'),detail:text('Hãy chờ lưu tài khoản xong trước khi đóng PADSwitcher.','Wait for the account operation to finish before closing PADSwitcher.')}); return; }
     if (service.running.size) {
       const response = dialog.showMessageBoxSync(window,{type:'question',buttons:['Giữ PADSwitcher mở','Đóng trình quản lý'],defaultId:0,cancelId:0,message:'CLI vẫn đang chạy',detail:'Nếu đóng trình quản lý, các cửa sổ CLI tiếp tục chạy. Phiên riêng sẽ được mã hóa lại khi đóng CLI bình thường; mở PADSwitcher lại để kiểm tra trạng thái sau đó.'});
       if (response === 0) { event.preventDefault(); return; }
@@ -178,7 +183,7 @@ async function start() {
   app.on('window-all-closed',() => { clearInterval(timer); clearInterval(integrationTimer); clearInterval(kaggleTimer); app.quit(); });
   app.on('before-quit',event => {
     if(quitting)return;
-    if(service?.busy||kaggle?.editing){event.preventDefault();if(service.login)service.cancelLogin();return;}
+    if(service?.busy||desktop?.flight||kaggle?.editing){event.preventDefault();if(service.login)service.cancelLogin();return;}
     if(gateway.turns.size){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:text('Codex còn lượt đang chạy','Codex has active turns'),detail:text('Chờ hoàn tất hoặc chọn Dừng gateway trong PADSwitcher trước khi thoát.','Wait for completion or disconnect Codex in PADSwitcher before quitting.')});return;}
     if(service.sayHi.flight||gateway.status!=='stopped'||kaggle.flights.size||kaggle.toolFlight||kaggle.saveFlight){
       event.preventDefault();if(shutdown)return;shutdown=true;

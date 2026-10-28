@@ -138,7 +138,7 @@ class KaggleService extends EventEmitter {
     if(!force&&this.tool?.supported)return this.tool;
     if(this.toolFlight)return this.toolFlight;
     this.toolFlight=(async()=>{
-      const candidates=this.state.settings.pythonPath?[this.state.settings.pythonPath]:['python.exe','python3.exe'];
+      const candidates=this.state.settings.pythonPath?[this.state.settings.pythonPath]:[path.join(this.root,'venv','Scripts','python.exe'),'python.exe','python3.exe'];
       let found;
       for(const candidate of candidates){if(this.stopping)throw fail('KAGGLE_CANCELLED');try{const info=await this.executeBridge(candidate,{action:'probe'},15000);if(info.ok&&typeof info.executable==='string'&&path.isAbsolute(info.executable)){found||=info;if(info.supported===true&&typeof info.scriptsPath==='string'&&path.isAbsolute(info.scriptsPath)){found=info;break;}}}catch{}}
       if(this.stopping)throw fail('KAGGLE_CANCELLED');

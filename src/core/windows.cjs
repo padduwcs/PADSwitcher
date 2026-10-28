@@ -2,6 +2,7 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs/promises');
+const os = require('node:os');
 const { UserError } = require('./errors.cjs');
 const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 function run(file, args, { input, env, timeout = 20000 } = {}) {
@@ -54,16 +55,40 @@ async function findCodex(custom) {
   for (const candidate of candidates) { try { if ((await fs.stat(candidate)).isFile() && path.basename(candidate).toLowerCase() === 'codex.exe') return path.resolve(candidate); } catch {} }
   throw new UserError('Chưa tìm thấy Codex CLI. Chọn codex.exe trong Cài đặt hoặc cài Codex chính thức.', 'CODEX_MISSING');
 }
-async function findGatewayCodex(custom) {
+async function findGatewayCodex(custom,{home=os.homedir(),arch=process.arch}={}) {
   if(custom)return findCodex(custom);
   // Prefer the binary shipped with the installed extension, matching its protocol version.
-  const folder=path.join(require('node:os').homedir(),'.vscode','extensions');
+  for(const ide of ['.vscode','.vscode-insiders','.cursor','.windsurf']){
+  const folder=path.join(home,ide,'extensions');
   const entries=await fs.readdir(folder).catch(()=>[]);
-  const versions=entries.filter(n=>/^openai\.chatgpt-\d+\.\d+\.\d+.*win32-x64$/.test(n)).sort((a,b)=>{
+  const versions=entries.filter(n=>/^openai\.chatgpt-\d+\.\d+\.\d+/.test(n)&&(!/win32-(x64|arm64)$/.test(n)||n.endsWith('win32-'+arch))).sort((a,b)=>{
     const av=a.match(/\d+/g).map(Number),bv=b.match(/\d+/g).map(Number);
     for(let i=0;i<3;i++)if(av[i]!==bv[i])return bv[i]-av[i];return 0;
   });
-  for(const name of versions){try{return await findCodex(path.join(folder,name,'bin','windows-x86_64','codex.exe'));}catch{}}
+  for(const name of versions){try{return await findCodex(path.join(folder,name,'bin',arch==='arm64'?'windows-aarch64':'windows-x86_64','codex.exe'));}catch{}}
+  }
   return findCodex();
 }
-module.exports = { powershell, run, ps, dpapi, protectDirectory, processes, blockers, findCodex, findGatewayCodex };
+async function nativeExecutable(file){
+  try{const real=await fs.realpath(file),stat=await fs.stat(real);if(!stat.isFile())return null;const handle=await fs.open(real,'r'),bytes=Buffer.alloc(2);try{await handle.read(bytes,0,2,0);}finally{await handle.close();}return bytes.toString('ascii')==='MZ'?real:null;}catch{return null;}
+}
+let desktopCache;
+async function findDesktop({candidates,local=process.env.LOCALAPPDATA||'',packages}={}){
+  if(!candidates&&!packages&&desktopCache&&Date.now()-desktopCache.at<30000&&await nativeExecutable(desktopCache.app.executable))return desktopCache.app;
+  const list=[...(candidates||[])];
+  if(!candidates){
+    for(const folder of ['Codex','ChatGPT','OpenAI\\Codex','Programs\\Codex','Programs\\ChatGPT','Programs\\OpenAI\\Codex']){
+      const root=path.join(local,folder);for(const name of ['Codex.exe','ChatGPT.exe'])list.push(path.join(root,name));
+      for(const version of (await fs.readdir(root).catch(()=>[])).filter(n=>/^app-\d/.test(n)).sort((a,b)=>b.localeCompare(a,undefined,{numeric:true})))for(const name of ['Codex.exe','ChatGPT.exe'])list.push(path.join(root,version,name));
+    }
+    const locations=packages||await ps("$ErrorActionPreference='Stop'; ConvertTo-Json -Compress -InputObject @((Get-AppxPackage -Name OpenAI.Codex | Sort-Object Version -Descending).InstallLocation)").then(JSON.parse).catch(()=>[]);
+    for(const root of locations)for(const name of ['ChatGPT.exe','Codex.exe'])list.push(path.join(root,'app',name));
+  }
+  for(const candidate of list){
+    const executable=await nativeExecutable(candidate);if(!executable)continue;
+    const resources=path.join(path.dirname(executable),'resources'),engine=await nativeExecutable(path.join(resources,'codex.exe'));
+    if(engine){const app={executable,engine,resources};if(!candidates&&!packages)desktopCache={at:Date.now(),app};return app;}
+  }
+  throw new UserError('Chưa tìm thấy ChatGPT/Codex desktop có Codex native đi kèm. Cài ứng dụng desktop chính thức rồi thử lại.','DESKTOP_MISSING');
+}
+module.exports = { powershell, run, ps, dpapi, protectDirectory, processes, blockers, findCodex, findGatewayCodex, nativeExecutable, findDesktop };

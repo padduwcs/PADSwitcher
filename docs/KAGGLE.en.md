@@ -1,5 +1,7 @@
 # Using Kaggle with PADSwitcher
 
+
+With automatic Python discovery, the copied install command creates `%APPDATA%\PADSwitcher\data\kaggle\venv`; the app prefers its `Scripts\python.exe`. An explicitly selected interpreter remains respected. Run the copied command in PowerShell; installation is not automatic.
 [Tiếng Việt](KAGGLE.md)
 
 Open **Services → Kaggle** to store authorized accounts, select one independently in each terminal, and monitor remaining GPU/TPU time and notebook status.

@@ -1,4 +1,57 @@
-# PADSwitcher 1.19.1 — validation
+# PADSwitcher 1.20.0 — validation
+
+## Windows parity — 2026-10-28
+
+Ported the complete Unix.7 routing behavior from `4f0039b` to Windows while
+retaining DPAPI, Windows ACLs, the C# helper, PowerShell and the existing data
+namespace. New data defaults to the user's home workspace; existing saved
+settings and authentication/history are retained.
+
+- Node regression suite: 236 tests, 235 passed, one PowerShell 7 check skipped
+  locally because that shell is not installed. Windows CI includes PowerShell 7.
+- Six official Kaggle SDK contract tests pass. Syntax and dependency audit pass;
+  the resolved dependency tree has no reported npm vulnerabilities at validation.
+- Real Windows Codex engines: pinned CI `0.160.0`, extension `0.164.0-alpha.11.1`
+  and installed desktop engine `0.163.0`; all inference replies and credentials are synthetic fixtures.
+- Native continuity: 14 completed turns, 12 quota fallbacks, four accepted steers,
+  14 unique disposable file writes and 40 upstream attempts; no duplicate tool
+  writes or blocked legitimate model steps. Both desktop and extension share
+  the production router and finish concurrent work in their existing threads.
+- Nine native success/fault scenarios each make one loopback upstream attempt;
+  later user turns remain usable. Missing MIME and incomplete/data-only/large
+  SSE, uncertain recovery, slow metadata and delayed auth synchronization have
+  regression coverage.
+- Native desktop protocol verifies unchanged original auth/config/history,
+  account verification, A/B quota fallback, manual account selection, restart,
+  resume and a plugin-provided MCP tool using the newly bound Windows named pipe.
+- Native helper checks verify desktop startup policy allowlisting, adjacent
+  gateway isolation, user/SYSTEM-only pipe ACL and owner-death cleanup of stdio
+  Codex through a Job Object. DPAPI, directory ACL and terminal guardian smoke pass.
+- Real Chromium screenshots cover Services, all four connection cards, Codex,
+  Kaggle and settings/help in VI/EN, light/dark and 1920/1260/1000px layouts.
+  Compact reset visibility and actual pointer resizing/pagination pass.
+- Portable build, ASAR/helper smoke and actual unpacked/portable executable
+  startup pass with disposable app data, sandboxed renderer, preload IPC and
+  desktop UI. Release CI repeats these checks before publishing.
+
+The existing Windows desktop GUI was left running. A second isolated GUI did
+not establish a desktop handshake, so ordinary installed-GUI launch and visual
+resume are **not claimed as passed**. First-use GUI acceptance requires saving
+work and fully quitting the existing desktop, then opening it through PADSwitcher.
+The connection remains opt-in and fails closed when native auth verification
+fails; a failed optional desktop startup does not stop existing shared clients.
+The live GUI's tool approvals and real-account quota exhaustion were not tested.
+
+An initial development fixture exposed the old helper's global fallback path;
+it could attach to the default running gateway. That attempt is not counted as
+isolated validation. The helper now requires its adjacent connection and sibling
+capability; the native fixtures were rerun after that repair. No reset credits
+or Kaggle jobs were submitted during this work.
+
+Generated screenshots, fixture logs and builds stay under ignored `artifacts/`
+and `dist/`. Published assets are unsigned and include a verified checksum.
+
+## Earlier Windows releases
 
 ## Aligned Codex toolbar and Say hi presentation — 1.19.1
 

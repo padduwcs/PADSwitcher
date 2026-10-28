@@ -134,3 +134,26 @@ saved sizes, reset and page-scroll pagination when a custom list fits its rows.
 
 See [ROUTING.md](../ROUTING.md) for routing boundaries and
 [VALIDATION.md](../VALIDATION.md) for the release verification scope.
+
+
+## Windows 1.20 parity checks
+
+Run `npm run smoke:faults`, `npm run smoke:continuity`, and `npm run smoke:desktop`
+after the usual unit/protocol checks. These use the production Windows gateway,
+synthetic credentials and loopback model responses. The desktop fixture checks
+existing history, restart/resume and current named-pipe MCP tools.
+
+After `npm run dist`, run `npm run smoke:executables` as well as the ASAR smoke.
+It starts both actual Windows executables with disposable app data and checks
+the packaged runtime/fuses, renderer, IPC and four connection cards.
+`PADSWITCHER_APPDATA_DIR` must be absolute and isolates both app data and browser
+profile. Do not use saved accounts for routine validation.
+
+`src/core/desktop-tools.cjs` starts a C# named-pipe proxy restricted to the current
+Windows user and SYSTEM; destination server identity is checked before forwarding.
+`--host-stdio` pumps binary stdio with explicit flushes and kills the native tree
+when its owner dies. Each helper defaults to its adjacent connection file.
+
+Keep router/gateway behavior tests aligned with Unix.7 or later through selected
+commits; preserve Windows app identity, storage, DPAPI and PowerShell behavior.
+See VALIDATION.md for the remaining ordinary-GUI acceptance boundary.

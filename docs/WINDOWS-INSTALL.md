@@ -36,18 +36,24 @@
 
 [Hướng dẫn Codex chi tiết](CODEX.md) có cách mở lại chat, chọn tài khoản riêng
 cho từng kết nối và xử lý thiết lập bị workspace/profile ghi đè.
-Tính năng mở desktop Codex qua PADSwitcher hiện có trên
-[bản Unix](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.md).
+Từ 1.20.0, **Kết nối → Codex trong desktop** mở desktop bằng tài khoản chung.
+Lần đầu hãy lưu công việc và thoát hẳn desktop, sau đó bấm **Mở desktop qua PADSwitcher**.
+Chờ trạng thái **Đang kết nối** rồi mở hội thoại Codex cũ. Các lần đổi tài khoản
+sau chờ lượt hiện tại kết thúc và giữ cửa sổ/chat. **Chọn thư mục hội thoại**
+nếu kho Codex nằm ngoài `~/.codex`; **Gỡ kết nối desktop** trả về cách mở thông thường.
+Tính năng áp dụng cho Codex cục bộ, không chuyển lịch sử ChatGPT giữa tài khoản.
 
 ## Bật tự chuyển khi hết quota
 
 1. Thêm ít nhất **hai tài khoản Codex cá nhân** Free/Plus/Pro đã đăng nhập.
 2. Vào **Tài khoản**. Nếu đang dùng lựa chọn **Dùng cho**, chọn nhóm cần cấu hình:
    **Dùng chung** hoặc kết nối có tài khoản riêng.
-3. Bấm **Tự đổi · Tắt** để mở **Tự đổi khi hết quota**.
+3. Bấm **Tự chuyển khi hết quota: Tắt** để mở **Tự đổi khi hết quota**.
 4. Đánh dấu **Tự đổi tài khoản khi hết quota**, chọn ít nhất hai tài khoản dự phòng
    và đặt thứ tự ưu tiên; số nhỏ được thử trước.
-5. Bấm **Lưu thiết lập**. Kiểm tra nút đã hiện **Tự đổi · Bật**.
+5. Bấm **Lưu thiết lập**. Kiểm tra nút đã hiện **Tự chuyển khi hết quota: Bật**.
+
+Có thể mở **Thiết lập tự chuyển** ngay trang **Kết nối**.
 
 Thiết lập Dùng chung áp dụng cho các kết nối đang dùng chung. Kết nối chọn
 tài khoản riêng có chính sách riêng, cần bật cho đúng nhóm.

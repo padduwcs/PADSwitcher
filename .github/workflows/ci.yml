@@ -35,13 +35,18 @@ jobs:
       - run: npm run smoke
       - run: npm run smoke:protocol
       - run: npm run smoke:say-hi
+      - run: npm run smoke:faults
+      - run: npm run smoke:continuity
+      - run: npm run smoke:desktop
       - run: npm run smoke:ui
       - run: npm run dist
       - run: node scripts/run-electron.cjs scripts/electron-packaged-smoke.cjs
+      - run: npm run smoke:executables
       - name: SHA-256
         shell: pwsh
         run: |
-          $releaseFile = Get-ChildItem -LiteralPath dist -Filter 'PADSwitcher-*-Windows.exe' | Select-Object -First 1
+          $version = node -p "require('./package.json').version"
+          $releaseFile = Get-Item -LiteralPath "dist/PADSwitcher-$version-Windows.exe"
           $releaseHash = (Get-FileHash -LiteralPath $releaseFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           [IO.File]::WriteAllText("$($releaseFile.FullName).sha256", "$releaseHash  $($releaseFile.Name)`n", [Text.UTF8Encoding]::new($false))
       - uses: actions/upload-artifact@v7

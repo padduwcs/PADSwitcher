@@ -4,6 +4,21 @@ const fs=require('node:fs/promises'),path=require('node:path');
 const {spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../artifacts/tests');
 
+test('gateway discovery finds local Insiders, Cursor and Windsurf extensions without a PATH shim',async t=>{
+  await fs.mkdir(root,{recursive:true});const home=await fs.mkdtemp(path.join(root,'ide-discovery-'));t.after(()=>fs.rm(home,{recursive:true,force:true}));
+  for(const ide of ['.vscode-insiders','.cursor','.windsurf']){
+    const exe=path.join(home,ide,'extensions','openai.chatgpt-26.1021.1-win32-x64','bin','windows-x86_64','codex.exe');await fs.mkdir(path.dirname(exe),{recursive:true});await fs.writeFile(exe,'fixture executable');
+    assert.equal(await require('../src/core/windows.cjs').findGatewayCodex('',{home,arch:'x64'}),exe);await fs.unlink(exe);
+  }
+});
+
+test('desktop discovery requires a GUI with a bundled native engine and ignores incomplete installs',async t=>{
+  await fs.mkdir(root,{recursive:true});const folder=await fs.mkdtemp(path.join(root,'desktop-discovery-'));t.after(()=>fs.rm(folder,{recursive:true,force:true}));
+  const exe=path.join(folder,'ChatGPT.exe'),engine=path.join(folder,'resources','codex.exe'),w=require('../src/core/windows.cjs');await fs.writeFile(exe,'MZfixture');
+  await assert.rejects(w.findDesktop({candidates:[exe]}),{code:'DESKTOP_MISSING'});await fs.mkdir(path.dirname(engine));await fs.writeFile(engine,'MZfixture');
+  assert.deepEqual(await w.findDesktop({candidates:[exe]}),{executable:exe,engine,resources:path.dirname(engine)});
+});
+
 test('Codex discovery finds native binary in npm layouts without invoking a command shim',async t=>{
   await fs.mkdir(root,{recursive:true});const dir=await fs.mkdtemp(path.join(root,'discovery-'));
   t.after(()=>fs.rm(dir,{recursive:true,force:true}));

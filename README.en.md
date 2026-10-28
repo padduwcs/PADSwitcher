@@ -34,11 +34,11 @@ keep the stable Windows release's **Latest** download unchanged.
 1. Install/open the app, choose **Services → Codex**, and add an account through
    your browser.
 2. Open **Connections** and set up **VS Code**, **CLI** or **JetBrains**.
-   Unix also offers **Open desktop through PADSwitcher** for local Codex.
+   Windows 1.20 and Unix offer **Open desktop through PADSwitcher** for local Codex.
 3. For account fallback, add at least two accounts, open the auto-switch setup,
    select backup accounts and save. Keep PADSwitcher running while connected.
 
-Unix desktop Codex uses the **Shared** fallback policy. Extensions in Shared
+Desktop Codex uses the **Shared** fallback policy. Extensions in Shared
 mode use the same policy; separate-account connections have their own lists.
 [Step-by-step auto-switch setup](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md#enable-account-fallback-for-desktop-and-the-extension).
 

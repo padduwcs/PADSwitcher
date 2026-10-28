@@ -31,7 +31,7 @@ function outgoingHeaders(incoming,bundle){
   return headers;
 }
 class ModelRouter {
-  constructor(gateway,options={}){this.g=gateway;this.options=options;this.requests=new Set();this.used=new Map();this.turnStates=new Map();this.usage=createUsage();this.epoch=0;this.profileId=null;this.active=0;}
+  constructor(gateway,options={}){this.g=gateway;this.options=options;this.requests=new Set();this.used=new Map();this.turnStates=new Map();this.failedRequests=new Set();this.usage=createUsage();this.epoch=0;this.profileId=null;this.active=0;}
   async start(){
     const upstream=new URL(this.options.upstream||'https://chatgpt.com/backend-api/codex/');
     if(!this.options.allowTestUpstream&&(upstream.protocol!=='https:'||upstream.hostname!=='chatgpt.com'||upstream.pathname!=='/backend-api/codex/'))throw Error('Invalid model upstream');
@@ -52,7 +52,7 @@ class ModelRouter {
     return req.headers.host===this.host&&!req.headers.origin&&!req.headers['sec-fetch-site']&&req.url.startsWith(prefix)&&/^Bearer \S+$/.test(req.headers.authorization||'');
   }
   cancel(){this.epoch++;for(const controller of this.requests)controller.abort();}
-  async stop(){this.cancel();this.turnStates.clear();if(!this.server)return;this.server.closeAllConnections();await new Promise(r=>this.server.close(r));this.server=null;this.capability=null;this.baseUrl=null;this.profileId=null;}
+  async stop(){this.cancel();this.turnStates.clear();this.failedRequests.clear();if(!this.server)return;this.server.closeAllConnections();await new Promise(r=>this.server.close(r));this.server=null;this.capability=null;this.baseUrl=null;this.profileId=null;}
   note(type,message,from=null,to=null){this.g.recovery.note(type,message,from,to);}
   select(id){this.profileId=id;}
   isUsing(id){return this.profileId===id||this.used.has(id);}
@@ -84,11 +84,12 @@ class ModelRouter {
     // Routing tokens live only in bounded process memory, never in diagnostics.
     while(this.turnStates.size>1024)this.turnStates.delete(this.turnStates.keys().next().value);
   }
-  async routeSelected(id){
+  persist(message){Promise.resolve().then(()=>this.g.service.save()).catch(()=>this.note('error',message));}
+  routeSelected(id){
     if(this.profileId===id||(this.g.service.state.quotaCooldowns?.[id]||0)>Date.now())return;
     const from=this.profileId||this.g.profileId;this.profileId=id;
     this.g.service.state.gatewayProfileId=id;
-    try{await this.g.service.save();}catch{this.note('error','Không lưu được tài khoản đã đổi; phiên hiện tại vẫn tiếp tục.');}
+    this.persist('Không lưu được tài khoản đã đổi; phiên hiện tại vẫn tiếp tục.');
     this.note('routed','Đã đổi tài khoản và thử lại lần gọi model; không thêm tin nhắn.',from,id);
     this.g.changed();
   }
@@ -97,12 +98,29 @@ class ModelRouter {
     if(!policy.enabled||!personalProfile(g.service.state.profiles.find(p=>p.id===first)))return attempted.size?[]:[first];
     return [...new Set([first,...policy.order])].filter(id=>!attempted.has(id)&&g.service.state.profiles.some(p=>p.id===id&&personalProfile(p)&&p.status!=='reauth'&&!g.service.running.has(id)&&!exhaustedSnapshot(p,Date.now()))&&(g.service.state.quotaCooldowns?.[id]||0)<=Date.now());
   }
-  async cooldown(id,value){
+  cooldown(id,value){
     const e=value?.error||value?.response?.error||{},now=Date.now();
     const reset=Number(e.resets_at)*1000||now+Number(e.resets_in_seconds)*1000;
     this.g.service.state.quotaCooldowns={...this.g.service.state.quotaCooldowns,[id]:Number.isFinite(reset)&&reset>now?reset:now+900000};
-    try{await this.g.service.save();}catch{this.note('error','Không lưu được thời gian chờ quota; vẫn giữ trong phiên hiện tại.');}
+    this.persist('Không lưu được thời gian chờ quota; vẫn giữ trong phiên hiện tại.');
   }
+  requestKey(req,route,bytes,body){
+    // Hash only; never retain prompts or native identifiers in diagnostics.
+    // A new explicit turn may intentionally repeat the same input.
+    let turn='';try{const value=JSON.parse(req.headers['x-codex-turn-metadata']||'{}').turn_id;if(typeof value==='string'&&value.length<=256)turn=value;}catch{}
+    const hash=crypto.createHash('sha256').update(JSON.stringify([route,req.headers['thread-id']||req.headers['session-id']||'',turn]));
+    // A turn contains many model steps. New steering input and completed tool
+    // results are forward progress, even when native keeps the same turn ID.
+    // Automatic stream recovery can append partial assistant output; that alone
+    // is not progress and must not authorize another uncertain inference.
+    if(turn){
+      const input=body?.input;
+      const progress=Array.isArray(input)?input.filter(item=>item?.role==='user'||['function_call_output','custom_tool_call_output','tool_search_output'].includes(item?.type)):input;
+      hash.update(JSON.stringify(progress)??'');
+    }else hash.update(bytes);
+    return hash.digest('hex');
+  }
+  blockReplay(key){if(!key)return;this.failedRequests.add(key);while(this.failedRequests.size>1024)this.failedRequests.delete(this.failedRequests.values().next().value);}
   error(res,status,code,message){if(!res.headersSent){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:{type:code,code,message}}));}else res.destroy();}
   async handle(req,res){
     if(!this.authorized(req)){this.error(res,401,'unauthorized','Local model connection rejected.');return;}
@@ -115,7 +133,7 @@ class ModelRouter {
     // Timeout inactivity, not total generation time. Cutting off a healthy long
     // stream can make native Codex retry inference that already consumed quota.
     let timer;const touch=()=>{clearTimeout(timer);timer=setTimeout(()=>controller.abort(),this.options.idleTimeoutMs||300000);};touch();
-    let bytes=Buffer.alloc(0);const used=new Set();
+    let bytes=Buffer.alloc(0),requestKey=null,inferenceStarted=false,sse=false,streamCompleted=false,streamFailed=false;const used=new Set();
     try{
       const chunks=[];let size=0;
       for await(const chunk of req){touch();size+=chunk.length;if(size>MAX_BODY){this.error(res,413,'request_too_large','Model request is too large.');return;}chunks.push(chunk);}
@@ -123,7 +141,9 @@ class ModelRouter {
       if(req.method==='POST'){
         try{body=decodeRequest(bytes,req.headers['content-encoding']);}catch{this.error(res,400,'invalid_request','Invalid model request.');return;}
       }
-      const track=req.method==='POST'&&route.startsWith('responses'),observe=track?observeUsage(this.usage):()=>{};
+      const track=req.method==='POST'&&route.startsWith('responses');
+      if(track){requestKey=this.requestKey(req,route,bytes,body);if(this.failedRequests.has(requestKey)){this.usage.blockedReplays++;this.note('blocked','Kết nối bị ngắt ở bước trước. Đã dừng gửi lặp bước đó để tránh tốn quota; bạn có thể nhắn tiếp trong cùng chat.');this.error(res,400,'model_replay_blocked','The previous model step was interrupted. Automatic retry stopped to avoid duplicate usage. Send a new message in this chat to continue.');return;}}
+      const observe=track?observeUsage(this.usage,ok=>{if(ok)streamCompleted=true;else streamFailed=true;}):()=>{};
       if(track){this.usage.requests++;this.usage.lastModel=typeof body?.model==='string'&&/^[a-z0-9_.-]{1,80}$/i.test(body.model)?body.model:null;this.usage.lastEffort=['none','minimal','low','medium','high','xhigh','max'].includes(body?.reasoning?.effort)?body.reasoning.effort:null;}
       const canReplay=replayable(body),attempted=new Set(),deadline=Date.now()+120000;
       let first=this.profileId||this.g.profileId,lastQuota=null;
@@ -146,19 +166,25 @@ class ModelRouter {
             this.error(res,409,'unsupported_account_plan','Only confirmed personal Free, Plus and Pro accounts can use this model route.');return;
           }
           if(track){this.usage.attempts++;if(lastQuota&&!refreshed)this.usage.quotaRetries++;}
+          inferenceStarted=track;
           const response=await (this.options.fetch||fetch)(new URL(suffix,this.upstream),{method:req.method,headers:this.headers(req.headers,bundle,id),body:req.method==='POST'?bytes:undefined,redirect:'error',signal:controller.signal});touch();
           if(response.status===401&&!refreshed){await response.body?.cancel();refreshed=true;if(track)this.usage.authRefreshes++;continue;}
           let prefix=[],quota=null,streamReader=null;
           if(!response.ok){
             const reader=response.body?.getReader();let length=0;
-            if(reader)for(;;){const {done,value}=await reader.read();if(done)break;touch();length+=value.length;if(length>MAX_ERROR){await reader.cancel();this.error(res,502,'upstream_error','Upstream error body is too large.');return;}prefix.push(Buffer.from(value));}
+            if(reader)for(;;){const {done,value}=await reader.read();if(done)break;touch();length+=value.length;if(length>MAX_ERROR){await reader.cancel();this.blockReplay(requestKey);this.error(res,502,'upstream_error','Upstream error body is too large.');return;}prefix.push(Buffer.from(value));}
             try{const value=JSON.parse(Buffer.concat(prefix).toString());if(response.status===429&&quotaError(value))quota=value;}catch{}
-          }else if(['responses','responses/lite'].includes(route)&&/text\/event-stream/.test(response.headers.get('content-type')||'')){
+          }else if(['responses','responses/lite'].includes(route)&&(body?.stream===true||/text\/event-stream/.test(response.headers.get('content-type')||''))){
+            // Native Codex accepts SSE without Content-Type. Decide from the
+            // requested protocol too, then verify the actual terminal event.
+            // A missing MIME header is not an inference failure.
+            sse=true;
             const peek=await this.peek(response,controller,touch);prefix=peek.prefix;quota=peek.quota;streamReader=peek.reader;
             if(!quota){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);await this.forward(response,res,prefix,peek.reader,touch,observe);return;}
           }
           const personal=personalProfile(this.g.service.state.profiles.find(p=>p.id===first))&&['free','plus','pro'].includes(String(bundle.chatgptPlanType||'').toLowerCase());
-          if(quota&&this.g.service.state.autoSwitch?.enabled&&personal&&!this.g.pendingId&&!this.g.changing&&canReplay&&epoch===this.epoch){
+          const manualChange=(this.g.pendingId||this.g.changing)&&this.g.pendingSource!=='route';
+          if(quota&&this.g.service.state.autoSwitch?.enabled&&personal&&!manualChange&&canReplay&&epoch===this.epoch){
             await this.cooldown(id,quota);lastQuota=quota;
             this.note('retrying','Hết quota: đang thử tài khoản dự phòng cho cùng lần gọi model.',id);
             break;
@@ -166,13 +192,15 @@ class ModelRouter {
           if(quota&&!canReplay)this.note('blocked','Yêu cầu dùng trạng thái riêng của tài khoản; không tự phát lại.');
           if(quota&&this.g.service.state.autoSwitch?.enabled&&!personal)this.note('blocked','Tự đổi chỉ hỗ trợ tài khoản cá nhân Free, Plus và Pro đã xác định.');
           if(response.ok){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);}
+          if(!response.ok)this.blockReplay(requestKey);
           await this.forward(response,res,prefix,streamReader,touch,observe);return;
         }
       }
     }catch{
+      if(inferenceStarted&&!streamCompleted)this.blockReplay(requestKey);
       if(!controller.signal.aborted)this.note('error','Lần gọi model bị lỗi kết nối; không tự phát lại.');
       this.error(res,502,'model_transport_error','Model connection failed. No automatic replay was performed.');
-    }finally{clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
+    }finally{if(inferenceStarted&&!streamCompleted&&(controller.signal.aborted||sse||streamFailed))this.blockReplay(requestKey);clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
   }
   async peek(response,controller,touch=()=>{}){
     const reader=response.body.getReader(),prefix=[],decoder=new TextDecoder();let text='',parsed=0,size=0;

@@ -37,18 +37,26 @@
 
 The [Codex guide](CODEX.md#english) covers resuming chats, separate accounts per
 client, and workspace/profile settings that override the connection.
-Launching local Codex desktop through PADSwitcher is currently available in
-[the Unix edition](https://github.com/padduwcs/PADSwitcher/blob/feature/cross-platform/docs/UNIX-INSTALL.en.md).
+
+## Codex desktop
+
+From 1.20.0, open **Connections → Codex in desktop**. Save work and fully quit
+the existing desktop for the first connection, then choose **Open desktop through
+PADSwitcher**. Wait for **Connected** and reopen the existing Codex chat. Later
+account switches wait for active turns and keep the same window/history. Desktop
+uses the Shared account and policy. Choose the conversation folder if it is
+outside `~/.codex`; quit desktop before disconnecting. Regular ChatGPT history
+does not transfer between accounts.
 
 ## Enable account fallback on quota exhaustion
 
 1. Add at least **two signed-in personal Codex accounts**: Free, Plus or Pro.
 2. Open **Accounts**. If using **Use for**, choose the group to configure:
    **Shared** or a client with a separate account.
-3. Select **Auto-switch · Off** to open **Auto-switch when usage runs out**.
+3. Select **Auto-switch on quota: Off** to open **Auto-switch when usage runs out**.
 4. Enable **Switch accounts on usage limit**, select at least two backup accounts,
    and set priorities; lower numbers are tried first.
-5. Select **Save setup** and confirm the button shows **Auto-switch · On**.
+5. Select **Save setup** and confirm the button shows **Auto-switch on quota: On**.
 
 The Shared policy applies to clients using Shared. A client configured with a
 separate account has its own policy, which must be enabled for that group.
