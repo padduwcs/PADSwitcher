@@ -2,9 +2,14 @@
 // Native Codex + the installed desktop (optional), synthetic accounts, isolated
 // history and loopback inference only. Never reads the user's auth or app data.
 const fs=require('node:fs/promises'),path=require('node:path'),http=require('node:http'),net=require('node:net'),assert=require('node:assert/strict');
+const electron=process.versions.electron?require('electron'):null;
+let fixtureError;
+if(electron){const sync=require('node:fs'),parent=path.resolve('artifacts/desktop-protocol-harness');sync.mkdirSync(parent,{recursive:true});const profile=sync.mkdtempSync(path.join(parent,'run-'));electron.app.disableHardwareAcceleration();electron.app.setPath('userData',profile);process.on('uncaughtException',error=>{console.error(error.stack);electron.app.exit(1);});}
 const {spawn}=require('node:child_process');
 const packaged=process.env.PADSWITCHER_DESKTOP_PACKAGED_ROOT;
 if(packaged&&!process.versions.electron)throw Error('Use the Electron runner to exercise packaged ASAR modules.');
+const fixtureNode=process.versions.electron?process.env.PADSWITCHER_TEST_NODE:process.execPath;
+if(!fixtureNode||!path.isAbsolute(fixtureNode))throw Error('An absolute Node runtime is required for fixture MCP.');
 const core=name=>require(path.join(packaged?path.resolve(packaged,'resources/app.asar/src/core'):path.join(__dirname,'../src/core'),name));
 const {GatewayHub}=core('gateway-hub.cjs');
 const {defaults}=core('client-routes.cjs');
@@ -12,7 +17,7 @@ const {createPlatform}=core('platform.cjs');
 const {CodexRpc}=core('rpc.cjs');
 const {DesktopIntegration,installedDesktop}=core('desktop.cjs');
 const {decodeRequest}=core('model-router.cjs');
-const useApp=process.argv.includes('--app')||!!process.env.PADSWITCHER_DESKTOP_SMOKE_APP;
+const useApp=process.argv.includes('--installed-desktop')||!!process.env.PADSWITCHER_DESKTOP_SMOKE_APP;
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.stringify(p)).toString('base64url')+'.fixture-signature';
 const fixtureExpiry=Math.floor(Date.now()/1000)+86400;
@@ -24,7 +29,7 @@ function respond(res,output){
   output.forEach((item,index)=>{res.write(event('response.output_item.added',{output_index:index,item:{...item,...(item.type==='message'?{content:[]}:{arguments:''})}}));if(item.type==='function_call')res.write(event('response.function_call_arguments.delta',{item_id:item.id,output_index:index,delta:item.arguments}));res.write(event('response.output_item.done',{output_index:index,item}));});
   res.end(event('response.completed',{response:{id,status:'completed',output,usage:{input_tokens:100,output_tokens:5,total_tokens:105}}}));
 }
-async function until(fn,label,timeout=120000){const deadline=Date.now()+timeout;do{const value=await fn();if(value)return value;await pause(100);}while(Date.now()<deadline);throw Error('Timed out: '+label);}
+async function until(fn,label,timeout=120000){const deadline=Date.now()+timeout;do{if(fixtureError)throw fixtureError;const value=await fn();if(value)return value;await pause(100);}while(Date.now()<deadline);throw Error('Timed out: '+label);}
 (async()=>{
 
   const root=await fs.realpath(await fs.mkdtemp(path.join(require('node:os').tmpdir(),'pad-desktop-smoke-'))),home=path.join(root,'existing-codex'),privateHome=path.join(root,'pad-private');
@@ -34,13 +39,13 @@ async function until(fn,label,timeout=120000){const deadline=Date.now()+timeout;
   await fs.writeFile(mcp,`const readline=require('node:readline'),net=require('node:net');readline.createInterface({input:process.stdin}).on('line',async line=>{const m=JSON.parse(line);if(m.id==null)return;let result={};if(m.method==='initialize')result={protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'desktop-fixture',version:'1'}};if(m.method==='tools/list')result={tools:[{name:'desktop_fixture',description:'Verify the current desktop tools pipe.',inputSchema:{type:'object',properties:{}}}]};if(m.method==='tools/call'){const text=await new Promise((resolve,reject)=>{const c=net.connect(process.env.CODEX_APP_TOOLS_PIPE_PATH,()=>c.write('fixture'));let text='';c.on('data',b=>text+=b);c.on('end',()=>resolve(text));c.on('error',reject);});result={content:[{type:'text',text}]};}process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result})+'\\n');});`);
   await fs.mkdir(path.join(plugin,'.codex-plugin'),{recursive:true});await fs.mkdir(path.join(marketplace,'.agents/plugins'),{recursive:true});
   await fs.writeFile(path.join(plugin,'.codex-plugin/plugin.json'),JSON.stringify({name:'codex-app-tools',version:'0.0.1',mcpServers:'./.mcp.json',description:'Offline fixture only.'}));
-  await fs.writeFile(path.join(plugin,'.mcp.json'),JSON.stringify({mcpServers:{codex_app:{command:process.execPath,args:[mcp],env_vars:['CODEX_APP_TOOLS_PIPE_PATH'],enabled:true,default_tools_approval_mode:'approve'}}}));
+  await fs.writeFile(path.join(plugin,'.mcp.json'),JSON.stringify({mcpServers:{codex_app:{command:fixtureNode,args:[mcp],env_vars:['CODEX_APP_TOOLS_PIPE_PATH'],enabled:true,default_tools_approval_mode:'approve'}}}));
   await fs.writeFile(path.join(marketplace,'.agents/plugins/marketplace.json'),JSON.stringify({name:'desktop-fixture',plugins:[{name:'codex-app-tools',source:{source:'local',path:'./plugins/codex-app-tools'},policy:{installation:'AVAILABLE',authentication:'ON_INSTALL'},category:'Developer Tools'}]}));
   const config='model = "gpt-5.4"\nmodel_reasoning_effort = "low"\nmcp_optional_startup_grace_ms = 0\n[features]\napps = false\n[analytics]\nenabled = false\n';await fs.writeFile(path.join(home,'config.toml'),config,{mode:0o600});await fs.writeFile(path.join(privateHome,'config.toml'),config,{mode:0o600});
   const pipeCalls=[],pipeServers=[],sockets=['first','second'].map(n=>'\\\\.\\pipe\\PADSwitcher-fixture-'+require('node:crypto').randomUUID()+'-'+n);let generation=0;
   for(const socket of sockets){const server=net.createServer(c=>c.once('data',()=>{pipeCalls.push(socket);c.end('MCP_PIPE_VERIFIED');}));pipeServers.push(server);await new Promise(r=>server.listen(socket,r));}
   const seen=[];let tools=0,completed=0,failed=0,rpc,hub,appChild,forceGuiQuota=false,guiQuotaRejected=false;
-  const upstream=http.createServer(async(req,res)=>{
+  const upstream=http.createServer((req,res)=>{(async()=>{
     if(req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json'});res.end('{"models":[]}');return;}
     const parts=[];for await(const p of req)parts.push(p);const bytes=Buffer.concat(parts),body=decodeRequest(bytes,req.headers['content-encoding']);seen.push({bytes,body,account:req.headers['chatgpt-account-id'],thread:req.headers['thread-id']});
     if(forceGuiQuota&&!guiQuotaRejected){guiQuotaRejected=true;res.writeHead(429,{'Content-Type':'application/json'});res.end('{"error":{"type":"usage_limit_reached","resets_in_seconds":900}}');return;}
@@ -48,13 +53,13 @@ async function until(fn,label,timeout=120000){const deadline=Date.now()+timeout;
     if(seen.length===2){res.writeHead(429,{'Content-Type':'application/json'});res.end('{"error":{"type":"usage_limit_reached","resets_in_seconds":900}}');return;}
     if(seen.length===5){assert(JSON.stringify(body.tools).includes('desktop_fixture'),'MCP tool must be visible after desktop restart');respond(res,[{type:'function_call',id:'fc_mcp',call_id:'call_mcp',namespace:'mcp__codex_app',name:'desktop_fixture',arguments:'{}'}]);return;}
     respond(res,[{type:'message',id:'msg_'+seen.length,role:'assistant',status:'completed',content:[{type:'output_text',text:'DESKTOP_CONTEXT_PRESERVED_'+seen.length,annotations:[]}]}]);
-  });await new Promise(r=>upstream.listen(0,'127.0.0.1',r));
+  })().catch(error=>{fixtureError||=error;res.destroy();});});await new Promise(r=>upstream.listen(0,'127.0.0.1',r));
   const platform={...createPlatform(root),processes:async()=>[]};
   const executable=process.env.PADSWITCHER_DESKTOP_SMOKE_CODEX||(useApp?(await installedDesktop()).engine:await platform.findGatewayCodex());
   const service={root,platform,state:{profiles:['a','b','c'].map(id=>({id,plan:'plus',status:'ready'})),settings:{desktopHome:privateHome,workspace:home,codexPath:executable},autoSwitch:{enabled:true,order:['a','b']},quotaCooldowns:{},clientRoutes:defaults()},running:new Map(),get:id=>({id,email:id+'@example.test'}),accessBundle:async id=>({accessToken:token(id),chatgptAccountId:id,chatgptPlanType:'plus'}),save:async()=>{},changed:()=>{}};
   const open=async()=>{
     const pipe=sockets[Math.min(generation++,1)];
-    const r=new CodexRpc(hub.desktop.helper,home,{spawn:(exe,args,opts)=>spawn(exe,args,{...opts,env:{...opts.env,PADSWITCHER_CLIENT_KIND:'desktop',CODEX_APP_TOOLS_PIPE_PATH:pipe,CODEX_MCP_NODE_PATH:process.execPath}})});
+    const r=new CodexRpc(hub.desktop.helper,home,{spawn:(exe,args,opts)=>spawn(exe,args,{...opts,env:{...opts.env,PADSWITCHER_CLIENT_KIND:'desktop',CODEX_APP_TOOLS_PIPE_PATH:pipe,CODEX_MCP_NODE_PATH:fixtureNode}})});
     await r.initialize({experimentalApi:true});
     r.listeners.add((method,p)=>{if(method==='turn/completed'){if(p.turn.status==='completed')completed++;else failed++;}});
     const receive=r.receive.bind(r);r.receive=line=>{let m;try{m=JSON.parse(line);}catch{return;}if(m.error)console.error('Synthetic fixture RPC error:',m.error.code,String(m.error.message).slice(0,500));if(m.method==='item/tool/call'&&m.id!=null){tools++;r.send({id:m.id,result:{success:true,contentItems:[{type:'inputText',text:'Desktop fixture marker executed once.'}]}});return;}receive(line);};

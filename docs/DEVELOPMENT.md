@@ -150,6 +150,15 @@ and injects quota fallback against the same native backend while the GUI stays
 connected. It does not click or type in ChatGPT UI or use real account tokens.
 The standard desktop smoke also checks `app-server --print-startup-config`.
 
+To repeat the installed-app check against packaged modules after building:
+
+```powershell
+$env:PADSWITCHER_DESKTOP_PACKAGED_ROOT = (Resolve-Path dist/win-unpacked).Path
+$env:PADSWITCHER_TEST_NODE = (node -p 'process.execPath').Trim()
+node scripts/run-electron.cjs scripts/desktop-protocol-smoke.cjs --installed-desktop
+Remove-Item Env:PADSWITCHER_DESKTOP_PACKAGED_ROOT, Env:PADSWITCHER_TEST_NODE
+```
+
 After `npm run dist`, run `npm run smoke:executables` as well as the ASAR smoke.
 It starts both actual Windows executables with disposable app data and checks
 the packaged runtime/fuses, renderer, IPC and four connection cards.

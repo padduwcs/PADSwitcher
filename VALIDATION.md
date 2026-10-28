@@ -15,6 +15,8 @@ connection after a native startup-policy preflight.
 - With that GUI connected, the native backend resumes the existing three-turn
   thread and completes another turn after an injected quota rejection, with an
   identical request retried on a different account and original context retained.
+- The installed-app check also passes with core modules and the native helper
+  loaded from the packaged ASAR/unpacked-helper output, rather than the source tree.
 - Native desktop/MCP smoke passes on pinned `0.160.0` too. Mixed extension
   `0.164.0-alpha.11.1` / bundled desktop `0.165.0-alpha.1.2` continuity passes
   14 turns, 12 quota fallbacks, four steers and 14 unique real marker writes.

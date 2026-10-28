@@ -110,15 +110,29 @@ internal static class PADCodex {
             }
         }
     }
-    static async Task StartupConfiguration(Uri url, string token) {
+    static async Task StartupConfiguration(Uri url, string token, string[] args) {
         // New desktops perform this one-shot policy read before opening their
         // interactive transport. Read the selected native backend's real policy;
         // never invent an unrestricted policy or modify the original sign-in.
+        var client = new Dictionary<string, object> { { "name", "codex_desktop" }, { "title", "Codex Desktop" }, { "version", "startup" } };
+        int infoIndex = Array.IndexOf(args, "--startup-client-info");
+        if (infoIndex >= 0) {
+            if (infoIndex + 1 >= args.Length || args[infoIndex + 1].Length > 16384) throw new IOException();
+            var supplied = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(args[infoIndex + 1]);
+            foreach (string key in new [] { "name", "title", "version" }) {
+                object value;
+                if (supplied.TryGetValue(key, out value)) {
+                    string text = value as string;
+                    if (String.IsNullOrEmpty(text) || text.Length > 256) throw new IOException();
+                    client[key] = text;
+                }
+            }
+        }
         using (var ws = new ClientWebSocket()) using (var cancel = new CancellationTokenSource(30000)) {
             ws.Options.Proxy = null; ws.Options.SetRequestHeader("Authorization", "Bearer " + token);
             await ws.ConnectAsync(url, cancel.Token);
             var initialized = await StartupRequest(ws, "pad-startup-init", "initialize", new {
-                clientInfo = new { name = "codex_desktop", title = "Codex Desktop", version = "startup" },
+                clientInfo = client,
                 capabilities = new { experimentalApi = true }, _padswitcherStartup = true
             }, cancel.Token);
             string agent = StringValue(initialized, "userAgent");
@@ -273,7 +287,7 @@ internal static class PADCodex {
             bool server = Array.IndexOf(args, "app-server") >= 0;
             if (startup) {
                 if (!server || Array.IndexOf(args, "--startup-sign-out") >= 0) throw new IOException();
-                StartupConfiguration(url, token).GetAwaiter().GetResult(); return 0;
+                StartupConfiguration(url, token, args).GetAwaiter().GetResult(); return 0;
             }
             if (server) { Bridge(url, token).GetAwaiter().GetResult(); return 0; }
             if (Array.IndexOf(args, "--no-daemon") >= 0 || Array.IndexOf(args, "--remote") >= 0 || (args.Length > 0 && (args[0] == "exec" || args[0] == "e" || args[0] == "login" || args[0] == "logout" || args[0] == "daemon" || args[0] == "review" || args[0] == "cloud"))) {
