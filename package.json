@@ -51,7 +51,7 @@
     "release:verify": "node scripts/verify-windows-release.cjs"
   },
   "devDependencies": {
-    "electron": "44.9.3",
+    "electron": "45.0.0",
     "electron-builder": "26.15.3",
     "jsdom": "30.1.3"
   },
