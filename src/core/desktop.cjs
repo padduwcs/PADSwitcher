@@ -25,6 +25,18 @@ function launchEnvironment(input, { home, helper }) {
   return { ...env, CODEX_HOME: home, CODEX_CLI_PATH: helper, PADSWITCHER_CLIENT_KIND: 'desktop', CODEX_APP_SERVER_FORCE_CLI: '1', CODEX_APP_SERVER_USE_LOCAL_DAEMON: '0' };
 }
 
+function waitForDesktopConnection(child, connected, timeout = 45000) {
+  return new Promise((resolve, reject) => {
+    let timer, poll;
+    const finish = error => { clearTimeout(timer); clearInterval(poll); child.off('close', closed); error ? reject(error) : resolve(); };
+    const closed = () => finish(new UserError('Desktop đã thoát trước khi kết nối. Thử mở lại và kiểm tra phiên bản ứng dụng.', 'DESKTOP_START_EXIT'));
+    const check = () => { try { if (connected()) finish(); else if (child.exitCode != null) closed(); } catch (error) { finish(error); } };
+    child.once('close', closed);
+    timer = setTimeout(() => finish(new UserError('Desktop chưa kết nối được với PADSwitcher. Thoát hẳn desktop rồi thử mở lại; kiểm tra cấu hình và phiên bản ứng dụng nếu lỗi lặp lại.', 'DESKTOP_START_TIMEOUT')), timeout);
+    poll = setInterval(check, 100); check();
+  });
+}
+
 class DesktopIntegration {
   constructor(service, hub, options = {}) {
     this.service = service; this.hub = hub; this.options = options;
@@ -86,16 +98,23 @@ class DesktopIntegration {
     try {
       const gateway = await this.resumeGateway();
       if (!gateway?.profileId) throw new UserError('Chưa xác minh được tài khoản desktop. Hãy thử kết nối lại.', 'DESKTOP_AUTH_VERIFY');
-      await atomicWrite(this.file, JSON.stringify(this.record));
       const env = { ...launchEnvironment(this.options.environment || process.env, { home: this.record.home, helper: gateway.helper }), ...this.options.testEnvironment };
-      const child = (this.options.spawn || spawn)(app.executable, this.options.arguments || [], { env, cwd: this.service.state.settings.workspace, detached: true, stdio: 'ignore', windowsHide: true });
+      try {
+        const policy = this.options.readStartupConfig ? await this.options.readStartupConfig(gateway.helper, env) : JSON.parse(await this.service.platform.run(gateway.helper, ['app-server', '--print-startup-config', '--startup-client-info', JSON.stringify({name:'codex_desktop',title:'Codex Desktop',version:require('../../package.json').version})], {env,timeout:35000}));
+        if (typeof policy?.appServerVersion !== 'string' || !policy.configRequirements || !Object.hasOwn(policy.configRequirements, 'requirements')) throw Error('Invalid startup policy');
+      } catch { throw new UserError('Chưa đọc được cấu hình khởi động của Codex Desktop. Giữ nguyên đăng nhập, kiểm tra cấu hình Codex và thử kết nối lại.', 'DESKTOP_STARTUP_POLICY'); }
+      await atomicWrite(this.file, JSON.stringify(this.record));
+      const child = (this.options.spawn || spawn)(app.executable, this.options.arguments || [], { env, cwd: this.service.state.settings.workspace, detached: true, stdio: 'ignore', windowsHide: false });
       await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
       child.once('close', code => { if (code) this.error = 'Desktop đã thoát trước khi hoàn tất kết nối. Kiểm tra ứng dụng và thử mở lại.'; this.running = false; this.service.changed(); });
       child.unref(); this.running = true;
       clearTimeout(this.launchTimer);
-      this.launchTimer=setTimeout(()=>{if(!this.view().connected&&this.running){this.error='Desktop chưa kết nối. Thoát hẳn desktop rồi mở lại qua PADSwitcher; nếu đã kết nối, kiểm tra phiên bản ứng dụng.';this.service.changed();}},45000);
-      this.launchTimer.unref?.();
-      return { launched: true, connected: false };
+      await waitForDesktopConnection(child, () => {
+        if (this.hub.desktop?.status === 'error') throw new UserError('Backend Codex Desktop đã dừng. Kiểm tra cấu hình và mở lại kết nối.', 'DESKTOP_BACKEND_STOPPED');
+        return this.view().connected > 0;
+      }, this.options.startupTimeout || 45000);
+      this.error = null;
+      return { launched: true, connected: true };
     } catch (error) {
       this.record = previous; await atomicWrite(this.file, JSON.stringify(previous));
       if (!previous.enabled) await this.hub.stopDesktop().catch(() => {});
@@ -120,4 +139,4 @@ class DesktopIntegration {
     this.record.home = home; await atomicWrite(this.file, JSON.stringify(this.record)); this.service.changed();
   }
 }
-module.exports = { DesktopIntegration, installedDesktop, launchEnvironment };
+module.exports = { DesktopIntegration, installedDesktop, launchEnvironment, waitForDesktopConnection };

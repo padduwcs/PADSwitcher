@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.20.1 — 2026-10-28
+
+### Fixed
+
+- Support the desktop's one-shot startup policy command through the authenticated
+  native backend. Preserve the actual application network requirements and keep
+  startup probes separate from interactive connection indicators.
+- Open the desktop GUI visibly instead of inheriting a hidden startup window.
+- Check startup policy before launching and await an interactive handshake before
+  reporting success. Show early-exit, policy and timeout errors in PADSwitcher.
+
+### Validation
+
+- Add an installed-app smoke that checks the visible process window, real gateway
+  connection, existing native thread and a synthetic quota fallback while the GUI
+  remains connected. Original authentication/configuration stay in the fixture.
+- Add native restricted-policy/failure/sign-out guards and deterministic shutdown
+  cancellation coverage. See VALIDATION.md for the exact scope.
+
 ## 1.20.0 — 2026-10-28
 
 ### Added

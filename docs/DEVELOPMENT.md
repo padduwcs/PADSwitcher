@@ -143,6 +143,13 @@ after the usual unit/protocol checks. These use the production Windows gateway,
 synthetic credentials and loopback model responses. The desktop fixture checks
 existing history, restart/resume and current named-pipe MCP tools.
 
+With the official Windows desktop installed, run `npm run smoke:desktop:app`.
+It launches the installed GUI with a disposable browser profile, checks its
+visible process window and gateway handshake, then resumes the fixture thread
+and injects quota fallback against the same native backend while the GUI stays
+connected. It does not click or type in ChatGPT UI or use real account tokens.
+The standard desktop smoke also checks `app-server --print-startup-config`.
+
 After `npm run dist`, run `npm run smoke:executables` as well as the ASAR smoke.
 It starts both actual Windows executables with disposable app data and checks
 the packaged runtime/fuses, renderer, IPC and four connection cards.

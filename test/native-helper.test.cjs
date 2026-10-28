@@ -2,6 +2,20 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process'),{WebSocketServer}=require('ws');
 const windows=require('../src/core/windows.cjs');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
+test('native desktop startup forwards the actual network policy without opening inference or signing out',{timeout:20000},async t=>{
+  const parent=path.resolve('artifacts/tests');await fs.mkdir(parent,{recursive:true});
+  const root=await fs.mkdtemp(path.join(parent,'startup-')),helper=path.join(root,'PADCodex.exe');await fs.copyFile(path.resolve('src/assets/PADCodex.exe'),helper);
+  const token=crypto.randomBytes(32).toString('hex'),server=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise(r=>server.once('listening',r));
+  t.after(async()=>{for(const c of server.clients)c.terminate();await new Promise(r=>server.close(r));assert.equal(path.dirname(path.resolve(root)).toLowerCase(),parent.toLowerCase());await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});});
+  await fs.writeFile(path.join(root,'client-capability'),token);await fs.writeFile(path.join(root,'connection.json'),JSON.stringify({version:1,url:'ws://127.0.0.1:'+server.address().port,tokenFile:path.join(root,'client-capability')}));
+  const policy={requirements:{application:{network:{enabled:true,domains:{'example.test':'allow','blocked.test':'deny'}}}}},seen=[];let fail=false;
+  server.on('connection',(socket,request)=>{assert.equal(request.headers.authorization,'Bearer '+token);socket.on('message',data=>{const m=JSON.parse(data);seen.push(m);if(m.id==null)return;const result=m.method==='initialize'?{userAgent:'codex_desktop/0.165.0-alpha.1.2 (Windows)'}:policy;socket.send(JSON.stringify(fail&&m.method==='configRequirements/read'?{id:m.id,error:{code:-1,message:'Policy unavailable'}}:{id:m.id,result}));});});
+  const run=extra=>new Promise((resolve,reject)=>{const env={...process.env};delete env.PADSWITCHER_CONNECTION_FILE;const child=spawn(helper,['-c','features.code_mode_host=true','app-server','--analytics-default-enabled','--print-startup-config','--startup-client-info','{"name":"codex_desktop","version":"fixture"}',...extra],{env,windowsHide:true,stdio:['ignore','pipe','ignore']});let text='';child.stdout.on('data',b=>text+=b);child.on('error',reject);child.on('close',code=>resolve({code,value:JSON.parse(text)}));});
+  const success=await run([]);assert.equal(success.code,0);assert.equal(success.value.appServerVersion,'0.165.0-alpha.1.2');assert.deepEqual(success.value.configRequirements,policy);
+  assert.equal(seen[0].params._padswitcherStartup,true);assert.deepEqual(seen.map(m=>m.method),['initialize','initialized','configRequirements/read']);
+  fail=true;const failed=await run([]);assert.equal(failed.code,1);assert.equal(failed.value.error.code,-32000);assert.equal(failed.value.configRequirements,undefined);
+  const before=seen.length,signOut=await run(['--startup-sign-out']);assert.equal(signOut.code,1);assert.equal(signOut.value.error.code,-32000);assert.equal(seen.length,before);
+});
 test('native desktop handshake carries only allowed startup configuration and uses the adjacent gateway',{timeout:20000},async t=>{
   const parent=path.resolve('artifacts/tests');await fs.mkdir(parent,{recursive:true});const root=await fs.mkdtemp(path.join(parent,'helper-')),helper=path.join(root,'PADCodex.exe');await fs.copyFile(path.resolve('src/assets/PADCodex.exe'),helper);
   const server=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise(r=>server.once('listening',r));

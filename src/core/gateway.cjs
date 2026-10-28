@@ -26,7 +26,7 @@ class Gateway {
     this.recovery=new Recovery(this);
     this.knownTurns=new Map();
   }
-  view(){const connected={vscode:0,cli:0,jetbrains:0,desktop:0,other:0};for(const c of this.clients)if(c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',usage:this.router?{...this.router.usage}:null,lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
+  view(){const connected={vscode:0,cli:0,jetbrains:0,desktop:0,other:0};for(const c of this.clients)if(!c.startup&&c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',usage:this.router?{...this.router.usage}:null,lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
   changed(){this.service.changed();}
   async start(id){
     this.service.get(id);
@@ -198,6 +198,7 @@ class Gateway {
     if(m.method==='initialize'){
       if(c.initializeId===undefined&&!c.initializeAccepted&&m.id!=null){
         const name=m.params?.clientInfo?.name;
+        c.startup=m.params?._padswitcherStartup===true;
         c.kind=this.options.clientKind||(['jetbrains','desktop'].includes(m.params?._padswitcherClient)?m.params._padswitcherClient:['codex_vscode','codex_vscode_copilot'].includes(name)?'vscode':['codex_cli_rs','codex_cli'].includes(name)?'cli':'other');c.initializeId=m.id;
       }
       m.params={...m.params,capabilities:{...m.params?.capabilities,experimentalApi:true}};
@@ -209,6 +210,7 @@ class Gateway {
         for(const key of ['plugins.codex-app-tools@openai-bundled.mcp_servers.codex_app.enabled','plugins.code-review@openai-bundled.mcp_servers.code-review.enabled']){const value=m.params._padswitcherDesktopConfig?.[key];if(typeof value==='boolean')c.desktopConfig[key]=value;}
       }
       delete m.params._padswitcherClient;
+      delete m.params._padswitcherStartup;
       delete m.params._padswitcherDesktopEnvironment;
       delete m.params._padswitcherDesktopConfig;
     }

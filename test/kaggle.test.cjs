@@ -101,9 +101,9 @@ test('subprocess environment excludes inherited Kaggle credentials and Python ho
 });
 test('shutdown cancels read-only bridge work and preserves the last successful snapshot',async t=>{
   const f=await setup(t),a=await f.k.add({token:tokenA,workspace:f.directory});await f.k.refresh(a);const before=f.k.view().accounts[0];
-  const original=f.k.bridge;
-  f.k.bridge=async(python,payload,timeout,signal)=>payload.action!=='refresh'?original(python,payload):new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new UserError('Cancelled','KAGGLE_CANCELLED')),{once:true}));
-  const read=f.k.refresh(a);await new Promise(r=>setTimeout(r,10));assert.equal(f.k.controllers.size,1);await f.k.shutdown();await read;
+  const original=f.k.bridge;let entered;const started=new Promise(resolve=>entered=resolve);
+  f.k.bridge=async(python,payload,timeout,signal)=>payload.action!=='refresh'?original(python,payload):new Promise((_resolve,reject)=>{signal.addEventListener('abort',()=>reject(new UserError('Cancelled','KAGGLE_CANCELLED')),{once:true});entered();});
+  const read=f.k.refresh(a);await started;assert.equal(f.k.controllers.size,1);await f.k.shutdown();await read;
   const after=f.k.view().accounts[0];assert.deepEqual(after.quota,before.quota);assert.deepEqual(after.notebooks,before.notebooks);assert.equal(after.lastError,null);assert.equal(f.k.controllers.size,0);assert.equal(f.k.flights.size,0);
 });
 test('corrupt Kaggle metadata disables its mutations without blocking Codex or overwriting the file',async t=>{

@@ -387,7 +387,7 @@ function desktopLaunchDialog(id){
   const label=state.profiles.find(p=>p.id===id)?.label||'';
   showModal('Kết nối Codex desktop','<p><span>Tài khoản</span>: <strong data-literal>'+e(label)+'</strong>.</p><p>Desktop sẽ dùng tài khoản chung đã chọn qua PADSwitcher và giữ kho hội thoại Codex hiện tại.</p><p>Áp dụng cùng tài khoản cho các kết nối đang dùng chung.</p><p class="field-help">Lần đầu: lưu công việc và thoát hẳn desktop trước khi mở. Các lần đổi tài khoản sau chờ lượt đang chạy hoàn tất và không cần đóng desktop. Áp dụng cho Codex cục bộ; lịch sử ChatGPT thông thường không chuyển giữa tài khoản.</p>',async()=>{
     closeModal();const r=await call('desktopLaunch',{id});
-    if(r)toast(r.result?.connected?'Đã gửi yêu cầu chọn tài khoản cho desktop.':'Đã yêu cầu mở desktop. Chờ trạng thái Đang kết nối.');
+    if(r)toast(r.result?.launched&&r.result?.connected?'Đã mở và kết nối Codex desktop.':r.result?.connected?'Đã gửi yêu cầu chọn tài khoản cho desktop.':'Đã yêu cầu mở desktop. Chờ trạng thái Đang kết nối.');
   },'Mở desktop qua PADSwitcher');
 }
 $('#open-desktop-connected').onclick=()=>desktopLaunchDialog(state.gateway?.profileId);

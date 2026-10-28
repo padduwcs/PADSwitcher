@@ -36,7 +36,8 @@
 
 [Hướng dẫn Codex chi tiết](CODEX.md) có cách mở lại chat, chọn tài khoản riêng
 cho từng kết nối và xử lý thiết lập bị workspace/profile ghi đè.
-Từ 1.20.0, **Kết nối → Codex trong desktop** mở desktop bằng tài khoản chung.
+Từ 1.20.1, **Kết nối → Codex trong desktop** mở desktop bằng tài khoản chung,
+kiểm tra policy khởi động và chờ kết nối được xác nhận trước khi báo thành công.
 Lần đầu hãy lưu công việc và thoát hẳn desktop, sau đó bấm **Mở desktop qua PADSwitcher**.
 Chờ trạng thái **Đang kết nối** rồi mở hội thoại Codex cũ. Các lần đổi tài khoản
 sau chờ lượt hiện tại kết thúc và giữ cửa sổ/chat. **Chọn thư mục hội thoại**
