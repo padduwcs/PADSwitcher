@@ -46,7 +46,7 @@ class GatewayHub{
       const owner=this.service,hub=this;
       const state=new Proxy({}, {get:(_t,k)=>k==='settings'?{...owner.state.settings,desktopHome:home}:k==='gatewayProfileId'?owner.state.desktopGatewayProfileId:k==='gatewayEnabled'?false:owner.state[k],set:(_t,k,v)=>{if(k==='gatewayProfileId')owner.state.desktopGatewayProfileId=v;else if(k!=='gatewayEnabled')owner.state[k]=v;return true;}});
       const facade={root:owner.root,platform:owner.platform,state,running:owner.running,get busy(){return owner.busy;},get:id=>owner.get(id),accessBundle:(...args)=>owner.accessBundle(...args),save:()=>owner.save(),changed:()=>owner.changed()};
-      this.desktop=new Gateway(facade,{...this.options,attach:undefined,root:path.join(owner.root,'gateway','desktop'),executable,environment,clientKind:'desktop',isolatedState:false,sharedRouter:this.shared.router,verifyAccount:true,canChange:()=>!hub.shared.turns.size&&!hub.shared.changing,canStart:()=>!hub.shared.changing&&!hub.shared.pendingId});
+      this.desktop=new Gateway(facade,{...this.options,attach:undefined,root:path.join(owner.root,'gateway','desktop'),executable,environment:{...this.options.environment,...environment},clientKind:'desktop',isolatedState:false,sharedRouter:this.shared.router,verifyAccount:true,canChange:()=>!hub.shared.turns.size&&!hub.shared.changing,canStart:()=>!hub.shared.changing&&!hub.shared.pendingId});
     }
     if(this.desktop.status!=='ready'||this.desktop.profileId!==this.shared.router.profileId||this.desktop.pendingId)await this.desktop.start(this.shared.router.profileId);
     return this.desktop;

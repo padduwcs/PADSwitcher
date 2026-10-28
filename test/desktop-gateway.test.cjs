@@ -42,6 +42,16 @@ test('desktop fails closed if native auth does not match; the existing shared co
   await assert.rejects(f.hub.startDesktop({home:f.desktop,executable:'fixture-codex',environment:{PAD_TEST_WRONG_AUTH:'1'}}),{code:'DESKTOP_AUTH_VERIFY'});
   assert.equal(f.hub.shared.status,'ready');assert(f.hub.shared.router.server.listening);assert.equal((await vs.request('account/read')).account.email,'fixture-account-a@example.test');
 });
+test('desktop inherits gateway network settings and applies its runtime overrides to the spawned backend',async t=>{
+  const f=await setup(t),{hub}=f;
+  hub.options.environment={HTTP_PROXY:'http://127.0.0.1:9',NO_PROXY:'localhost,127.0.0.1',CODEX_CLI_PATH:'shared-runtime'};
+  const start=hub.options.spawn;let environment;
+  hub.options.spawn=(exe,args,options)=>{environment=options.env;return start(exe,args,options);};
+  await hub.startDesktop({home:f.desktop,executable:'fixture-codex',environment:{CODEX_CLI_PATH:'desktop-runtime'}});
+  assert.equal(environment.HTTP_PROXY,'http://127.0.0.1:9');assert.equal(environment.NO_PROXY,'localhost,127.0.0.1');
+  assert.equal(environment.CODEX_CLI_PATH,'desktop-runtime');assert.equal(environment.CODEX_HOME,f.desktop);
+  assert.equal(hub.options.environment.CODEX_CLI_PATH,'shared-runtime');
+});
 test('runtime account verification failure closes desktop transport without stopping the shared router',async t=>{
   const f=await setup(t),{hub}=f;await hub.startDesktop({home:f.desktop,executable:'fixture-codex'});
   const desktop=await f.client(hub.desktop,true);await desktop.request('fixture/wrongAuth');
