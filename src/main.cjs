@@ -1,7 +1,6 @@
 'use strict';
 const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, clipboard } = require('electron');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 const { ProfileService } = require('./core/service.cjs');
 const { KaggleService, notebookRef } = require('./core/kaggle.cjs');
 const { createQuotaRefresher } = require('./core/quota-refresh.cjs');
@@ -20,7 +19,7 @@ function updateTray() {
 }
 if(process.env.PADSWITCHER_APPDATA_DIR){if(!path.isAbsolute(process.env.PADSWITCHER_APPDATA_DIR))throw Error('PADSWITCHER_APPDATA_DIR must be absolute.');app.setPath('appData',process.env.PADSWITCHER_APPDATA_DIR);app.setPath('userData',path.join(process.env.PADSWITCHER_APPDATA_DIR,'PADSwitcher'));}
 const rendererFile = path.join(__dirname,'renderer','index.html');
-const rendererUrl = pathToFileURL(rendererFile).href;
+const trustedRenderer = require('./core/renderer-origin.cjs').rendererOrigin(rendererFile);
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance',() => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
@@ -43,14 +42,14 @@ async function start() {
   await checkIntegration();
   window = new BrowserWindow({ width: 1260, height: 840, minWidth: 1000, minHeight: 680, title: 'PADSwitcher', icon:path.join(__dirname,'assets','padswitcher.ico'), backgroundColor:'#F6F8FB', autoHideMenuBar:true, show:false, webPreferences: { preload:path.join(__dirname,'preload.cjs'), nodeIntegration:false, contextIsolation:true, sandbox:true, webSecurity:true, devTools:!app.isPackaged } });
   window.webContents.setWindowOpenHandler(() => ({ action:'deny' }));
-  window.webContents.on('will-navigate',(event,url) => { if (url !== rendererUrl) event.preventDefault(); });
+  window.webContents.on('will-navigate',(event,url) => { if (!trustedRenderer.accept(url)) event.preventDefault(); });
   window.webContents.session.setPermissionRequestHandler((_webContents,_permission,callback) => callback(false));
   window.webContents.session.setPermissionCheckHandler(() => false);
   window.webContents.session.webRequest.onBeforeRequest({ urls:['http://*/*','https://*/*','ws://*/*','wss://*/*'] },(_details,callback) => callback({cancel:true}));
   const publish = state => { if (!window?.isDestroyed()) window.webContents.send('pad:state',state); };
   service.on('change',publish);
   ipcMain.handle('pad:action',async (event,command,args = {}) => {
-    if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== rendererUrl) return { ok:false,error:{message:'Nguồn yêu cầu không hợp lệ.',code:'INVALID_ORIGIN'} };
+    if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || !trustedRenderer.accept(event.senderFrame.url)) return { ok:false,error:{message:'Nguồn yêu cầu không hợp lệ.',code:'INVALID_ORIGIN'} };
     try {
       if (!args || typeof args !== 'object' || Array.isArray(args)) throw new UserError('Yêu cầu không hợp lệ.', 'INVALID_REQUEST');
       if(['vi','en'].includes(args.locale)&&uiLocale!==args.locale){uiLocale=args.locale;updateTray();}
