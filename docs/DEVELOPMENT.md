@@ -143,6 +143,12 @@ after the usual unit/protocol checks. These use the production Windows gateway,
 synthetic credentials and loopback model responses. The desktop fixture checks
 existing history, restart/resume and current named-pipe MCP tools.
 
+Gateway fixtures verify the native `initialize.codexHome` against their disposable
+root before starting turns or installing plugins. Do not rely on `CODEX_HOME`
+alone: a misbound helper can connect to a running server in another home. The
+fault smoke preserves native retry after definite HTTP/SSE rejection and still
+blocks replay after uncertain connection loss or partial output.
+
 With the official Windows desktop installed, run `npm run smoke:desktop:app`.
 It launches the installed GUI with a disposable browser profile, checks its
 visible process window and gateway handshake, then resumes the fixture thread

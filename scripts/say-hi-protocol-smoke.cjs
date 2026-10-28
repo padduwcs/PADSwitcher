@@ -46,7 +46,7 @@ const event=(type,value)=>'event: '+type+'\ndata: '+JSON.stringify({type,...valu
     for(const {body} of seen){assert.equal((body.tools||[]).length,0);assert(JSON.stringify(body.input).includes('greeting assistant'));assert.equal(body.reasoning.effort,'low');assert.equal(body.service_tier,undefined);assert(body.input.some(item=>JSON.stringify(item).includes('Say hi. Reply only Hi.')));}
     assert.deepEqual(toolEvents,[],'No tools execute during either greeting');
     assert.equal(service.state.gatewayProfileId,'kept');assert(sessions.every(({rpc})=>rpc.closed));
-    assert((await fs.readdir(root)).every(name=>!name.startsWith('sayhi-rpc-')));
+    assert((await fs.readdir(root)).every(name=>!name.startsWith('sayhi-rpc-')),JSON.stringify(greetings.view()));
     console.log('Native Say hi: two independent accounts, one request each, no tools executed, isolated credentials, quota refresh and cleanup passed.');
   } finally {
     await greetings.shutdown();for(const {rpc} of sessions)await rpc.close();upstream.closeAllConnections();await new Promise(r=>upstream.close(r));

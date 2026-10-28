@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.20.2 — 2026-10-28
+
+### Fixed
+
+- Keep native Codex retry policy after explicit HTTP rejection or an early SSE
+  failure before output. These outcomes no longer incorrectly trigger
+  `model_replay_blocked` in either the extension or desktop route.
+- Count new native agent messages as model-step progress, excluding volatile
+  delivery metadata. Preserve replay protection after uncertain or partial output.
+
+### Validation
+
+- Verify the native server's actual home before gateway fixtures start turns or
+  install plugins, preventing tests from attaching to a user's running backend.
+- Reproduce 503 and early SSE recovery through the real native engine; retain
+  single-attempt protection for connection loss, incomplete output and timeout.
+- Document a development-fixture plugin left in the maintainer's real Codex home,
+  its precise removal and the validation limits. See VALIDATION.md.
+
 ## 1.20.1 — 2026-10-28
 
 ### Fixed

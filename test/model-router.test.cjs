@@ -215,6 +215,32 @@ test('uncertain failure blocks native recovery even when its body changes; an ex
   await f.r.stop();assert.equal(f.r.failedRequests.size,0);
 });
 
+test('explicit HTTP rejections remain native errors and do not poison a later retry of the same model step',async t=>{
+  for(const status of [400,403,429,500,503]){
+    const f=await fixture(t,(_req,res)=>{if(f.seen.length===1){res.writeHead(status,{'Content-Type':'application/json'});res.end('{"error":{"type":"server_rejection"}}');}else {res.writeHead(200);res.end(completed);}});
+    const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"same-step"}'},body={input:[{role:'user',content:'Original task'}],stream:true};
+    const first=await f.call(body,headers);assert.equal(first.status,status);await first.text();
+    const next=await f.call(body,headers);assert.equal(next.status,200,'HTTP '+status+' must not become model_replay_blocked');assert.equal(await next.text(),completed);
+    assert.deepEqual(f.seen.map(x=>x.account),['a','a']);assert.equal(f.r.failedRequests.size,0);
+  }
+});
+
+test('a definitive early SSE rejection permits native retry while partial output still stops replay',async t=>{
+  const f=await fixture(t,(_req,res)=>{res.writeHead(200);res.end(f.seen.length===1?event('response.created')+event('response.failed',{response:{error:{type:'server_error'}}}):completed);});
+  const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"same-step"}'},body={input:[{role:'user',content:'Original task'}],stream:true};
+  await (await f.call(body,headers)).text();const next=await f.call(body,headers);assert.equal(next.status,200);assert.equal(await next.text(),completed);assert.equal(f.seen.length,2);assert.equal(f.r.failedRequests.size,0);
+});
+
+test('new inter-agent messages are real progress; delivery timestamps alone do not authorize replay',async t=>{
+  const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200);res.end(completed);}});
+  const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"same-step"}'},user={role:'user',content:'Original task'};
+  const agent=text=>({type:'agent_message',id:'agent-message-fixture',author:'worker',recipient:'parent',content:[{type:'input_text',text}],internal_chat_message_metadata_passthrough:{turn_id:'delivery',create_time:1}});
+  const first=await f.call({input:[user,agent('First result')],stream:true},headers);assert.equal(first.status,502);await first.text();
+  const metadataOnly=agent('First result');metadataOnly.internal_chat_message_metadata_passthrough.create_time=999;
+  assert.equal((await f.call({input:[user,metadataOnly],stream:true},headers)).status,400);assert.equal(f.seen.length,1);
+  const advanced=await f.call({input:[user,agent('New completed work')],stream:true},headers);assert.equal(advanced.status,200);assert.equal(await advanced.text(),completed);assert.equal(f.seen.length,2);
+});
+
 test('partial SSE ending normally or failing explicitly blocks a retry, while successful tool follow-ups remain allowed',async t=>{
   for(const end of ['',event('response.failed',{response:{error:{type:'server_error'}}})]){
     const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(event('response.output_text.delta',{delta:'partial'})+end);});

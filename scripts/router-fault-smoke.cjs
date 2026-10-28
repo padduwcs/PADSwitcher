@@ -4,6 +4,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),http=require('nod
 const {Gateway}=require('../src/core/gateway.cjs');
 const {CodexRpc}=require('../src/core/rpc.cjs');
 const {createPlatform}=require('../src/core/platform.cjs');
+const {assertFixtureHome}=require('./native-fixture.cjs');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 const event=(type,value={})=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
 const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.stringify(p)).toString('base64url')+'.fixture';
@@ -15,8 +16,8 @@ const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.string
     for await(const chunk of req){} // Deliberately never log request content.
     if(req.method==='GET'){res.end('{"models":[]}');return;}
     counts.set(scenario,(counts.get(scenario)||0)+1);
-    if(scenario==='status503'){res.writeHead(503);res.end('{"error":{"type":"server_error"}}');return;}
-    if(scenario==='status429'){res.writeHead(429);res.end('{"error":{"type":"rate_limit_exceeded"}}');return;}
+    if(scenario==='status503'&&counts.get(scenario)===1){res.writeHead(503);res.end('{"error":{"type":"server_error"}}');return;}
+    if(scenario==='status429'&&counts.get(scenario)===1){res.writeHead(429);res.end('{"error":{"type":"rate_limit_exceeded"}}');return;}
     if(scenario==='drop'){req.socket.destroy();return;}
     res.writeHead(200); // Omitted MIME header must not hide either completion or a broken stream.
     res.write(event('response.created',{response:{id:'resp_fixture',status:'in_progress',output:[]}}));
@@ -27,7 +28,7 @@ const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.string
     }
     if(scenario==='idle-timeout')return;
     if(scenario==='eof'){res.end();return;}
-    if(scenario==='failed-sse'){res.end(event('response.failed',{response:{error:{type:'server_error',message:'Synthetic error'}}}));return;}
+    if(scenario==='failed-sse'&&counts.get(scenario)===1){res.end(event('response.failed',{response:{error:{type:'server_error',message:'Synthetic error'}}}));return;}
     res.end(event('response.completed',{response:{id:'resp_fixture',status:'completed',output:[],usage:{input_tokens:1,output_tokens:0,total_tokens:1}}}));
   });await new Promise(r=>upstream.listen(0,'127.0.0.1',r));
   const platform={...createPlatform(root),processes:async()=>[]};
@@ -36,7 +37,9 @@ const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.string
   const service={root,platform,state:{profiles:[{id:'a',plan:'plus',status:'ready'}],settings:{desktopHome:home,codexPath:executable},autoSwitch:{enabled:false,order:[]},quotaCooldowns:{}},running:new Map(),get:()=>({id:'a'}),accessBundle:async()=>({accessToken,chatgptAccountId:'a',chatgptPlanType:'plus'}),save:async()=>{},changed:()=>{}};
   try{
     gateway=new Gateway(service,{executable,environment:{HTTPS_PROXY:'http://127.0.0.1:9',HTTP_PROXY:'http://127.0.0.1:9',NO_PROXY:'localhost,127.0.0.1'},routerOptions:{upstream:'http://127.0.0.1:'+upstream.address().port+'/',allowTestUpstream:true,idleTimeoutMs:250}});
-    await gateway.start('a');rpc=new CodexRpc(gateway.helper,home,{isolated:true});await rpc.initialize({experimentalApi:true});
+    await gateway.start('a');rpc=new CodexRpc(gateway.helper,home,{isolated:true});
+    const initialized=await rpc.request('initialize',{clientInfo:{name:'padswitcher',title:'PADSwitcher',version:require('../package.json').version},capabilities:{experimentalApi:true}});
+    await assertFixtureHome(initialized,home,root);rpc.send({method:'initialized',params:{}});
     rpc.listeners.add((method,p)=>{if(method==='turn/completed')status=p.turn.status;});
     const thread=(await rpc.request('thread/start',{cwd:home,approvalPolicy:'never',sandbox:'read-only'})).thread;
     for(scenario of ['success','status503','status429','drop','partial','eof','failed-sse','idle-timeout','success-after-errors']){
@@ -45,7 +48,8 @@ const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.string
       for(let i=0;i<450&&!status;i++)await pause(100);
       if(!status){await rpc.request('turn/interrupt',{threadId:thread.id,turnId});await pause(200);}
       const count=counts.get(scenario)||0;console.log(JSON.stringify({scenario,requests:count,status}));
-      assert.equal(count,1,scenario+' must not automatically repeat inference');assert.equal(status,scenario.startsWith('success')?'completed':'failed');
+      const retryable=['status503','failed-sse'].includes(scenario);
+      assert.equal(count,retryable?2:1,scenario+' must preserve native retry for definite rejection and stop uncertain replay');assert.equal(status,scenario.startsWith('success')||retryable?'completed':'failed');
       await pause(200);
     }
     assert.equal(counts.get('idle')||0,0);await pause(500);console.log('Native fault checks completed without real model inference.');
