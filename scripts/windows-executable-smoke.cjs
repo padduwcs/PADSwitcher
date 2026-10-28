@@ -11,8 +11,10 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
     const env={...process.env,PADSWITCHER_APPDATA_DIR:root,CODEX_HOME:path.join(root,'codex')};delete env.ELECTRON_RUN_AS_NODE;delete env.NODE_OPTIONS;delete env.PADSWITCHER_CONNECTION_FILE;
     const child=spawn(binary,[`--remote-debugging-port=${port}`],{env,stdio:'ignore',windowsHide:true});let launchError,socket;child.on('error',e=>launchError=e);
     try{
-      let page;for(let i=0;i<400;i++){if(launchError)throw launchError;try{page=(await(await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(p=>p.type==='page'&&p.url.endsWith('/renderer/index.html'));if(page)break;}catch{}await pause(100);}
-      assert(page,kind+' renderer did not become available');socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((r,j)=>{socket.once('open',r);socket.once('error',j);});
+      // Cold portable extraction and Windows first-use checks can exceed 40s on
+      // hosted runners. Bound readiness separately from individual HTTP probes.
+      let page;const deadline=Date.now()+120000;do{if(launchError)throw launchError;if(child.exitCode!=null&&child.exitCode!==0)throw Error(kind+' exited before renderer startup: '+child.exitCode);try{page=(await(await fetch(`http://127.0.0.1:${port}/json/list`,{signal:AbortSignal.timeout(1500)})).json()).find(p=>p.type==='page'&&p.url.endsWith('/renderer/index.html'));if(page)break;}catch{}await pause(100);}while(Date.now()<deadline);
+      assert(page,kind+' renderer did not become available within 120s (launcher exit '+child.exitCode+')');socket=new WebSocket(page.webSocketDebuggerUrl);await new Promise((r,j)=>{socket.once('open',r);socket.once('error',j);});
       let sequence=0;const pending=new Map();socket.on('message',raw=>{const m=JSON.parse(raw),p=pending.get(m.id);if(p){pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result);}});
       socket.on('close',()=>{for(const p of pending.values())p.reject(Error('Packaged debug connection closed'));pending.clear();});
       const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++sequence,timer=setTimeout(()=>{pending.delete(id);reject(Error('Packaged debug request timed out'));},15000);pending.set(id,{resolve:r=>{clearTimeout(timer);resolve(r);},reject:e=>{clearTimeout(timer);reject(e);}});socket.send(JSON.stringify({id,method,params}));});
