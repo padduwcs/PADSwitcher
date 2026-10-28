@@ -40,7 +40,8 @@ client, and workspace/profile settings that override the connection.
 
 ## Codex desktop
 
-From 1.20.0, open **Connections → Codex in desktop**. Save work and fully quit
+From 1.20.1, desktop launch checks startup policy and waits for a verified
+connection before reporting success. Open **Connections → Codex in desktop**. Save work and fully quit
 the existing desktop for the first connection, then choose **Open desktop through
 PADSwitcher**. Wait for **Connected** and reopen the existing Codex chat. Later
 account switches wait for active turns and keep the same window/history. Desktop

@@ -89,6 +89,62 @@ internal static class PADCodex {
         return new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(ReadPrivate(file, 16384));
     }
     static string StringValue(Dictionary<string, object> config, string key) { return (string)config[key]; }
+    static async Task<Dictionary<string, object>> StartupRequest(ClientWebSocket ws, string id, string method, object parameters, CancellationToken cancel) {
+        var serializer = new JavaScriptSerializer { MaxJsonLength = MaxFrame };
+        byte[] request = Utf8.GetBytes(serializer.Serialize(new { id = id, method = method, @params = parameters }));
+        await ws.SendAsync(new ArraySegment<byte>(request), WebSocketMessageType.Text, true, cancel);
+        byte[] buffer = new byte[65536];
+        for (;;) {
+            using (var frame = new MemoryStream()) {
+                WebSocketReceiveResult result;
+                do {
+                    result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), cancel);
+                    if (result.MessageType != WebSocketMessageType.Text || frame.Length + result.Count > MaxFrame) throw new IOException();
+                    frame.Write(buffer, 0, result.Count);
+                } while (!result.EndOfMessage);
+                var message = serializer.Deserialize<Dictionary<string, object>>(Utf8.GetString(frame.ToArray()));
+                object responseId;
+                if (!message.TryGetValue("id", out responseId) || !String.Equals(responseId as string, id, StringComparison.Ordinal) || message.ContainsKey("method")) continue;
+                if (message.ContainsKey("error")) throw new IOException();
+                return (Dictionary<string, object>)message["result"];
+            }
+        }
+    }
+    static async Task StartupConfiguration(Uri url, string token, string[] args) {
+        // New desktops perform this one-shot policy read before opening their
+        // interactive transport. Read the selected native backend's real policy;
+        // never invent an unrestricted policy or modify the original sign-in.
+        var client = new Dictionary<string, object> { { "name", "codex_desktop" }, { "title", "Codex Desktop" }, { "version", "startup" } };
+        int infoIndex = Array.IndexOf(args, "--startup-client-info");
+        if (infoIndex >= 0) {
+            if (infoIndex + 1 >= args.Length || args[infoIndex + 1].Length > 16384) throw new IOException();
+            var supplied = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(args[infoIndex + 1]);
+            foreach (string key in new [] { "name", "title", "version" }) {
+                object value;
+                if (supplied.TryGetValue(key, out value)) {
+                    string text = value as string;
+                    if (String.IsNullOrEmpty(text) || text.Length > 256) throw new IOException();
+                    client[key] = text;
+                }
+            }
+        }
+        using (var ws = new ClientWebSocket()) using (var cancel = new CancellationTokenSource(30000)) {
+            ws.Options.Proxy = null; ws.Options.SetRequestHeader("Authorization", "Bearer " + token);
+            await ws.ConnectAsync(url, cancel.Token);
+            var initialized = await StartupRequest(ws, "pad-startup-init", "initialize", new {
+                clientInfo = client,
+                capabilities = new { experimentalApi = true }, _padswitcherStartup = true
+            }, cancel.Token);
+            string agent = StringValue(initialized, "userAgent");
+            var version = System.Text.RegularExpressions.Regex.Match(agent, @"^[^/\s]+/(?<version>\d+\.\d+\.\d+[^\s]*)");
+            if (!version.Success) throw new IOException();
+            byte[] ready = Utf8.GetBytes("{\"method\":\"initialized\",\"params\":{}}");
+            await ws.SendAsync(new ArraySegment<byte>(ready), WebSocketMessageType.Text, true, cancel.Token);
+            var policy = await StartupRequest(ws, "pad-startup-policy", "configRequirements/read", new { }, cancel.Token);
+            if (!policy.ContainsKey("requirements")) throw new IOException();
+            Console.WriteLine(new JavaScriptSerializer { MaxJsonLength = MaxFrame }.Serialize(new { appServerVersion = version.Groups["version"].Value, configRequirements = policy }));
+        }
+    }
     static async Task Bridge(Uri url, string token) {
         using (var ws = new ClientWebSocket()) {
             ws.Options.Proxy = null;
@@ -218,6 +274,7 @@ internal static class PADCodex {
         }
     }
     public static int Main(string[] args) {
+        bool startup = Array.IndexOf(args, "--print-startup-config") >= 0;
         try {
             if (args.Length > 0 && (args[0] == "--host" || args[0] == "--host-stdio")) return Host(args);
             if (args.Length == 3 && args[0] == "--tools-pipe") return ToolsPipe(args);
@@ -228,6 +285,10 @@ internal static class PADCodex {
             string token = ReadPrivate(tokenFile, 256).Trim();
             if (!System.Text.RegularExpressions.Regex.IsMatch(token, "^[a-f0-9]{64}$")) throw new IOException();
             bool server = Array.IndexOf(args, "app-server") >= 0;
+            if (startup) {
+                if (!server || Array.IndexOf(args, "--startup-sign-out") >= 0) throw new IOException();
+                StartupConfiguration(url, token, args).GetAwaiter().GetResult(); return 0;
+            }
             if (server) { Bridge(url, token).GetAwaiter().GetResult(); return 0; }
             if (Array.IndexOf(args, "--no-daemon") >= 0 || Array.IndexOf(args, "--remote") >= 0 || (args.Length > 0 && (args[0] == "exec" || args[0] == "e" || args[0] == "login" || args[0] == "logout" || args[0] == "daemon" || args[0] == "review" || args[0] == "cloud"))) {
                 Console.Error.WriteLine("PADCodex supports the interactive Codex CLI. Manage authentication in PADSwitcher."); return 2;
@@ -241,6 +302,7 @@ internal static class PADCodex {
             start.EnvironmentVariables["CODEX_HOME"] = StringValue(config, "home");
             using (var child = Process.Start(start)) { child.WaitForExit(); return child.ExitCode; }
         } catch {
+            if (startup) Console.WriteLine("{\"error\":{\"code\":-32000,\"message\":\"Desktop startup policy is unavailable. Manage authentication and reconnect in PADSwitcher.\"}}");
             Console.Error.WriteLine("PADSwitcher gateway is unavailable. Open PADSwitcher and choose an account, then reconnect Codex."); return 1;
         }
     }

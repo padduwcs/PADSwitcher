@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),{EventEmitter}=require('node:events');
-const {DesktopIntegration,launchEnvironment}=require('../src/core/desktop.cjs');
+const {DesktopIntegration,launchEnvironment,waitForDesktopConnection}=require('../src/core/desktop.cjs');
 const {fixture,auth}=require('./helpers.cjs');
 
 test('desktop launch keeps the conversation home and removes inherited credentials and isolated databases',()=>{
@@ -14,15 +14,15 @@ async function setup(t){
   const hub={status:'ready',turns:new Map(),shared:{router:{active:0},pendingId:null},desktop:null,start:async id=>calls.push(['start',id]),startDesktop:async opts=>{calls.push(['desktop',opts]);return hub.desktop={profileId:p.id,pendingId:null,helper:'/private/PADCodex',view:()=>({connected:{desktop:0}})};},stopDesktop:async()=>{calls.push(['stop']);hub.desktop=null;}};
   f.service.platform.processes=async()=>[];
   let child;
-  const desktop=new DesktopIntegration(f.service,hub,{home:f.desktop,installed:async()=>({executable:'/official/ChatGPT',engine:'/official/resources/codex',resources:f.directory}),spawn:(...args)=>{calls.push(['spawn',...args]);child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>child.emit('spawn'));return child;}});
+  const desktop=new DesktopIntegration(f.service,hub,{home:f.desktop,readStartupConfig:async()=>({appServerVersion:'0.165.0',configRequirements:{requirements:null}}),installed:async()=>({executable:'/official/ChatGPT',engine:'/official/resources/codex',resources:f.directory}),spawn:(...args)=>{calls.push(['spawn',...args]);child=new EventEmitter();child.unref=()=>{};queueMicrotask(()=>{child.emit('spawn');hub.desktop.view=()=>({connected:{desktop:1}});});return child;}});
   await desktop.init();return {...f,desktopHome:f.desktop,p,hub,desktop,calls,child:()=>child};
 }
 test('desktop uses the original home without replacing its auth, config or conversation history',async t=>{
   const f=await setup(t);await fs.writeFile(path.join(f.desktop.record.home,'auth.json'),auth('original'));
   const files=['auth.json','config.toml','history.jsonl'],before=await Promise.all(files.map(n=>fs.readFile(path.join(f.desktop.record.home,n))));
-  const result=await f.desktop.launch(f.p.id);assert.deepEqual(result,{launched:true,connected:false});
+  const result=await f.desktop.launch(f.p.id);assert.deepEqual(result,{launched:true,connected:true});
   const spawn=f.calls.find(c=>c[0]==='spawn');assert.equal(spawn[1],'/official/ChatGPT');assert.deepEqual(spawn[2],[]);assert.equal(spawn[3].env.CODEX_HOME,f.desktop.record.home);assert.equal(spawn[3].env.CODEX_CLI_PATH,'/private/PADCodex');
-  assert.equal(spawn[3].env.CODEX_SQLITE_HOME,undefined);assert.equal(spawn[3].detached,true);
+  assert.equal(spawn[3].env.CODEX_SQLITE_HOME,undefined);assert.equal(spawn[3].detached,true);assert.equal(spawn[3].windowsHide,false);
   assert.deepEqual(await Promise.all(files.map(n=>fs.readFile(path.join(f.desktop.record.home,n)))),before);
   const record=await fs.readFile(f.desktop.file,'utf8');assert(!record.includes('fixture-only'));assert(!record.includes('token'));assert.equal(JSON.parse(record).enabled,true);
 });
@@ -43,6 +43,17 @@ test('account selection on a connected desktop keeps the same instance and waits
 test('desktop startup failure restores configuration and stops only the new desktop endpoint',async t=>{
   const f=await setup(t);f.desktop.options.spawn=()=>{const child=new EventEmitter();queueMicrotask(()=>child.emit('error',Object.assign(new Error('fixture'),{code:'ENOENT'})));return child;};
   await assert.rejects(f.desktop.launch(f.p.id));assert.equal(f.desktop.configured,false);assert.equal(f.hub.desktop,null);assert(f.calls.some(c=>c[0]==='stop'));assert.equal(f.desktop.flight,null);
+});
+test('invalid native startup policy is reported before launching the GUI and preserves the original sign-in',async t=>{
+  const f=await setup(t),file=path.join(f.desktop.record.home,'auth.json');await fs.writeFile(file,auth('original'));const before=await fs.readFile(file);
+  f.desktop.options.readStartupConfig=async()=>({error:{code:-1}});
+  await assert.rejects(f.desktop.launch(f.p.id),{code:'DESKTOP_STARTUP_POLICY'});assert(!f.calls.some(c=>c[0]==='spawn'));assert.equal(f.desktop.configured,false);assert.equal(f.hub.desktop,null);assert.deepEqual(await fs.readFile(file),before);
+});
+test('desktop startup waits for an interactive handshake and reports early exit or timeout',async()=>{
+  const child=new EventEmitter();let connected=false,settled=false;
+  const wait=waitForDesktopConnection(child,()=>connected,1000).then(()=>settled=true);await new Promise(r=>setTimeout(r,20));assert.equal(settled,false);connected=true;await wait;assert.equal(settled,true);assert.equal(child.listenerCount('close'),0);
+  const failed=new EventEmitter(),exit=waitForDesktopConnection(failed,()=>false,1000);failed.emit('close',1);await assert.rejects(exit,{code:'DESKTOP_START_EXIT'});assert.equal(failed.listenerCount('close'),0);
+  await assert.rejects(waitForDesktopConnection(new EventEmitter(),()=>false,5),{code:'DESKTOP_START_TIMEOUT'});
 });
 test('desktop launch reserves the integration against concurrent disconnect and history changes',async t=>{
   const f=await setup(t);let release;const original=f.desktop.installed.bind(f.desktop);

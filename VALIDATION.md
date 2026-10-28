@@ -1,4 +1,39 @@
-# PADSwitcher 1.20.0 — validation
+# PADSwitcher 1.20.1 — validation
+
+## Desktop startup repair — 2026-10-28
+
+Reproduced the reported launch failure with the installed Windows desktop.
+Its `app-server --print-startup-config` command received a streaming bridge
+instead of the required one-shot JSON result. The GUI was also launched with
+`windowsHide: true`; a successful native handshake alone did not prove a visible
+window. Both cases are repaired, and launch success now awaits a real interactive
+connection after a native startup-policy preflight.
+
+- Installed desktop `26.1023.6123.0`, bundled Codex `0.165.0-alpha.1.2`: real
+  one-shot policy read, visible process window and GUI-to-gateway handshake pass
+  with a disposable browser profile and synthetic authentication.
+- With that GUI connected, the native backend resumes the existing three-turn
+  thread and completes another turn after an injected quota rejection, with an
+  identical request retried on a different account and original context retained.
+- The installed-app check also passes with core modules and the native helper
+  loaded from the packaged ASAR/unpacked-helper output, rather than the source tree.
+- Native desktop/MCP smoke passes on pinned `0.160.0` too. Mixed extension
+  `0.164.0-alpha.11.1` / bundled desktop `0.165.0-alpha.1.2` continuity passes
+  14 turns, 12 quota fallbacks, four steers and 14 unique real marker writes.
+- Helper regression verifies forwarding of restricted network policy unchanged,
+  refusal when policy cannot be read, no sign-out side effect and zero model
+  calls for startup. Startup probes never appear as an interactive desktop.
+- Regression suite: 243 tests; 242 pass locally and the PowerShell 7 check is
+  skipped locally. Hosted Windows CI supplies that shell. Native window startup,
+  original authentication preservation, timeout/exit handling and VI/EN messages
+  have dedicated checks.
+
+The installed-app check starts a real GUI and verifies its visible process window
+without automating ChatGPT UI controls. Model requests are driven through native
+RPC to the same backend while that GUI is connected. It does not claim an
+automated test of typing in every GUI control or exhausting real account quota.
+The user's running desktop and real credentials are left in place; fixture model
+traffic stays on loopback. No live usage reset is submitted.
 
 ## Windows parity — 2026-10-28
 

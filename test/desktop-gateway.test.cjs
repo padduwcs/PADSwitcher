@@ -75,3 +75,13 @@ test('desktop tool policy does not invent a standalone transport or override exp
   await c.request('thread/fork',{threadId:'existing',config:{'plugins.code-review@openai-bundled.mcp_servers.code-review.enabled':false}});assert.equal(sent.params.config['plugins.code-review@openai-bundled.mcp_servers.code-review.enabled'],false);
   assert(!JSON.stringify(hub.view()).includes('current-desktop.sock'));assert(!JSON.stringify(sent).includes('fixture-secret'));
 });
+test('startup policy probes do not count as an interactive desktop connection or leak internal metadata',async t=>{
+  const f=await setup(t),{hub}=f;await hub.startDesktop({home:f.desktop,executable:'fixture-codex'});
+  const c=new WsRpc(await connect(hub.desktop.url,hub.desktop.frontToken));t.after(()=>c.close());
+  await c.request('initialize',{clientInfo:{name:'codex_desktop'},_padswitcherStartup:true});c.send({method:'initialized',params:{}});await pause(15);
+  assert.equal(hub.view().connected.desktop,0);assert.equal(hub.desktop.clients.size,1);
+  const client=[...hub.desktop.clients][0],send=client.back.send.bind(client.back);let sent;
+  client.back.send=data=>{sent=JSON.parse(data);return send(data);};
+  await c.request('initialize',{clientInfo:{name:'codex_desktop'},_padswitcherStartup:true});assert.equal(sent.params._padswitcherStartup,undefined);
+  c.close();await f.client(hub.desktop,true);await pause(15);assert.equal(hub.view().connected.desktop,1);
+});

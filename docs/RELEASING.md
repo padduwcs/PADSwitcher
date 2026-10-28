@@ -16,8 +16,8 @@ Do not include generated helpers, `dist`, `artifacts`, credentials, gateway file
 Merge the release commit into `main`, wait for **Windows checks and portable build**, then create and push the matching tag:
 
 ```powershell
-git tag -a v1.20.0 -m "PADSwitcher 1.20.0"
-git push origin v1.20.0
+git tag -a v1.20.1 -m "PADSwitcher 1.20.1"
+git push origin v1.20.1
 ```
 
 The **Publish Windows release** workflow repeats the isolated checks, builds the portable executable, verifies the packaged app, generates its SHA-256 file, and publishes both assets to GitHub Releases.

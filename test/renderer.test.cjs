@@ -243,13 +243,16 @@ function dom(t,demo = true, editState = null) {
   window.eval(script); t.after(() => {window.close();assert.deepEqual(errors,[],'Renderer must not throw uncaught errors');}); return window;
 }
 test('Windows desktop launch names the shared account, explains history and waits for a verified connection',async t=>{
-  const w=dom(t,true,s=>{s.platform='windows';s.desktop={available:true,configuration:'notConfigured',home:'/home/test/.codex',connected:0};s.gateway={...s.gateway,status:'ready',profileId:s.profiles[1].id};});await settle();const d=w.document,calls=[];
+  let fixtureState;const w=dom(t,true,s=>{fixtureState=s;s.platform='windows';s.desktop={available:true,configuration:'notConfigured',home:'/home/test/.codex',connected:0};s.gateway={...s.gateway,status:'ready',profileId:s.profiles[1].id};});await settle();const d=w.document,calls=[];
   w.pad.action=async(command,args)=>{calls.push({command,args});return {ok:true,result:{launched:true,connected:false}};};
   assert(!d.querySelector('#open-desktop-connected').disabled);d.querySelector('#open-desktop-connected').click();
   assert(d.querySelector('#modal-body').textContent.includes('Dự án · Pro'));assert(d.querySelector('#modal-body').textContent.includes('thoát hẳn desktop'));assert.equal(calls.length,0);
   d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
   assert.equal(calls[0].command,'desktopLaunch');assert.equal(calls[0].args.id,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');assert(!calls.some(c=>c.command==='switch'));
   assert(d.querySelector('.toast').textContent.includes('Chờ trạng thái'));assert.equal(d.querySelector('#desktop-state').textContent,'Chưa kết nối');
+  w.pad.action=async()=>({ok:true,result:{launched:true,connected:true},state:{...fixtureState,desktop:{...fixtureState.desktop,connected:1}}});
+  d.querySelector('#open-desktop-connected').click();d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+  assert([...d.querySelectorAll('.toast')].some(el=>el.textContent.includes('Đã mở và kết nối')));assert.equal(d.querySelector('#desktop-state').textContent,'Đang kết nối');
 });
 test('desktop indicators distinguish waiting, pending and missing app states and translate account labels safely',async t=>{
   for(const [desktop,expected]of [[{available:false},'Chưa kết nối'],[{available:true,configuration:'configured'},'Chờ desktop'],[{available:true,connected:2,pendingId:'next'},'Đang chờ đổi tài khoản']]){
