@@ -11,7 +11,7 @@ module.exports = `
   ];
   profiles[0].resetCredits={availableCount:2,credits:[{id:'fixture-reset-a',resetType:'codexRateLimits',status:'available',title:'Reset',expiresAt:reset+86400},{id:'fixture-reset-b',resetType:'codexRateLimits',status:'available',title:'Reset',expiresAt:null}]};
   profiles[1].resetCredits={availableCount:1,credits:null};
-  let state = {version:'1.9.0',jetbrains:{configuration:'configured',runtimePresent:true},vscode:{configuration:'configured',helperPresent:true},profiles:new URLSearchParams(location.search).has('demo')?profiles:[],settings:{workspace:'D:\\\\Projects\\\\MyProject',desktopHome:'C:\\\\Users\\\\Personal\\\\.codex',codexPath:'',autoRefresh:false},busy:false,login:null,canRestore:false,recoveryPending:false,gateway:{status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0}};
+  let state = {version:'1.9.0',jetbrains:{configuration:'configured',runtimePresent:true},vscode:{configuration:'configured',helperPresent:true},profiles:new URLSearchParams(location.search).has('demo')?profiles:[],settings:{workspace:'D:\\\\Projects\\\\MyProject',desktopHome:'C:\\\\Users\\\\Personal\\\\.codex',codexPath:'',autoRefresh:false,autoUpdate:true},update:{status:'idle',supported:true,current:'1.21.0',version:null,notes:null,progress:0,error:null},busy:false,login:null,canRestore:false,recoveryPending:false,gateway:{status:'stopped',profileId:null,pendingId:null,activeTurns:0,clients:0}};
   state.autoSwitch={enabled:false,order:[]};
   state.clientRoutes=Object.fromEntries(['vscode','jetbrains','cli'].map(k=>[k,{mode:'shared',profileId:null,autoSwitch:{enabled:false,order:[]}}]));
 ${require('./kaggle-preview-data.cjs')}
@@ -20,6 +20,7 @@ ${require('./kaggle-preview-data.cjs')}
   window.pad = {
     onState: cb => { callback = cb; },onDevice:cb => {deviceCallback=cb;},
     action:async (command,args={}) => {
+      if(command==='reorderProfiles'){const byId=new Map(state.profiles.map(p=>[p.id,p]));state.profiles=args.ids.map(id=>byId.get(id));publish();return {ok:true,state:clone(state)};}
       if(command.startsWith('kaggle'))return kaggleAction(command,args);
       if(command==='sayHi'||command==='sayHiAll'){
         if(state.sayHi?.active)return {ok:false,error:{code:'SAY_HI_BUSY',message:'Say hi đang chạy. Hãy chờ hoàn tất.'},state:clone(state)};

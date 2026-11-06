@@ -40,7 +40,7 @@ Từ 1.20.1, **Kết nối → Codex trong desktop** mở desktop bằng tài kh
 kiểm tra policy khởi động và chờ kết nối được xác nhận trước khi báo thành công.
 Lần đầu hãy lưu công việc và thoát hẳn desktop, sau đó bấm **Mở desktop qua PADSwitcher**.
 Chờ trạng thái **Đang kết nối** rồi mở hội thoại Codex cũ. Các lần đổi tài khoản
-sau chờ lượt hiện tại kết thúc và giữ cửa sổ/chat. **Chọn thư mục hội thoại**
+sau có hiệu lực từ lần gọi model tiếp theo và giữ cửa sổ/chat. **Chọn thư mục hội thoại**
 nếu kho Codex nằm ngoài `~/.codex`; **Gỡ kết nối desktop** trả về cách mở thông thường.
 Tính năng áp dụng cho Codex cục bộ, không chuyển lịch sử ChatGPT giữa tài khoản.
 

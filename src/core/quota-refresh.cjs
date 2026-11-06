@@ -5,7 +5,7 @@ function createQuotaRefresher(service, now = Date.now) {
   let lastAttempt = -Infinity;
   let inFlight = false;
   return async function refresh(reason) {
-    if (inFlight || service.busy || !service.state.profiles.length) return false;
+    if (inFlight || !service.state.profiles.length) return false;
     if (reason === 'periodic' && !service.state.settings.autoRefresh) return false;
     const current = now();
     // A periodic timer can fire a few milliseconds early. Keep focus throttling
@@ -13,7 +13,7 @@ function createQuotaRefresher(service, now = Date.now) {
     if (current >= lastAttempt && current - lastAttempt < (reason==='periodic'?59000:60000)) return false;
     lastAttempt = current;
     inFlight = true;
-    try { await service.refreshAll(); return true; }
+    try { await service.refreshBackground({ dueOnly: reason === 'periodic' }); return true; }
     finally { inFlight = false; }
   };
 }

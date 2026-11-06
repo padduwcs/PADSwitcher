@@ -14,6 +14,11 @@ const { CodexRpc } = require('./rpc.cjs');
 const { SEAL_SESSION } = require('./guardian.cjs');
 const {defaults:routeDefaults,validate:validateRoutes,SCOPES}=require('./client-routes.cjs');
 const { SayHiService } = require('./say-hi.cjs');
+const { EventLog } = require('./event-log.cjs');
+const { KeyedLock } = require('./locks.cjs');
+const CREDENTIAL_MARGIN = 90000, IDLE_REFRESH_INTERVAL = 5 * 60000, REFRESH_CONCURRENCY = 3;
+const personalPlan = plan => ['free','plus','pro'].includes(String(plan||'').toLowerCase());
+function tokenExpiry(data) { try { return (JSON.parse(Buffer.from(data.tokens.access_token.split('.')[1],'base64url')).exp||0)*1000; } catch { return 0; } }
 
 class ProfileService extends EventEmitter {
   constructor(root, adapters = {}) {
@@ -22,9 +27,11 @@ class ProfileService extends EventEmitter {
     this.journalFile = path.join(this.root, 'desktop-journal.json');
     this.platform = require('./platform.cjs').createPlatform(this.root,adapters);
     this.rpcFactory = adapters.rpcFactory || ((exe,home,opts) => new CodexRpc(exe,home,opts));
-    this.running = new Map(); this.busy = false; this.login = null;
+    this.running = new Map(); this.lock = new KeyedLock(); this.refreshing = new Set(); this.login = null;
+    // Model calls read this in-memory copy instead of decrypting the vault each time.
+    this.credentials = new Map(); this.eventLog = new EventLog(path.join(this.root,'events.jsonl'));
     this.sayHi = new SayHiService(this, adapters.sayHiOptions);
-    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), workspace: os.homedir(), autoRefresh: true }, activeDesktopId: null, rollback: null };
+    this.state = { version: 1, profiles: [], settings: { codexPath: '', desktopHome: process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), workspace: os.homedir(), autoRefresh: true, autoUpdate: true }, activeDesktopId: null, rollback: null };
     this.state.autoSwitch={enabled:false,order:[]};this.state.quotaCooldowns={};
     this.state.clientRoutes=routeDefaults();
   }
@@ -48,10 +55,18 @@ class ProfileService extends EventEmitter {
       if(!this.state.autoSwitch||typeof this.state.autoSwitch.enabled!=='boolean'||!Array.isArray(this.state.autoSwitch.order)||this.state.autoSwitch.order.length>200||new Set(this.state.autoSwitch.order).size!==this.state.autoSwitch.order.length||this.state.autoSwitch.order.some(id=>!ids.has(id)))throw new UserError('Cấu hình tự đổi tài khoản không hợp lệ.', 'STORE_INVALID');
       if(!this.state.quotaCooldowns||Array.isArray(this.state.quotaCooldowns)||typeof this.state.quotaCooldowns!=='object'||Object.entries(this.state.quotaCooldowns).some(([id,v])=>!ids.has(id)||!Number.isFinite(v)||v<0))throw new UserError('Thời gian chờ quota không hợp lệ.', 'STORE_INVALID');
     } else await this.save();
+    await this.sweepTemporary();
     await this.recoverJournal();
     await this.recoverRuntimes();
     await this.syncDesktop();
     return this.view();
+  }
+  async sweepTemporary() {
+    // Windows can hold a stopped backend's folder after its own cleanup retries.
+    // Nothing else can use these at startup: the app holds a single-instance lock.
+    for (const entry of await fs.readdir(this.root,{withFileTypes:true})) {
+      if (entry.isDirectory() && !entry.isSymbolicLink() && /^(sayhi|reset)-rpc-[A-Za-z0-9]+$/.test(entry.name)) await fs.rm(path.join(this.root,entry.name),{recursive:true,force:true,maxRetries:3,retryDelay:100}).catch(() => {});
+    }
   }
   async save() {
     // Quota/recovery notifications may arrive while a user operation is saving.
@@ -63,9 +78,10 @@ class ProfileService extends EventEmitter {
     return {
       platform: this.platform.kind,
       desktop: this.desktopIntegration?.view() || {configuration:'notConfigured',available:false,connected:0},
-      version: require('../../package.json').version, profiles: this.state.profiles.map(p => ({ ...p, running: this.running.has(p.id), desktopActive: p.id === this.state.activeDesktopId })),
-      settings: { ...this.state.settings }, busy: this.busy||!!this.gateway?.flight||!!this.desktopIntegration?.flight, login: this.login ? { profileId: this.login.profileId } : null,
+      version: require('../../package.json').version, profiles: this.state.profiles.map(p => ({ ...p, running: this.running.has(p.id), refreshing: this.refreshing.has(p.id), desktopActive: p.id === this.state.activeDesktopId })),
+      settings: { ...this.state.settings }, busy: this.foregroundBusy||!!this.gateway?.flight||!!this.desktopIntegration?.flight, login: this.login ? { profileId: this.login.profileId } : null,
       sayHi: this.sayHi.view(),
+      update: this.updater?.view() || {status:'idle',supported:false,current:require('../../package.json').version},
       autoSwitch:{...this.state.autoSwitch,order:[...this.state.autoSwitch.order]},
       clientRoutes:JSON.parse(JSON.stringify(this.state.clientRoutes)),
       canRestore: Boolean(this.state.rollback), recoveryPending: this.recoveryPending || false,
@@ -76,10 +92,14 @@ class ProfileService extends EventEmitter {
     };
   }
   changed() { this.emit('change',this.view()); }
-  async exclusive(operation) {
-    if (this.busy) throw new UserError('Một thao tác khác đang chạy. Hãy chờ hoàn tất.', 'BUSY');
-    this.busy = true; this.changed();
-    try { return await operation(); } finally { this.busy = false; this.changed(); }
+  get busy() { return this.lock.active > 0; }
+  get foregroundBusy() { return this.lock.whole; }
+  // Pass `account` whenever only one profile is touched, so others stay available.
+  async exclusive(operation, { account = null } = {}) {
+    return this.lock.run(account, async () => {
+      if (account === null) this.changed();
+      try { return await operation(); } finally { if (account === null) queueMicrotask(() => this.changed()); }
+    });
   }
   get(id) { const p = this.state.profiles.find(p => p.id === id); if (!p) throw new UserError('Không tìm thấy hồ sơ.', 'PROFILE_MISSING'); return p; }
   home(id) { return profilePath(this.profilesRoot,id); }
@@ -92,6 +112,7 @@ class ProfileService extends EventEmitter {
   async storeAuth(id, bytes) {
     const identity = parseAuth(bytes);
     if (this.get(id).identity !== identity.identity) throw new UserError('Phiên đăng nhập không khớp hồ sơ. Chưa ghi đè dữ liệu.', 'IDENTITY_MISMATCH');
+    if (this.credentials.get(id)?.accessToken !== JSON.parse(bytes.toString('utf8')).tokens.access_token) this.credentials.delete(id);
     const encrypted = await this.platform.dpapi(bytes);
     try { await atomicWrite(this.vault(id),encrypted); } finally { encrypted.fill(0); }
   }
@@ -138,15 +159,27 @@ class ProfileService extends EventEmitter {
     });
   }
   async executable() { return this.platform.findGatewayCodex ? this.platform.findGatewayCodex(this.state.settings.codexPath) : this.platform.findCodex(this.state.settings.codexPath); }
+  bundlePlan(p, tokenPlan) {
+    // Either source indicating a managed plan must keep it out of the
+    // personal model route, including during a plan/token transition.
+    return tokenPlan&&!personalPlan(tokenPlan)?tokenPlan:p.plan||tokenPlan||null;
+  }
+  cachedBundle(id) {
+    const entry=this.credentials.get(id);
+    if(!entry||entry.expires-Date.now()<CREDENTIAL_MARGIN)return null;
+    return {accessToken:entry.accessToken,chatgptAccountId:entry.accountId,chatgptPlanType:this.bundlePlan(this.get(id),entry.tokenPlan)};
+  }
   async accessBundle(id, force = false) {
+    if(!force){const cached=this.cachedBundle(id);if(cached)return cached;}
     return this.exclusive(async () => {
+      if(!force){const cached=this.cachedBundle(id);if(cached)return cached;} // Filled while queued.
       const p=this.get(id), desktop=(await this.desktopIdentity())?.identity===p.identity;
       let bytes=desktop ? await this.desktopAuth() : this.running.has(id) ? await readLimited(path.join(this.home(id),'auth.json')) : await this.loadAuth(id);
       try {
         if(parseAuth(bytes).identity!==p.identity) throw new UserError('Phiên không khớp hồ sơ.', 'IDENTITY_MISMATCH');
         let data=JSON.parse(bytes.toString('utf8'));
-        let expires=0;try{expires=JSON.parse(Buffer.from(data.tokens.access_token.split('.')[1],'base64url')).exp||0;}catch{}
-        if(force || (expires && expires*1000-Date.now()<90000)) {
+        const expires=tokenExpiry(data);
+        if(force || (expires && expires-Date.now()<CREDENTIAL_MARGIN)) {
           bytes.fill(0); bytes=null;
           const home=desktop ? this.state.settings.desktopHome : await this.runtime(id);
           const rpc=this.rpcFactory(await this.executable(),home,{fileStore:!desktop});
@@ -157,13 +190,11 @@ class ProfileService extends EventEmitter {
         }
         const accountId=data.tokens.account_id||JSON.parse(Buffer.from(data.tokens.id_token.split('.')[1],'base64url'))['https://api.openai.com/auth']?.chatgpt_account_id;
         if(!accountId)throw new UserError('Phiên thiếu mã tài khoản ChatGPT.', 'AUTH_INVALID');
-        const tokenPlan=parseAuth(bytes).plan,personal=plan=>['free','plus','pro'].includes(String(plan||'').toLowerCase());
-        // Either source indicating a managed plan must keep it out of the
-        // personal model route, including during a plan/token transition.
-        const plan=tokenPlan&&!personal(tokenPlan)?tokenPlan:p.plan||tokenPlan||null;
-        return {accessToken:data.tokens.access_token,chatgptAccountId:accountId,chatgptPlanType:plan};
+        const tokenPlan=parseAuth(bytes).plan,accessToken=data.tokens.access_token,valid=tokenExpiry(data);
+        if(valid)this.credentials.set(id,{accessToken,accountId,tokenPlan,expires:valid});
+        return {accessToken,chatgptAccountId:accountId,chatgptPlanType:this.bundlePlan(p,tokenPlan)};
       } finally {bytes?.fill(0);}
-    });
+    },{account:id});
   }
   async runtime(id) {
     const home = this.home(id); await assertDirectory(home);
@@ -206,15 +237,31 @@ class ProfileService extends EventEmitter {
       await this.seal(id); await fs.unlink(path.join(this.home(id),'runtime.json')).catch(() => {}); this.running.delete(id);
     }
   }
-  async refresh(id) { return this.exclusive(() => this.refreshOne(id)); }
-  async refreshAll() {
-    return this.exclusive(async () => {
-      await this.checkRecovered();
-      await this.syncDesktop();
-      for (const p of this.state.profiles) {
-        try { await this.refreshOne(p.id); } catch(e) { p.lastError = publicError(e).message; p.status = e.code === 'AUTH_INVALID' || e.code === 'AUTH_UNSUPPORTED' ? 'reauth' : 'error'; await this.save(); this.changed(); }
+  async refresh(id) { return this.exclusive(() => this.refreshTracked(id),{account:id}); }
+  async refreshTracked(id) {
+    this.refreshing.add(id); this.changed();
+    try { return await this.refreshOne(id); } finally { this.refreshing.delete(id); this.changed(); }
+  }
+  async refreshAll() { await this.refreshAccounts(() => true); }
+  async refreshRecorded(p) {
+    try { await this.refreshTracked(p.id); } catch(e) { p.lastError = publicError(e).message; p.status = e.code === 'AUTH_INVALID' || e.code === 'AUTH_UNSUPPORTED' ? 'reauth' : 'error'; await this.save(); this.changed(); }
+  }
+  refreshDue(p, now = Date.now()) {
+    const fetched = Date.parse(p.quotaAt);
+    return !!this.gateway?.isUsing?.(p.id) || p.status !== 'ready' || !Number.isFinite(fetched) || now - fetched >= IDLE_REFRESH_INTERVAL;
+  }
+  // A periodic pass reads only accounts in use or due, instead of spawning Codex for all.
+  refreshBackground({ dueOnly = false } = {}) { return this.refreshAccounts(p => !dueOnly || this.refreshDue(p)); }
+  async refreshAccounts(wanted) {
+    await this.exclusive(async () => { await this.checkRecovered(); await this.syncDesktop(); });
+    const queue = this.state.profiles.filter(wanted).map(p => p.id);
+    const worker = async () => {
+      while (queue.length && !this.closing) {
+        const id = queue.shift(), p = this.state.profiles.find(x => x.id === id);
+        if (p) await this.exclusive(() => this.refreshRecorded(p),{account:id});
       }
-    });
+    };
+    await Promise.all(Array.from({ length: REFRESH_CONCURRENCY }, worker));
   }
   async refreshOne(id) {
     await this.syncDesktop();
@@ -253,7 +300,7 @@ class ProfileService extends EventEmitter {
       if (creditId !== null && !availableCredit(p.resetCredits,creditId)) throw new UserError('Lượt reset đã thay đổi hoặc hết hạn. Hãy chọn lại.', 'RESET_STALE');
       p.resetAttempt = {key:crypto.randomUUID(),creditId,status:'prepared',at:new Date().toISOString()};
       await this.save(); return {...p.resetAttempt,retry:false};
-    });
+    },{account:id});
   }
   async consumeReset(id, key, confirmed = false) {
     // Authenticate the named profile, never the currently selected gateway account.
@@ -308,10 +355,15 @@ class ProfileService extends EventEmitter {
           await fs.rm(home,{recursive:true,force:true,maxRetries:10,retryDelay:100});
         }
       }
-    }); } finally { bundle.accessToken = null; }
+    },{account:id}); } finally { bundle.accessToken = null; }
   }
   async addAccount(label, openUrl, device = false, expectedId = null, onDevice = () => {}) {
-    return this.exclusive(async () => {
+    // The browser step can take minutes and touches only the login folder, so it
+    // holds no account lock. Only one login can be in progress.
+    if (this.login) throw new UserError('Đang có một lần đăng nhập. Hoàn tất hoặc hủy trước khi bắt đầu lần khác.', 'LOGIN_ACTIVE');
+    let cancelled = false;
+    this.login = { profileId: expectedId, cancel: () => { cancelled = true; } }; this.changed();
+    try {
       if (expectedId && this.sayHi.isUsing(expectedId)) throw new UserError('Chờ Say hi hoàn tất trước khi thay phiên tài khoản này.', 'SAY_HI_PROFILE');
       if(expectedId&&(this.gateway?.isUsing?.(expectedId)||this.gateway?.profileId===expectedId||this.gateway?.pendingId===expectedId||this.gateway?.router?.isUsing(expectedId)))throw new UserError('Dừng gateway hoặc chọn tài khoản khác trước khi đăng nhập lại hồ sơ này.', 'PROFILE_ACTIVE');
       if (expectedId && this.running.has(expectedId)) throw new UserError('Hãy đóng CLI của hồ sơ trước khi đăng nhập lại.', 'PROFILE_RUNNING');
@@ -320,9 +372,9 @@ class ProfileService extends EventEmitter {
       // The dedicated login directory is never a profile or the desktop home.
       const loginAuth = path.join(loginRoot,'auth.json');
       if (await exists(loginAuth)) throw new UserError('Có phiên đăng nhập chưa được lưu từ lần trước. Dùng “Khôi phục đăng nhập” trong Cài đặt.', 'LOGIN_RECOVERY');
+      if (cancelled) throw new UserError('Đã hủy đăng nhập.', 'CANCELLED');
       const rpc = this.rpcFactory(await this.executable(),loginRoot,{ fileStore: true });
       let timer, resolveLogin, rejectLogin, loginId;
-      let cancelled = false;
       const done = new Promise((resolve,reject) => { resolveLogin = resolve; rejectLogin = reject; });
       // Attach immediately so a very fast callback/cancel cannot cause an unhandled rejection.
       done.catch(() => {});
@@ -343,6 +395,7 @@ class ProfileService extends EventEmitter {
         timer = setTimeout(() => rejectLogin(new UserError('Đăng nhập đã quá 5 phút. Hãy thử lại.', 'LOGIN_TIMEOUT')),5 * 60 * 1000);
         await done;
         await rpc.close(); // Credentials are complete and no longer being written.
+        return await this.exclusive(async () => {
         const bytes = await readLimited(loginAuth);
         try {
           const identity = parseAuth(bytes);
@@ -356,13 +409,14 @@ class ProfileService extends EventEmitter {
           }
           const p = await this.capture(bytes,label); await fs.unlink(loginAuth); return p.id;
         } finally { bytes.fill(0); }
+        });
       } finally {
         clearTimeout(timer);
         if (!rpc.closed && loginId) await rpc.request('account/login/cancel',{ loginId },5000).catch(() => {});
-        await rpc.close(); rpc.listeners.delete(listener); this.login = null;
+        await rpc.close(); rpc.listeners.delete(listener);
         // If a callback finished but saving failed, retain it under private ACL for recovery.
       }
-    });
+    } finally { this.login = null; this.changed(); }
   }
   cancelLogin() { this.login?.cancel(); }
   async recoverLogin() {
@@ -482,19 +536,24 @@ class ProfileService extends EventEmitter {
         await atomicWrite(path.join(this.home(id),'runtime.json'),JSON.stringify({ pid: child.pid, desktop, createdAt: new Date().toISOString() }));
         return child.pid;
       } catch(e) { if (!child.pid && !desktop) await this.seal(id); throw e; }
-    });
+    },{account:id});
   }
   async finishCli(id) {
-    // A quota read may still be using the same home. Wait for that operation to close first.
-    while (this.busy) await new Promise(resolve => setTimeout(resolve,100));
-    return this.exclusive(async () => {
+    return this.exclusive(async () => { // Queued behind a quota read using the same home.
       if (this.running.get(id)?.desktop) { const bytes = await this.desktopAuth(); if (bytes) { try { await this.storeAuth(id,bytes); } finally { bytes.fill(0); } } }
       else await this.seal(id);
       await fs.unlink(path.join(this.home(id),'runtime.json')).catch(() => {}); this.running.delete(id);
-    });
+    },{account:id});
   }
   async edit(id, label, notes) {
-    return this.exclusive(async () => { const p = this.get(id); p.label = cleanText(label,80); if (!p.label) throw new UserError('Tên hồ sơ không được để trống.', 'INVALID_LABEL'); p.notes = cleanText(notes,500); await this.save(); });
+    const p = this.get(id), name = cleanText(label,80); if (!name) throw new UserError('Tên hồ sơ không được để trống.', 'INVALID_LABEL');
+    p.label = name; p.notes = cleanText(notes,500); await this.save(); this.changed();
+  }
+  async reorderProfiles(ids) {
+    const position = new Map(Array.isArray(ids) ? ids.map((id,index) => [id,index]) : []), profiles = this.state.profiles;
+    if (position.size !== profiles.length || ids.length !== profiles.length || profiles.some(p => !position.has(p.id))) throw new UserError('Danh sách tài khoản vừa thay đổi. Hãy thử sắp xếp lại.', 'INVALID_ORDER');
+    this.state.profiles = [...profiles].sort((a,b) => position.get(a.id) - position.get(b.id));
+    await this.save(); this.changed();
   }
   async remove(id) {
     return this.exclusive(async () => {
@@ -509,7 +568,7 @@ class ProfileService extends EventEmitter {
       const trash = path.join(this.root,'trash'); await fs.mkdir(trash,{recursive:true}); await assertDirectory(trash);
       const destination = path.join(trash,id); if (await exists(destination)) throw new UserError('Có hồ sơ cùng mã trong thùng rác.', 'TRASH_CONFLICT');
       await fs.rename(home,destination);
-      this.state.profiles = this.state.profiles.filter(p => p.id !== id);
+      this.state.profiles = this.state.profiles.filter(p => p.id !== id); this.credentials.delete(id);
       const oldAuto=this.state.autoSwitch,oldCooldown=this.state.quotaCooldowns,oldRoutes=this.state.clientRoutes;
       const order=oldAuto.order.filter(x=>x!==id);this.state.autoSwitch={enabled:oldAuto.enabled&&order.length>=2,order};
       this.state.quotaCooldowns={...oldCooldown};delete this.state.quotaCooldowns[id];this.gateway?.recovery.cancel();
@@ -559,31 +618,30 @@ class ProfileService extends EventEmitter {
       await assertDirectory(next.workspace); await assertDirectory(next.desktopHome);
       if (next.desktopHome !== this.state.settings.desktopHome && (this.state.rollback || this.recoveryPending)) throw new UserError('Khôi phục lần chuyển gần nhất trước khi đổi thư mục desktop.', 'ROLLBACK_EXISTS');
       if (next.desktopHome !== this.state.settings.desktopHome) this.state.activeDesktopId = null;
-      if (input.autoRefresh !== undefined) { if (typeof input.autoRefresh !== 'boolean') throw new UserError('Cài đặt không hợp lệ.', 'INVALID_SETTINGS'); next.autoRefresh = input.autoRefresh; }
+      for (const field of ['autoRefresh','autoUpdate']) if (input[field] !== undefined) { if (typeof input[field] !== 'boolean') throw new UserError('Cài đặt không hợp lệ.', 'INVALID_SETTINGS'); next[field] = input[field]; }
       this.state.settings = next; await this.save();
     });
   }
   async autoSwitchSettings(input){
-    return this.exclusive(async()=>{
-      if(!input||typeof input.enabled!=='boolean'||!Array.isArray(input.order)||input.order.length>200||new Set(input.order).size!==input.order.length||input.order.some(id=>typeof id!=='string'||!this.state.profiles.some(p=>p.id===id))||(input.enabled&&input.order.length<2))throw new UserError('Chọn ít nhất hai tài khoản khác nhau và thứ tự dự phòng hợp lệ.', 'INVALID_SETTINGS');
-      const requested=input.scope||'shared';
-      if(requested!=='shared'&&!SCOPES.includes(requested))throw new UserError('Kết nối không hợp lệ.', 'INVALID_SETTINGS');
-      if(this.gateway?.flight)throw new UserError('Chờ thay đổi chế độ kết nối hoàn tất.', 'BUSY');
-      const scope=requested!=='shared'&&this.state.clientRoutes[requested].mode==='private'?requested:'shared';
-      const target=scope==='shared'?this.state:this.state.clientRoutes[scope];
-      (this.gateway?.route?.(scope)||this.gateway)?.recovery.cancel('Đã cập nhật cấu hình tự đổi; các lượt tiếp tục đang chờ đã được hủy.');
-      const old=target.autoSwitch;target.autoSwitch={enabled:input.enabled,order:[...input.order]};
-      try{await this.save();}catch(e){target.autoSwitch=old;throw e;}
-    });
+    if(!input||typeof input.enabled!=='boolean'||!Array.isArray(input.order)||input.order.length>200||new Set(input.order).size!==input.order.length||input.order.some(id=>typeof id!=='string'||!this.state.profiles.some(p=>p.id===id))||(input.enabled&&input.order.length<2))throw new UserError('Chọn ít nhất hai tài khoản khác nhau và thứ tự dự phòng hợp lệ.', 'INVALID_SETTINGS');
+    const requested=input.scope||'shared';
+    if(requested!=='shared'&&!SCOPES.includes(requested))throw new UserError('Kết nối không hợp lệ.', 'INVALID_SETTINGS');
+    if(this.gateway?.flight)throw new UserError('Chờ thay đổi chế độ kết nối hoàn tất.', 'BUSY');
+    const scope=requested!=='shared'&&this.state.clientRoutes[requested].mode==='private'?requested:'shared';
+    const target=scope==='shared'?this.state:this.state.clientRoutes[scope];
+    (this.gateway?.route?.(scope)||this.gateway)?.recovery.cancel('Đã cập nhật cấu hình tự đổi; các lượt tiếp tục đang chờ đã được hủy.');
+    const old=target.autoSwitch;target.autoSwitch={enabled:input.enabled,order:[...input.order]};
+    try{await this.save();}catch(e){target.autoSwitch=old;throw e;}
+    this.changed();
   }
   async diagnostics() {
     const executable = await this.executable(); const version = await this.platform.run(executable,['--version']);
     const blocked = this.platform.blockers(await this.platform.processes());
     const view=this.gateway?.view?.(),routes=[['shared',view],...Object.entries(view?.scopes||{}).filter(([,v])=>v.mode==='private')];
     const modelUsage=routes.filter(([,v])=>v?.usage).map(([scope,v])=>({scope,...v.usage}));
-    return { codex: executable, version: /^codex-cli [\w.+-]+$/.test(version) ? version : 'Codex CLI', blockers: [...new Set(blocked.map(p => p.Name))], storage: this.root, loginRecovery: await exists(path.join(this.root,'login','auth.json')),modelUsage };
+    return { codex: executable, version: /^codex-cli [\w.+-]+$/.test(version) ? version : 'Codex CLI', blockers: [...new Set(blocked.map(p => p.Name))], storage: this.root, eventLog: this.eventLog.file, loginRecovery: await exists(path.join(this.root,'login','auth.json')),modelUsage };
   }
-  async close() { this.cancelLogin(); clearTimeout(this.desktopIntegration?.launchTimer); await this.sayHi.shutdown(); await this.saveFlight?.catch(()=>{}); }
+  async close() { this.closing = true; this.cancelLogin(); clearTimeout(this.desktopIntegration?.launchTimer); await this.sayHi.shutdown(); await this.lock.idle(); this.credentials.clear(); await this.saveFlight?.catch(()=>{}); await this.eventLog.flush(); }
 }
 function cleanText(value,max) { if (typeof value !== 'string') return ''; return value.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'').trim().slice(0,max); }
 function hash(bytes) { return bytes ? crypto.createHash('sha256').update(bytes).digest('hex') : null; }

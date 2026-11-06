@@ -38,9 +38,20 @@ Có thể thêm `resume` để mở lại hội thoại. Lệnh `codex` thông t
 
 Thiết lập thêm một agent trong `%USERPROFILE%\.jetbrains\acp.json` và giữ nguyên các agent khác. Muốn quay lại cách dùng thông thường, chọn agent **Codex**; có thể gỡ agent PADSwitcher tại trang **Kết nối**.
 
+## Sắp xếp tài khoản
+
+Kéo thẻ tài khoản để đổi vị trí, hoặc chọn thẻ rồi nhấn Alt+↑/↓. Thứ tự được lưu lại.
+Khi đang tìm kiếm, tính năng này tạm tắt.
+
+## Cập nhật phiên bản
+
+Mở **Cài đặt → Phiên bản** để kiểm tra, tải và cài bản mới. PADSwitcher đối chiếu
+checksum của bản phát hành, chuyển shortcut sang bản mới và giữ lại file cũ. Sau khi
+cài, chạy Developer: Reload Window trong VS Code một lần.
+
 ## Đổi tài khoản
 
-- **Thủ công:** chọn tài khoản khác → **Dùng tài khoản này**. PADSwitcher đợi lượt đang chạy kết thúc rồi mới đổi.
+- **Thủ công:** chọn tài khoản khác → **Dùng tài khoản này**. Có hiệu lực từ lần gọi model tiếp theo; bước đang trả lời chạy nốt rồi các bước sau dùng tài khoản mới, các phiên khác vẫn gửi yêu cầu bình thường.
 - **Tự động:** bật **Tự đổi**, chọn ít nhất hai tài khoản cá nhân và đặt ưu tiên. Nếu model trả về lỗi quota đã xác định trước khi có nội dung, cùng yêu cầu được thử một lần trên từng tài khoản dự phòng phù hợp.
 - **Tài khoản riêng theo kết nối:** tại trang **Kết nối**, bấm **Tài khoản** trên thẻ VS Code, JetBrains hoặc CLI rồi chọn **Tài khoản riêng**. Mở lại kết nối đó một lần. Sau này có thể quản lý từng nhóm qua **Dùng cho** ở trang Tài khoản.
 

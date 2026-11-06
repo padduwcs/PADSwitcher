@@ -20,7 +20,8 @@ Changing a group never moves an active socket to another backend. PADSwitcher wa
 4. The relay obtains a matched bearer/account bundle from the encrypted local vault and forwards the unchanged request body to the fixed Codex upstream.
 5. A structured `usage_limit_reached` response before any output can select another eligible personal account and retry the exact request bytes.
 6. Once response text, tool items, or other output has been committed, the relay never retries that response on another account.
-7. No second `turn/start` or synthetic “continue” input is created. Native account state is reconciled after active work finishes.
+7. No second `turn/start` or synthetic “continue” input is created. Native account state is reconciled once that backend's active work finishes.
+8. Every model request carries the relay's credential, so a manual choice changes the relay at once. A streaming step finishes uninterrupted and the next model call uses the new account, the same way a quota rotation does. Neither a switch nor an auth sync blocks `turn/start` in other sessions.
 
 ## Safety boundaries
 
@@ -31,7 +32,7 @@ Changing a group never moves an active socket to another backend. PADSwitcher wa
 - Production upstream and model endpoints are fixed. Redirects and arbitrary proxy targets are rejected.
 - Body, decoded-body, concurrency, error-body, account-selection, and inactivity limits bound resource use.
 - A credential rejected with HTTP 401 is refreshed once for that same account. Network errors, generic 429/403/5xx responses, uncertain outcomes, and partial output do not rotate accounts.
-- Disabling auto-switch, manually selecting an account, disconnecting a client, or stopping the gateway prevents new fallback work and aborts affected upstream requests.
+- Disabling auto-switch prevents new fallback work; disconnecting a client or stopping the gateway aborts affected upstream requests. If a request hits quota just after the user selected another account, it moves to that selected account, and an older request can never overwrite the newer choice.
 - Prompts, request bodies, tokens, capability URLs, response text, and account/thread identifiers are not written to PADSwitcher logs or diagnostics.
 - Reset credits are never consumed automatically.
 
@@ -61,12 +62,18 @@ Shared account and policy; VS Code/CLI/JetBrains private routes remain separate.
 Native auth is ephemeral and verified before the desktop endpoint becomes ready.
 Desktop MCP uses a user/SYSTEM-only named pipe bound to the current GUI transport.
 
-Uncertain model-step replay is blocked in bounded process memory, keyed by a
-hash of request route, native thread/turn and user/tool-result progress. Partial
-assistant recovery alone cannot authorize another attempt; new user/steering
-input and completed tool results can continue. Successful data-only or large
+Native retries are never cut short. Repeated uncertain failures of one model step
+are counted in bounded process memory, keyed by a hash of request route, native
+thread/turn and user/tool/agent-result progress, and only attempts past the
+measured native budget (30 with default settings on 0.164, limit 32) are refused.
+Partial assistant recovery alone is not progress; new user/steering input,
+completed tool results and new agent messages start a new count. Agent delivery
+timestamps alone do not count as progress. Explicit HTTP rejection and early SSE
+failure before output are not counted at all. Successful data-only or large
 SSE terminal events are recognized even without a Content-Type header.
 
-Automatic auth synchronization follows the newest routing decision and does not
-block further quota fallback. Slow account/cooldown persistence does not hold the
+Automatic auth synchronization follows the newest routing decision and blocks
+neither further quota fallback nor new turns; each backend syncs when it is idle.
+Model calls use an in-memory access token until shortly before expiry, so they do
+not wait for vault decryption or quota polling, which takes the lock per account. Slow account/cooldown persistence does not hold the
 response stream; metadata is still serialized and flushed on normal shutdown.

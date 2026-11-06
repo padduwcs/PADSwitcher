@@ -37,6 +37,7 @@ jobs:
       - run: npm run smoke:say-hi
       - run: npm run smoke:faults
       - run: npm run smoke:continuity
+      - run: npm run smoke:switch
       - run: npm run smoke:desktop
       - run: npm run smoke:ui
       - run: npm run dist

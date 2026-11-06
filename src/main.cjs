@@ -8,8 +8,10 @@ const { GatewayHub } = require('./core/gateway-hub.cjs');
 const { Integration } = require('./core/integration.cjs');
 const { JetBrainsIntegration } = require('./core/jetbrains.cjs');
 const { DesktopIntegration } = require('./core/desktop.cjs');
+const { syncManagerLauncher } = require('./core/manager-launcher.cjs');
+const { Updater, RELEASE_PAGE, CHECK_INTERVAL } = require('./core/updater.cjs');
 const { UserError, publicError } = require('./core/errors.cjs');
-let window, service, kaggle, gateway, integration, jetbrains, desktop, tray, timer, kaggleTimer, integrationTimer, integrationFlight, quitting = false, shutdown = false;
+let window, service, kaggle, gateway, integration, jetbrains, desktop, updater, tray, timer, kaggleTimer, integrationTimer, updateTimer, integrationFlight, quitting = false, shutdown = false;
 let uiLocale='vi';
 const text=(vi,en)=>uiLocale==='en'?en:vi;
 function updateTray() {
@@ -22,13 +24,23 @@ const rendererFile = path.join(__dirname,'renderer','index.html');
 const trustedRenderer = require('./core/renderer-origin.cjs').rendererOrigin(rendererFile);
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
-  app.on('second-instance',() => { if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
+  app.on('second-instance',(_event,argv) => { if (window && !argv.includes('--background')) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
   app.whenReady().then(start).catch(() => { dialog.showErrorBox('PADSwitcher','Không thể khởi động an toàn. Giữ nguyên thư mục dữ liệu và kiểm tra quyền truy cập Windows.'); app.quit(); });
 }
 async function openAuth(url) {
   let parsed; try { parsed = new URL(url); } catch { throw new UserError('Đường dẫn đăng nhập không hợp lệ.', 'LOGIN_URL'); }
   if (parsed.protocol !== 'https:' || !['auth.openai.com','chatgpt.com'].includes(parsed.hostname) || parsed.username || parsed.password || (parsed.port && parsed.port !== '443')) throw new UserError('Chỉ mở trang đăng nhập chính thức của OpenAI.', 'LOGIN_URL');
   await shell.openExternal(parsed.href);
+}
+const portableExecutable=()=>app.isPackaged?process.env.PORTABLE_EXECUTABLE_FILE||null:null;
+function updateLauncher() {
+  const executable=app.isPackaged?portableExecutable()||process.execPath:null;
+  return syncManagerLauncher(service,executable).catch(()=>{}); // Only a convenience: never fail the action.
+}
+// The replacement starts after this process exits, so nothing may keep it alive.
+function quitForUpdate() {
+  shutdown=true;clearInterval(timer);clearInterval(kaggleTimer);clearInterval(integrationTimer);clearInterval(updateTimer);
+  Promise.allSettled([service.close(),gateway.stop(true),kaggle.shutdown()]).finally(()=>{quitting=true;tray?.destroy();app.quit();});
 }
 async function start() {
   service = new ProfileService(path.join(app.getPath('appData'),'PADSwitcher','data'));
@@ -37,6 +49,7 @@ async function start() {
   try{await kaggle.init();}catch(error){kaggle.initError=publicError(error);}
   service.kaggle = kaggle;
   kaggle.on('change',()=>service.changed());
+  updater=new Updater({current:app.getVersion(),executable:portableExecutable(),root:service.root,platform:service.platform,onChange:()=>service.changed()});service.updater=updater;
   gateway=new GatewayHub(service);integration=new Integration(service);jetbrains=new JetBrainsIntegration(service);desktop=new DesktopIntegration(service,gateway);await desktop.init();
   const checkIntegration=()=>integrationFlight||(integrationFlight=(async()=>{const [next,jb,dt]=await Promise.all([integration.status(),jetbrains.status(),desktop.status()]);if(JSON.stringify(service.vscode)!==JSON.stringify(next)||JSON.stringify(service.jetbrains)!==JSON.stringify(jb)||JSON.stringify(service.desktopStatus)!==JSON.stringify(dt)){service.vscode=next;service.jetbrains=jb;service.desktopStatus=dt;service.changed();}})().finally(()=>{integrationFlight=null;}));
   await checkIntegration();
@@ -57,6 +70,7 @@ async function start() {
       switch(command) {
         case 'kaggleAdd': result=await kaggle.add(args);break;
         case 'kaggleEdit': await kaggle.edit(args);break;
+        case 'kaggleReorder': await kaggle.reorder(args.ids);break;
         case 'kaggleRemove': await kaggle.remove(args.id);break;
         case 'kaggleRefresh': await kaggle.refresh(args.id);break;
         case 'kaggleRefreshAll': await kaggle.refreshAll();break;
@@ -95,14 +109,14 @@ async function start() {
         case 'switch': result = await service.switchDesktop(args.id); break;
         case 'restore': result = await service.restoreDesktop(); break;
         case 'launch': result = await service.launchCli(args.id,args.resume === true); break;
-        case 'gateway': await gateway.start(args.id,args.scope); break;
+        case 'gateway': await gateway.start(args.id,args.scope);await updateLauncher(); break;
         case 'clientRoute': result=await gateway.configure(args);break;
         case 'autoSwitchSettings': await service.autoSwitchSettings(args);break;
         case 'cancelRecovery': gateway.route(args.scope)?.recovery.cancel('Đã hủy các lượt tự tiếp tục đang chờ.');gateway.changed();break;
-        case 'stopGateway': await gateway.stop();service.state.gatewayEnabled=false;await service.save();break;
+        case 'stopGateway': await gateway.stop();service.state.gatewayEnabled=false;await service.save();await updateLauncher();break;
         case 'forceStopGateway': {
           const answer=await dialog.showMessageBox(window,{type:'warning',buttons:[text('Giữ gateway','Keep connected'),text('Dừng và ngắt các lượt đang chạy','Disconnect and interrupt active turns')],defaultId:0,cancelId:0,message:text('Dừng toàn bộ gateway?','Disconnect all Codex sessions?'),detail:text('Các kết nối CLI/extension và lượt Codex đang chạy qua PADSwitcher sẽ bị ngắt. Thao tác này không đóng VS Code.','CLI/extension connections and Codex turns through PADSwitcher will be interrupted. VS Code stays open.')});
-          if(answer.response===1){await gateway.stop(true);service.state.gatewayEnabled=false;await service.save();}break;
+          if(answer.response===1){await gateway.stop(true);service.state.gatewayEnabled=false;await service.save();await updateLauncher();}break;
         }
         case 'configureVSCode': await integration.configure(gateway.helper);await checkIntegration();break;
         case 'restoreVSCode': await integration.restore();await checkIntegration();break;
@@ -125,7 +139,17 @@ async function start() {
           const child=spawn(service.platform.powershell,['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(outer,'utf16le').toString('base64')],{env,stdio:'ignore',windowsHide:true});
           await new Promise((r,j)=>{child.once('error',j);child.once('close',code=>code===0?r():j(new UserError('Không mở được terminal.', 'CLI_START')));});break;
         }
+        case 'updateCheck': result = await updater.check(); break;
+        case 'updateDownload': result = await updater.download(); break;
+        case 'updateCancel': updater.cancel(); break;
+        case 'updateInstall': {
+          const active=gateway.turns.size;
+          if(active&&args.force!==true)throw new UserError('Codex còn lượt đang chạy.','UPDATE_ACTIVE_TURNS');
+          await updater.install();quitForUpdate();break;
+        }
+        case 'openRelease': await shell.openExternal(RELEASE_PAGE); break;
         case 'edit': result = await service.edit(args.id,args.label,args.notes); break;
+        case 'reorderProfiles': await service.reorderProfiles(args.ids); break;
         case 'remove': result = await service.remove(args.id); break;
         case 'listTrash': result = await service.listTrash(); break;
         case 'restoreProfile': result = await service.restoreProfile(args.id); break;
@@ -150,13 +174,16 @@ async function start() {
       return { ok:true,result,state:service.view() };
     } catch(error) { return { ok:false,error:publicError(error),state:service.view() }; }
   });
-  await window.loadFile(rendererFile); window.show();
+  await window.loadFile(rendererFile);
   try{tray=new Tray(path.join(__dirname,'assets','padswitcher.ico'));tray.setToolTip('PADSwitcher — quản lý phiên Codex');}catch{tray=null;}
+  // Opened by the helper for a waiting Codex client: stay in the tray.
+  if(!tray||!process.argv.includes('--background'))window.show();
   const showWindow=()=>{if(window.isMinimized())window.restore();window.show();window.focus();};
   tray?.on('double-click',showWindow);
   updateTray();
   if(service.state.gatewayEnabled&&service.state.profiles.some(p=>p.id===service.state.gatewayProfileId)){
     await gateway.start(service.state.gatewayProfileId).catch(error=>{if(!window.isDestroyed())window.webContents.send('pad:refresh-error',publicError(error));});
+    await updateLauncher();
   }
   const refreshQuota = createQuotaRefresher(service);
   const refresh = reason => { refreshQuota(reason).catch(error => {
@@ -169,22 +196,24 @@ async function start() {
   timer = setInterval(() => refresh('periodic'), 60 * 1000);
   const refreshKaggle=()=>{if(kaggle.state.settings.autoRefresh)kaggle.refreshAll(true).catch(error=>{if(!window?.isDestroyed())window.webContents.send('pad:refresh-error',publicError(error));});};
   refreshKaggle(); kaggleTimer=setInterval(refreshKaggle,120000);
+  const checkUpdate=()=>{if(service.state.settings.autoUpdate)updater.check();};
+  setTimeout(checkUpdate,15000); updateTimer=setInterval(checkUpdate,CHECK_INTERVAL);
   window.on('close',event => {
     if (quitting) return;
     if(tray&&['ready','starting'].includes(gateway.status)){event.preventDefault();window.hide();return;}
-    if ((service.busy && !service.login)||desktop.flight||kaggle.editing) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:text('Thao tác đang hoàn tất','Operation in progress'),detail:text('Hãy chờ lưu tài khoản xong trước khi đóng PADSwitcher.','Wait for the account operation to finish before closing PADSwitcher.')}); return; }
+    if ((service.foregroundBusy && !service.login)||desktop.flight||kaggle.editing) { event.preventDefault(); dialog.showMessageBox(window,{type:'info',message:text('Thao tác đang hoàn tất','Operation in progress'),detail:text('Hãy chờ lưu tài khoản xong trước khi đóng PADSwitcher.','Wait for the account operation to finish before closing PADSwitcher.')}); return; }
     if (service.running.size) {
       const response = dialog.showMessageBoxSync(window,{type:'question',buttons:['Giữ PADSwitcher mở','Đóng trình quản lý'],defaultId:0,cancelId:0,message:'CLI vẫn đang chạy',detail:'Nếu đóng trình quản lý, các cửa sổ CLI tiếp tục chạy. Phiên riêng sẽ được mã hóa lại khi đóng CLI bình thường; mở PADSwitcher lại để kiểm tra trạng thái sau đó.'});
       if (response === 0) { event.preventDefault(); return; }
     }
-    if (service.login) { event.preventDefault(); service.cancelLogin(); const wait = setInterval(() => { if (!service.busy) { clearInterval(wait); quitting = true; window.close(); } },100); }
+    if (service.login) { event.preventDefault(); service.cancelLogin(); const wait = setInterval(() => { if (!service.login) { clearInterval(wait); quitting = true; window.close(); } },100); }
   });
-  app.on('window-all-closed',() => { clearInterval(timer); clearInterval(integrationTimer); clearInterval(kaggleTimer); app.quit(); });
+  app.on('window-all-closed',() => { clearInterval(timer); clearInterval(integrationTimer); clearInterval(kaggleTimer); clearInterval(updateTimer); app.quit(); });
   app.on('before-quit',event => {
     if(quitting)return;
-    if(service?.busy||desktop?.flight||kaggle?.editing){event.preventDefault();if(service.login)service.cancelLogin();return;}
+    if(service?.foregroundBusy||desktop?.flight||kaggle?.editing){event.preventDefault();if(service.login)service.cancelLogin();return;}
     if(gateway.turns.size){event.preventDefault();window.show();dialog.showMessageBox(window,{type:'info',message:text('Codex còn lượt đang chạy','Codex has active turns'),detail:text('Chờ hoàn tất hoặc chọn Dừng gateway trong PADSwitcher trước khi thoát.','Wait for completion or disconnect Codex in PADSwitcher before quitting.')});return;}
-    if(service.sayHi.flight||gateway.status!=='stopped'||kaggle.flights.size||kaggle.toolFlight||kaggle.saveFlight){
+    if(service.busy||service.sayHi.flight||gateway.status!=='stopped'||kaggle.flights.size||kaggle.toolFlight||kaggle.saveFlight){
       event.preventDefault();if(shutdown)return;shutdown=true;
       clearInterval(kaggleTimer);
       Promise.all([service.close(),gateway.stop(),kaggle.shutdown()]).then(()=>{quitting=true;clearInterval(timer);tray?.destroy();app.quit();},error=>{shutdown=false;window.show();dialog.showMessageBox(window,{type:'info',message:publicError(error).message});});

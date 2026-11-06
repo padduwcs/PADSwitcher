@@ -24,7 +24,7 @@ class Recovery {
   get policy(){return this.g.service.state.autoSwitch||{enabled:false,order:[]};}
   get busy(){return !!(this.queue.length||this.active);}
   view(){return {enabled:this.policy.enabled,queued:this.queue.length,active:!!this.active,message:this.message,events:this.events.slice(-12)};}
-  note(type,message,from=null,to=null){this.message=message;this.events.push({id:crypto.randomUUID(),at:new Date().toISOString(),type,message,from,to});if(this.events.length>30)this.events.shift();this.g.changed();}
+  note(type,message,from=null,to=null){this.g.log?.('note',{event:type});this.message=message;this.events.push({id:crypto.randomUUID(),at:new Date().toISOString(),type,message,from,to});if(this.events.length>30)this.events.shift();this.g.changed();}
   cancel(message=null){
     this.epoch++;this.queue=[];
     if(this.active?.target===this.g.pendingId)this.g.pendingId=null;
@@ -57,7 +57,7 @@ class Recovery {
     const g=this.g,job=this.queue[0],epoch=this.epoch;
     if(!this.valid(job,epoch)){this.queue.shift();return;}
     if(Date.now()>job.deadline){this.queue.shift();this.note('blocked','Đã chờ hơn 2 phút. Hãy đổi tài khoản và tiếp tục thủ công.');return;}
-    if(g.changing||g.refreshFlight||g.pendingId||g.service.busy)return;
+    if(g.changing||g.refreshFlight||g.pendingId)return;
     await g.reconcile();if(!this.valid(job,epoch)||g.turns.size)return;
     this.queue.shift();this.active=job;
     try{

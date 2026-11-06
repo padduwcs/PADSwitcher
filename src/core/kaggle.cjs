@@ -131,7 +131,10 @@ class KaggleService extends EventEmitter {
   get(id){profilePath(this.root,id);const p=this.state.accounts.find(a=>a.id===id);if(!p)throw new UserError('Không tìm thấy tài khoản Kaggle.', 'KAGGLE_ACCOUNT');return p;}
   vault(id){return path.join(profilePath(this.root,id),'token.dpapi');}
   requireStore(){if(this.initError)throw new UserError(this.initError.message,this.initError.code);}
-  async exclusive(fn){this.requireStore();if(this.stopping||this.editing)throw new UserError('Một thao tác Kaggle khác đang chạy.', 'BUSY');this.editing=true;this.changed();try{return await fn();}finally{this.editing=false;this.changed();}}
+  // Saved changes run one at a time and wait their turn instead of failing.
+  async exclusive(fn){this.requireStore();if(this.stopping)throw new UserError('Một thao tác Kaggle khác đang chạy.', 'BUSY');this.pendingEdits=(this.pendingEdits||0)+1;const run=(this.editQueue||Promise.resolve()).catch(()=>{}).then(async()=>{if(this.stopping)throw new UserError('Một thao tác Kaggle khác đang chạy.', 'BUSY');this.editing=true;this.changed();try{return await fn();}finally{this.editing=--this.pendingEdits>0;this.changed();}});this.editQueue=run;return run;}
+  // A change to one account waits for that account's refresh only.
+  settled(id){return this.flights.get(id)?.catch(()=>{})??Promise.resolve();}
   async checkTools(force=false) {
     this.requireStore();
     if(this.stopping)throw fail('KAGGLE_CANCELLED');
@@ -154,7 +157,7 @@ class KaggleService extends EventEmitter {
   async terminalCommand(id){this.requireStore();const p=this.get(id);await this.shell.ensure();return this.shell.command(p.username);}
   async add({id=null,token,label='',workspace}) {return this.exclusive(async()=>{
     token=credentials(token);await assertDirectory(workspace);if(!path.isAbsolute(workspace))throw new UserError('Chọn thư mục làm việc tuyệt đối.', 'KAGGLE_WORKSPACE');
-    const previous=id?this.get(id):null;if(previous&&this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');
+    const previous=id?this.get(id):null;if(previous)await this.settled(id);
     const identity=await this.request({action:'verify',token,username:previous?.username});
     if(!/^\w[\w-]{0,79}$/.test(identity.username||''))throw fail('KAGGLE_RESPONSE');
     if(previous&&previous.username.toLowerCase()!==identity.username.toLowerCase())throw fail('KAGGLE_IDENTITY');
@@ -171,12 +174,17 @@ class KaggleService extends EventEmitter {
     try{await this.save();}catch(error){if(previous){Object.assign(p,old);if(backup)await atomicWrite(this.vault(p.id),backup);else await fs.unlink(this.vault(p.id));}else{this.state.accounts=this.state.accounts.filter(a=>a.id!==p.id);await fs.unlink(this.vault(p.id));}throw error;}finally{backup?.fill(0);}
     return p.id;
   });}
-  async edit({id,label,workspace}){return this.exclusive(async()=>{const p=this.get(id);if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');await assertDirectory(workspace);if(!path.isAbsolute(workspace))throw new UserError('Chọn thư mục làm việc tuyệt đối.', 'KAGGLE_WORKSPACE');const old={label:p.label,workspace:p.workspace};p.label=clean(label,80)||p.username;p.workspace=path.resolve(workspace);try{await this.save();}catch(error){Object.assign(p,old);throw error;}});}
-  async remove(id){return this.exclusive(async()=>{const p=this.get(id),index=this.state.accounts.indexOf(p);if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');this.state.accounts.splice(index,1);try{await this.save();}catch(error){this.state.accounts.splice(index,0,p);throw error;}try{await fs.unlink(this.vault(id));}catch(error){if(error.code!=='ENOENT'){this.state.accounts.splice(index,0,p);await this.save();throw error;}}this.notebookPages.delete(id);});}
+  async edit({id,label,workspace}){return this.exclusive(async()=>{const p=this.get(id);await this.settled(id);await assertDirectory(workspace);if(!path.isAbsolute(workspace))throw new UserError('Chọn thư mục làm việc tuyệt đối.', 'KAGGLE_WORKSPACE');const old={label:p.label,workspace:p.workspace};p.label=clean(label,80)||p.username;p.workspace=path.resolve(workspace);try{await this.save();}catch(error){Object.assign(p,old);throw error;}});}
+  async remove(id){return this.exclusive(async()=>{await this.settled(id);const p=this.get(id),index=this.state.accounts.indexOf(p);this.state.accounts.splice(index,1);try{await this.save();}catch(error){this.state.accounts.splice(index,0,p);throw error;}try{await fs.unlink(this.vault(id));}catch(error){if(error.code!=='ENOENT'){this.state.accounts.splice(index,0,p);await this.save();throw error;}}this.notebookPages.delete(id);});}
+  async reorder(ids){
+    this.requireStore();const position=new Map(Array.isArray(ids)?ids.map((id,index)=>[id,index]):[]),accounts=this.state.accounts;
+    if(position.size!==accounts.length||ids.length!==accounts.length||accounts.some(p=>!position.has(p.id)))throw new UserError('Danh sách tài khoản vừa thay đổi. Hãy thử sắp xếp lại.', 'INVALID_ORDER');
+    this.state.accounts=[...accounts].sort((a,b)=>position.get(a.id)-position.get(b.id));await this.save();this.changed();
+  }
   async settings({pythonPath,autoRefresh}){return this.exclusive(async()=>{if(typeof pythonPath!=='string'||(pythonPath&&(!path.isAbsolute(pythonPath)||path.basename(pythonPath).toLowerCase()!=='python.exe'))||typeof autoRefresh!=='boolean')throw new UserError('Cấu hình Kaggle không hợp lệ.', 'KAGGLE_SETTINGS');if(this.toolFlight)throw new UserError('Một thao tác Kaggle khác đang chạy.','BUSY');const old=this.state.settings;this.state.settings={pythonPath,autoRefresh};try{await this.save();this.tool=null;}catch(error){this.state.settings=old;throw error;}});}
-  async watch(id,value,remove=false){return this.exclusive(async()=>{const p=this.get(id),ref=notebookRef(value),old=[...p.watch];if(this.flights.has(id))throw new UserError('Chờ cập nhật Kaggle hoàn tất.', 'BUSY');if(remove)p.watch=p.watch.filter(r=>r!==ref);else if(!p.watch.includes(ref)){if(p.watch.length>=20)throw new UserError('Theo dõi tối đa 20 notebook ghim cho mỗi tài khoản.', 'KAGGLE_LIMIT');p.watch.push(ref);}try{await this.save();}catch(error){p.watch=old;throw error;}});}
+  async watch(id,value,remove=false){return this.exclusive(async()=>{await this.settled(id);const p=this.get(id),ref=notebookRef(value),old=[...p.watch];if(remove)p.watch=p.watch.filter(r=>r!==ref);else if(!p.watch.includes(ref)){if(p.watch.length>=20)throw new UserError('Theo dõi tối đa 20 notebook ghim cho mỗi tài khoản.', 'KAGGLE_LIMIT');p.watch.push(ref);}try{await this.save();}catch(error){p.watch=old;throw error;}});}
   refresh(id) {
-    const p=this.get(id);if(this.flights.has(id))return this.flights.get(id);if(this.editing||this.stopping)return Promise.resolve();
+    const p=this.get(id);if(this.flights.has(id))return this.flights.get(id);if(this.stopping)return Promise.resolve();
     const work=(async()=>{
       p.lastAttemptAt=new Date().toISOString();
       try {const token=await this.loadToken(id);const data=await this.request({action:'refresh',token,username:p.username,watch:p.watch});
@@ -191,7 +199,7 @@ class KaggleService extends EventEmitter {
     })();this.flights.set(id,work);this.changed();return work.finally(()=>{this.flights.delete(id);this.changed();});
   }
   notebooksMore(id){
-    this.requireStore();const p=this.get(id);if(this.flights.has(id))return this.flights.get(id);if(this.editing||this.stopping)return Promise.resolve();
+    this.requireStore();const p=this.get(id);if(this.flights.has(id))return this.flights.get(id);if(this.stopping)return Promise.resolve();
     let page=this.notebookPages.get(id);
     if(!page){page={rows:new Map(),nextPage:2,hasMore:this.notebookList(p).hasMore,loading:false,error:null};this.notebookPages.set(id,page);}
     if(!page.hasMore)return Promise.resolve();

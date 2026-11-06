@@ -35,7 +35,7 @@ test('concurrent refreshes use the intended token, deduplicate per account, and 
   f.setResponder(async payload=>{tokens.push(payload.token);await gate;return {ok:true,username:payload.token===tokenA?'account-a':'account-b',quota:[],notebooks:[]};});
   const first=f.k.refresh(a),duplicate=f.k.refresh(a),other=f.k.refresh(b);
   await new Promise(r=>setTimeout(r,20));assert.equal(f.k.view().accounts.filter(p=>p.refreshing).length,2);assert.equal(f.service.busy,false);
-  await assert.rejects(f.k.remove(a),{code:'BUSY'});unblock();await Promise.all([first,duplicate,other]);
+  const removal=f.k.remove(a);await new Promise(r=>setTimeout(r,10));assert.equal(f.k.view().accounts.some(p=>p.id===a),true,'a change waits for that account refresh');unblock();await Promise.all([first,duplicate,other,removal]);assert.equal(f.k.view().accounts.some(p=>p.id===a),false);
   assert.deepEqual(tokens.sort(),[tokenA,tokenB]);assert.equal(f.k.flights.size,0);
 });
 test('refresh errors preserve quota and notebook snapshots and mark reauthentication safely',async t=>{
@@ -123,7 +123,7 @@ test('notebook pagination deduplicates requests and refs, isolates accounts, and
   f.setResponder(async payload=>{reads.push(payload);await gate;return {ok:true,username:payload.username,page:payload.page,hasMore:false,notebooks:[{ref:payload.username+'/job',title:'Older duplicate',status:'complete'},{ref:payload.username+'/older',title:tokenA,status:'complete',machineShape:tokenB}]};});
   const first=f.k.notebooksMore(a),duplicate=f.k.notebooksMore(a),other=f.k.notebooksMore(b);
   await new Promise(resolve=>setTimeout(resolve,15));assert.equal(reads.length,2);assert(f.k.view().accounts.every(p=>p.notebookList.loading));
-  await assert.rejects(f.k.remove(a),{code:'BUSY'});release();await Promise.all([first,duplicate,other]);
+  release();await Promise.all([first,duplicate,other]);
   assert.deepEqual(reads.map(p=>[p.token,p.page]).sort(),[[tokenA,2],[tokenB,2]]);assert(reads.every(p=>p.action==='notebooks'&&!p.watch));
   const p=f.k.view().accounts[0];assert.equal(p.notebooks.length,2);assert.equal(p.notebooks[0].title,'Fresh first page');assert(p.notebooks[1].readAt);assert.equal(p.notebookList.hasMore,false);assert.equal(p.notebookList.loading,false);
   assert.equal(p.quotaAt,before.quotaAt);assert.equal(p.notebooksAt,before.notebooksAt);assert(!JSON.stringify(p).includes(tokenA));
@@ -161,4 +161,12 @@ test('quota refresh preserves expanded pages and their read times; shutdown canc
   f.k.bridge=async(python,payload,timeout,signal)=>payload.action!=='notebooks'?original(python,payload):new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new UserError('cancelled','KAGGLE_CANCELLED')),{once:true}));
   const read=f.k.notebooksMore(a);await new Promise(resolve=>setTimeout(resolve,10));await f.k.shutdown();await read;
   assert.deepEqual(f.k.view().accounts[0].notebooks,p.notebooks);assert.equal(f.k.view().accounts[0].notebookList.error,null);assert.equal(f.k.flights.size,0);assert.equal(f.k.controllers.size,0);
+});
+
+test('Kaggle accounts keep a saved order, and saved changes queue instead of failing',async t=>{
+  const f=await setup(t),a=await f.k.add({token:tokenA,label:'A',workspace:f.directory}),b=await f.k.add({token:tokenB,label:'B',workspace:f.directory});
+  await f.k.reorder([b,a]);assert.deepEqual(f.k.view().accounts.map(p=>p.id),[b,a]);assert.deepEqual((await f.create()).view().accounts.map(p=>p.id),[b,a]);
+  await assert.rejects(f.k.reorder([a]),{code:'INVALID_ORDER'});await assert.rejects(f.k.reorder([a,a]),{code:'INVALID_ORDER'});
+  await Promise.all([f.k.edit({id:a,label:'First',workspace:f.directory}),f.k.edit({id:b,label:'Second',workspace:f.directory}),f.k.edit({id:a,label:'Last',workspace:f.directory})]);
+  assert.deepEqual(f.k.view().accounts.map(p=>p.label),['Second','Last']);assert.equal(f.k.view().editing,false);
 });

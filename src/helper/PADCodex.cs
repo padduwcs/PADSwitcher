@@ -145,12 +145,18 @@ internal static class PADCodex {
             Console.WriteLine(new JavaScriptSerializer { MaxJsonLength = MaxFrame }.Serialize(new { appServerVersion = version.Groups["version"].Value, configRequirements = policy }));
         }
     }
-    static async Task Bridge(Uri url, string token) {
-        using (var ws = new ClientWebSocket()) {
+    static async Task<ClientWebSocket> Connect(Uri url, string token) {
+        var ws = new ClientWebSocket();
+        try {
             ws.Options.Proxy = null;
             ws.Options.SetRequestHeader("Authorization", "Bearer " + token);
+            using (var cancel = new CancellationTokenSource(10000)) await ws.ConnectAsync(url, cancel.Token);
+            return ws;
+        } catch { ws.Dispose(); throw; }
+    }
+    static async Task Bridge(ClientWebSocket connected) {
+        using (var ws = connected) {
             using (var cancel = new CancellationTokenSource()) {
-                cancel.CancelAfter(10000); await ws.ConnectAsync(url, cancel.Token); cancel.CancelAfter(Timeout.Infinite);
                 var input = Task.Run(async () => {
                     var reader = new StreamReader(Console.OpenStandardInput(), Utf8, false, 8192);
                     while (ws.State == WebSocketState.Open) {
@@ -273,23 +279,72 @@ internal static class PADCodex {
             return 0;
         }
     }
+    static string ManagerExecutable(string file) {
+        var launcher = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(ReadPrivate(file, 16384));
+        string executable = StringValue(launcher, "executable");
+        if (!Path.IsPathRooted(executable) || !String.Equals(Path.GetExtension(executable), ".exe", StringComparison.OrdinalIgnoreCase) || !File.Exists(executable)) throw new IOException();
+        return executable;
+    }
+    // Runs as a short-lived process so PADSwitcher does not become part of the
+    // extension's process tree and is not killed together with one window.
+    static int StartManager(string file) {
+        string executable = ManagerExecutable(file);
+        var start = new ProcessStartInfo(executable, "--background") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(executable) };
+        var names = new List<string>();
+        foreach (string name in start.EnvironmentVariables.Keys) names.Add(name);
+        // VS Code's extension host sets these; Electron would start as plain Node.
+        foreach (string name in names) {
+            string upper = name.ToUpperInvariant();
+            if (upper.StartsWith("ELECTRON_") || upper.StartsWith("NODE_") || upper.StartsWith("VSCODE_") || upper.StartsWith("PADSWITCHER_") || upper.StartsWith("CODEX_")) start.EnvironmentVariables.Remove(name);
+        }
+        using (Process.Start(start)) return 0;
+    }
+    static bool RequestManager() {
+        string file = Path.Combine(Path.GetDirectoryName(configurationFile), "launcher.json");
+        if (!File.Exists(file)) return false; // Connection turned off, or a source checkout.
+        using (var starter = Process.Start(new ProcessStartInfo(Process.GetCurrentProcess().MainModule.FileName, "--start-manager " + Quote(file)) { UseShellExecute = false, CreateNoWindow = true })) {
+            return starter.WaitForExit(5000) && starter.ExitCode == 0;
+        }
+    }
+    static Uri Endpoint(out string token) {
+        var config = Configuration(); var url = new Uri(StringValue(config, "url"));
+        if (url.Scheme != "ws" || url.Host != "127.0.0.1" || url.Port < 1 || url.UserInfo != "" || url.AbsolutePath != "/") throw new IOException();
+        string tokenFile = StringValue(config, "tokenFile");
+        if (!String.Equals(Path.GetFullPath(tokenFile), Path.Combine(Path.GetDirectoryName(configurationFile), "client-capability"), StringComparison.OrdinalIgnoreCase)) throw new IOException();
+        token = ReadPrivate(tokenFile, 256).Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(token, "^[a-f0-9]{64}$")) throw new IOException();
+        return url;
+    }
+    // Codex is often opened before PADSwitcher. Open the manager once and keep the
+    // client's first messages queued on stdin until its connection is ready.
+    static ClientWebSocket ConnectWhenReady() {
+        bool requested = false; var deadline = DateTime.UtcNow;
+        for (;;) {
+            try { string token; Uri url = Endpoint(out token); return Connect(url, token).GetAwaiter().GetResult(); }
+            catch (Exception) {
+                if (!requested) {
+                    requested = true;
+                    if (configurationFile == null || !RequestManager()) throw;
+                    deadline = DateTime.UtcNow.AddSeconds(90);
+                }
+                if (DateTime.UtcNow >= deadline) throw;
+            }
+            Thread.Sleep(500);
+        }
+    }
     public static int Main(string[] args) {
         bool startup = Array.IndexOf(args, "--print-startup-config") >= 0;
         try {
             if (args.Length > 0 && (args[0] == "--host" || args[0] == "--host-stdio")) return Host(args);
             if (args.Length == 3 && args[0] == "--tools-pipe") return ToolsPipe(args);
-            var config = Configuration(); var url = new Uri(StringValue(config, "url"));
-            if (url.Scheme != "ws" || url.Host != "127.0.0.1" || url.Port < 1 || url.UserInfo != "" || url.AbsolutePath != "/") throw new IOException();
-            string tokenFile = StringValue(config, "tokenFile");
-            if (!String.Equals(Path.GetFullPath(tokenFile), Path.Combine(Path.GetDirectoryName(configurationFile), "client-capability"), StringComparison.OrdinalIgnoreCase)) throw new IOException();
-            string token = ReadPrivate(tokenFile, 256).Trim();
-            if (!System.Text.RegularExpressions.Regex.IsMatch(token, "^[a-f0-9]{64}$")) throw new IOException();
+            if (args.Length == 2 && args[0] == "--start-manager") return StartManager(args[1]);
             bool server = Array.IndexOf(args, "app-server") >= 0;
+            if (server && !startup) { Bridge(ConnectWhenReady()).GetAwaiter().GetResult(); return 0; }
+            string token; Uri url = Endpoint(out token); var config = Configuration();
             if (startup) {
                 if (!server || Array.IndexOf(args, "--startup-sign-out") >= 0) throw new IOException();
                 StartupConfiguration(url, token, args).GetAwaiter().GetResult(); return 0;
             }
-            if (server) { Bridge(url, token).GetAwaiter().GetResult(); return 0; }
             if (Array.IndexOf(args, "--no-daemon") >= 0 || Array.IndexOf(args, "--remote") >= 0 || (args.Length > 0 && (args[0] == "exec" || args[0] == "e" || args[0] == "login" || args[0] == "logout" || args[0] == "daemon" || args[0] == "review" || args[0] == "cloud"))) {
                 Console.Error.WriteLine("PADCodex supports the interactive Codex CLI. Manage authentication in PADSwitcher."); return 2;
             }

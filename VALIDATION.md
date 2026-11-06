@@ -1,4 +1,84 @@
-# PADSwitcher 1.20.2 — validation
+# PADSwitcher 1.21.0 — validation
+
+## Concurrency, reordering, updates and shared layout — 2026-11-07
+
+- Regression suite: 288 tests, 286 passed locally. The PowerShell 7 check is skipped. The
+  Kaggle subprocess environment test fails in the local Git Bash environment before and
+  after this work.
+- `npm run smoke:ui` checks the real renderer in Electron, including a native pointer
+  drag that reorders a card without selecting it, at 1920/1260/1000 px, light/dark,
+  Vietnamese/English. Screenshots of each page were reviewed by eye; that review found
+  grid cards offset by a spacing rule, which is fixed.
+- Native loopback suites pass on the final code: faults, continuity, switch, protocol,
+  Say hi and desktop. The packaged ASAR smoke and both real executables also pass.
+- `--background` was checked on the built portable with isolated data: no visible window,
+  against a visible window for the same executable without the flag.
+- The updater is covered with a local fixture: version order, rejected hosts, checksum
+  failure and cleanup, cancelled downloads, reuse of a verified file, shortcut and
+  relaunch hand-over. Against the live GitHub release, an instance posing as 1.20.1
+  found 1.20.2, downloaded all 103 MB through GitHub's redirect, passed the published
+  checksum and reused the file on the next check. The shortcut script was run on sample
+  shortcuts: the match moved, the other stayed unchanged.
+  **Not exercised: the final hand-over** of closing a real install and reopening the
+  new version, because no release newer than this build exists. The first published
+  update is that test; the release page remains the fallback. Executables are unsigned,
+  so the checksum shows the file matches the release, not who built it, and SmartScreen
+  may warn.
+
+## Instant switching and native retry budget — 2026-11-07
+
+Reported symptoms were checked against VS Code and Codex logs on the maintainer's
+machine, 2026-10-31 to 2026-11-06. Four first messages failed with `PADSwitcher is
+switching accounts` (2026-11-03 and 2026-11-05), six requests hit
+`model_replay_blocked` (five in 12 minutes on 2026-11-02) and 96 model-catalog
+refreshes timed out. Sampling the running app showed quota polling holding the
+global lock for about 19 of every 60 seconds with eight accounts and PowerShell
+starting every 3 seconds; one DPAPI decrypt cost about 220 ms per model request.
+Linking the catalog timeouts to that lock is an inference, not a direct
+measurement. The upstream causes of those six interruptions cannot be reconstructed,
+which is why `events.jsonl` now records them.
+
+Native retry budget, measured on `codex-cli 0.164.0-alpha.11.1` with default
+settings, real engine, synthetic sign-in and loopback model. The guard was raised
+out of the way so that every attempt reached the fixture:
+
+| Fault, every attempt | Requests for one step |
+| --- | --- |
+| Connection dropped before a response | 30 |
+| No data until the relay's inactivity timeout | 30 |
+| Stream broken after partial output | 6 |
+| Stream ended without a terminal event | 6 |
+| `response.failed` | 6 |
+
+The guard limit is 32 so that it never shortens these. A user who configures a
+larger native retry budget can still reach it; the turn then ends with the guard's
+message rather than a native one. Other engine versions are not measured.
+
+Automatic VS Code window reloads are not explained. Logs from 2026-11-05 show clean,
+renderer-initiated extension-host restarts with no Codex crash; the 2026-11-05
+reload at 09:37 followed a VS Code extension auto-update. The extension reloads
+the window for any app-server restart request. No PADSwitcher path that triggers
+one was found, and `client_closed` entries in `events.jsonl` will show the close
+code and active turns if it recurs. Reloading still interrupts that window's
+running turns, as closing it would.
+
+- Regression suite: 270 tests, 268 passed locally. The PowerShell 7 check is
+  skipped. `subprocess environment excludes inherited Kaggle credentials` fails in
+  the local Git Bash environment both before and after this change.
+- `npm run smoke:switch` (new, native engine, two VS Code clients and desktop): a
+  selection during a tool call moved the running turn from account A to B at its
+  next model call; other sessions started and finished turns meanwhile; a selection
+  during a stream left that step on its account; six turns raced the native login.
+  No turn failed. It uses the same engine binary for both routes.
+- Helper launch is covered with a compiled fixture manager: one launch, Electron and
+  Codex variables removed, queued client message delivered, and immediate failure
+  when the connection is turned off. It was not tested with a real VS Code window;
+  the extension's own startup patience for the wait is unverified.
+
+All model traffic in these checks uses synthetic credentials and loopback
+responses. No real quota is consumed. Log inspection read error strings and counts
+only; no conversation content was retained. Running processes must restart to load
+this version.
 
 ## Retry and fixture isolation repair — 2026-10-28
 

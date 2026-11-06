@@ -7,6 +7,7 @@ const { nativeExecutable } = require('./windows.cjs');
 const { atomicWrite, assertDirectory, exists, readLimited } = require('./files.cjs');
 const { UserError, publicError } = require('./errors.cjs');
 
+const STATUS_INTERVAL = 15000;
 async function installedDesktop(options={}) {
   return require('./windows.cjs').findDesktop(options);
 }
@@ -58,9 +59,13 @@ class DesktopIntegration {
   view() {
     const gateway = this.hub.desktop;
     const connected = gateway?.view().connected.desktop || 0;
-    return { configuration: this.configured ? 'configured' : 'notConfigured', available: this.available, running: this.running, launching: !!this.flight, connected, profileId: gateway?.router?.profileId || gateway?.profileId || null, pendingId: this.hub.shared.pendingId || gateway?.pendingId || null, home: this.record.home, lastError: gateway?.error || (!connected ? this.error : null) || null };
+    return { configuration: this.configured ? 'configured' : 'notConfigured', available: this.available, running: this.running, launching: !!this.flight, connected, profileId: gateway?.router?.profileId || gateway?.profileId || null, pendingId: this.hub.shared.visiblePendingId || gateway?.visiblePendingId || null, home: this.record.home, lastError: gateway?.error || (!connected ? this.error : null) || null };
   }
-  async status() {
+  async status({ fresh = false } = {}) {
+    // Each check spawns PowerShell. Background polling reuses a recent answer;
+    // an action that depends on it asks for a fresh one.
+    if (!fresh && this.statusAt && Date.now() - this.statusAt < STATUS_INTERVAL) return this.view();
+    this.statusAt = Date.now();
     try {
       const app = await this.installed(); this.available = true;
       const list = await this.service.platform.processes();
@@ -89,7 +94,7 @@ class DesktopIntegration {
       await this.hub.start(id);
       return { launched: false, connected: true, pending: !!this.hub.shared.pendingId || !!this.hub.desktop?.pendingId };
     }
-    const app = await this.installed(); await this.status();
+    const app = await this.installed(); await this.status({ fresh: true });
     if (this.running) throw new UserError('Lưu công việc và thoát hẳn ChatGPT/Codex desktop trước lần kết nối này. PADSwitcher không tự đóng ứng dụng. Sau khi mở qua PADSwitcher, đổi tài khoản không cần mở lại desktop.', 'DESKTOP_RUNNING');
     if (this.hub.turns.size || this.hub.shared.router?.active) throw new UserError('Chờ các lượt Codex đang chạy hoàn tất trước lần kết nối desktop đầu tiên.', 'GATEWAY_ACTIVE');
     await fs.mkdir(this.record.home, { recursive: true, mode: 0o700 }); await assertDirectory(this.record.home);
@@ -123,7 +128,7 @@ class DesktopIntegration {
   }
   disconnect() { return this.perform(() => this.disconnectInner()); }
   async disconnectInner() {
-    await this.status();
+    await this.status({ fresh: true });
     if (this.running) throw new UserError('Thoát desktop đã kết nối trước khi gỡ kết nối. Sau đó mở ứng dụng từ menu hệ thống để trở về đăng nhập ban đầu.', 'DESKTOP_RUNNING');
     await this.hub.stopDesktop();
     clearTimeout(this.launchTimer);
@@ -133,7 +138,7 @@ class DesktopIntegration {
   setHome(home) { return this.perform(() => this.setHomeInner(home)); }
   async setHomeInner(home) {
     if (typeof home !== 'string' || !path.isAbsolute(home) || home.length > 2048) throw new UserError('Chọn thư mục Codex tuyệt đối chứa hội thoại desktop.', 'INVALID_SETTINGS');
-    await this.status();
+    await this.status({ fresh: true });
     if (this.running || this.view().connected) throw new UserError('Thoát desktop trước khi đổi thư mục hội thoại.', 'DESKTOP_RUNNING');
     await assertDirectory(home); await this.hub.stopDesktop();
     this.record.home = home; await atomicWrite(this.file, JSON.stringify(this.record)); this.service.changed();

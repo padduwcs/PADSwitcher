@@ -138,7 +138,7 @@ See [ROUTING.md](../ROUTING.md) for routing boundaries and
 
 ## Windows 1.20 parity checks
 
-Run `npm run smoke:faults`, `npm run smoke:continuity`, and `npm run smoke:desktop`
+Run `npm run smoke:faults`, `npm run smoke:continuity`, `npm run smoke:switch`, and `npm run smoke:desktop`
 after the usual unit/protocol checks. These use the production Windows gateway,
 synthetic credentials and loopback model responses. The desktop fixture checks
 existing history, restart/resume and current named-pipe MCP tools.

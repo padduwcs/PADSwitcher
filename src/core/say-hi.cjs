@@ -18,17 +18,6 @@ const THREAD_CONFIG = {
 const cancelled = () => new UserError('Đã dừng Say hi.', 'CANCELLED');
 const uncertain = () => new UserError('Chưa xác định lời chào đã hoàn tất. Làm mới quota trước khi gửi lại.', 'SAY_HI_UNCERTAIN');
 
-async function available(service, signal, operation) {
-  const until = Date.now() + 30000;
-  while (service.busy) {
-    if (signal.aborted) throw cancelled();
-    if (Date.now() >= until) throw new UserError('Một thao tác khác đang chạy. Hãy chờ hoàn tất.', 'BUSY');
-    await new Promise(resolve => setTimeout(resolve, 25));
-  }
-  if (signal.aborted) throw cancelled();
-  return operation();
-}
-
 async function selectModel(rpc) {
   let cursor;
   const models = [];
@@ -99,7 +88,6 @@ class SayHiService {
   start(id = null) {
     if (this.flight) throw new UserError('Say hi đang chạy. Hãy chờ hoàn tất.', 'SAY_HI_BUSY');
     if (this.closed) throw new UserError('Đã dừng Say hi.', 'CANCELLED');
-    if (this.service.busy) throw new UserError('Một thao tác khác đang chạy. Hãy chờ hoàn tất.', 'BUSY');
     const profiles = id === null ? [...this.service.state.profiles] : [this.service.get(id)];
     if (!profiles.length) throw new UserError('Thêm tài khoản trước khi Say hi.', 'SAY_HI_EMPTY');
     this.abort = new AbortController();
@@ -129,7 +117,8 @@ class SayHiService {
   async one(row) {
     const service = this.service, signal = this.abort.signal, p = service.get(row.id);
     if (p.status === 'reauth') { row.status = 'skipped'; row.error = {code:'AUTH_INVALID',message:'Phiên đã hết hạn. Hãy đăng nhập lại tài khoản này.'}; return; }
-    const bundle = await available(service, signal, () => service.accessBundle(row.id));
+    if (signal.aborted) throw cancelled();
+    const bundle = await service.accessBundle(row.id);
     let home, rpc;
     try {
       home = await fs.mkdtemp(path.join(service.root,'sayhi-rpc-'));
@@ -159,7 +148,7 @@ class SayHiService {
       row.status = 'sent'; row.sentAt = new Date().toISOString();
       try {
         const readAt = Date.now(), result = await rpc.request('account/rateLimits/read',{});
-        await available(service,signal,() => service.exclusive(async () => {
+        await service.exclusive(async () => {
           const target = service.get(row.id);
           if (!(Date.parse(target.quotaAt) > readAt)) {
             target.quota = normalizeLimits(result); target.resetCredits = normalizeResets(result);
@@ -168,7 +157,7 @@ class SayHiService {
             if (windows.length && windows.every(w => w.usedPercent < 100)) delete service.state.quotaCooldowns[row.id];
             await service.save();
           }
-        }));
+        },{account:row.id});
         row.quotaRefreshed = true;
       } catch { row.error = {code:'SAY_HI_REFRESH',message:'Đã say hi, chưa cập nhật được giờ reset. Hãy làm mới quota.'}; }
     } finally {

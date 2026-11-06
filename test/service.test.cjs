@@ -205,7 +205,7 @@ test('cancellation during initialization never opens browser or starts another l
   const f=await fixture(t);let started=false,opened=false,closed=false;
   f.service.rpcFactory=()=>({listeners:new Set(),closed:false,initialize:async()=>{await new Promise(r=>setTimeout(r,20));},request:async()=>{started=true;return {};},close:async()=>{closed=true;}});
   const promise=f.service.addAccount('B',async()=>{opened=true;});
-  while(!f.service.login)await new Promise(r=>setTimeout(r,1));f.service.cancelLogin();await assert.rejects(promise,{code:'CANCELLED'});
+  while(!f.service.login?.rpc)await new Promise(r=>setTimeout(r,1));f.service.cancelLogin();await assert.rejects(promise,{code:'CANCELLED'});
   assert.equal(started,false);assert.equal(opened,false);assert.ok(closed);assert.equal(f.service.busy,false);
 });
 test('wrong-account reauthentication leaves existing vault intact and retains recoverable login',async t => {
@@ -230,4 +230,161 @@ test('diagnostics show each model route once and do not persist numeric telemetr
   f.service.gateway={view:()=>({usage:shared,scopes:{vscode:{mode:'shared',usage:shared},cli:{mode:'shared',usage:shared},jetbrains:{mode:'private',usage:own}}})};
   const info=await f.service.diagnostics();assert.deepEqual(info.modelUsage,[{scope:'shared',...shared},{scope:'jetbrains',...own}]);
   await f.service.save();assert(!(await fs.readFile(f.service.metadataFile,'utf8')).includes('attempts'));
+});
+
+function freshAuth(name,revision='1'){
+  const data=JSON.parse(auth(name,revision).toString());data.tokens.access_token=jwt({sub:'fixture-user-'+name,revision,exp:Math.floor(Date.now()/1000)+3600});
+  return Buffer.from(JSON.stringify(data));
+}
+function countVault(service){let reads=0;const dpapi=service.platform.dpapi;service.platform.dpapi=(bytes,decrypt)=>{if(decrypt)reads++;return dpapi(bytes,decrypt);};return ()=>reads;}
+test('model calls reuse a valid credential without decrypting the vault or changing app state',async t=>{
+  const f=await fixture(t),p=await f.service.capture(freshAuth('a')),reads=countVault(f.service),first=await f.service.accessBundle(p.id);
+  let changes=0;f.service.on('change',()=>changes++);first.accessToken=null;
+  const second=await f.service.accessBundle(p.id);assert(second.accessToken);assert.equal(second.chatgptAccountId,'fixture-account-a');assert.equal(reads(),1);assert.equal(changes,0);
+  p.plan='business';assert.equal((await f.service.accessBundle(p.id)).chatgptPlanType,'business');
+});
+test('a rotated, expiring or forced credential is never served from memory',async t=>{
+  const f=await fixture(t),p=await f.service.capture(freshAuth('a'));await f.service.accessBundle(p.id);
+  await f.service.storeAuth(p.id,freshAuth('a','rotated'));
+  const rotated=await f.service.accessBundle(p.id);assert.equal(JSON.parse(Buffer.from(rotated.accessToken.split('.')[1],'base64url')).revision,'rotated');
+  const reads=countVault(f.service);f.service.credentials.get(p.id).expires=Date.now()+1000;await f.service.accessBundle(p.id).catch(()=>{});assert.equal(reads(),1);
+  f.service.credentials.get(p.id).expires=Date.now()+3600000;f.service.rpcFactory=()=>({initialize:async()=>{},request:async()=>{},close:async()=>{}});
+  await f.service.runtime(p.id);await f.service.accessBundle(p.id,true);assert.equal(reads()>=2,true);
+});
+test('removing a profile forgets its in-memory credential',async t=>{
+  const f=await fixture(t),a=await f.service.capture(freshAuth('a'));await f.service.capture(freshAuth('b'));await f.service.accessBundle(a.id);
+  await f.service.remove(a.id);assert.equal(f.service.credentials.has(a.id),false);await assert.rejects(f.service.accessBundle(a.id),{code:'PROFILE_MISSING'});
+});
+test('work on one account never waits for another, and the same account runs in order',async t=>{
+  const f=await fixture(t),a=await f.service.capture(freshAuth('a')),b=await f.service.capture(freshAuth('b')),order=[];
+  let release,entered;const gate=new Promise(r=>release=r),inside=new Promise(r=>entered=r);
+  const slow=f.service.exclusive(async()=>{order.push('a-start');entered();await gate;order.push('a-end');},{account:a.id});await inside;
+  assert.equal((await f.service.accessBundle(b.id)).chatgptAccountId,'fixture-account-b');await f.service.exclusive(async()=>order.push('b'),{account:b.id});
+  const same=f.service.exclusive(async()=>order.push('a-next'),{account:a.id});
+  assert.equal(f.service.view().busy,false,'one account never marks the whole app busy');release();await Promise.all([slow,same]);
+  assert.deepEqual(order,['a-start','b','a-end','a-next']);assert.equal(f.service.busy,false);
+});
+test('a whole-store operation waits its turn instead of failing and later work follows it',async t=>{
+  const f=await fixture(t),a=await f.service.capture(freshAuth('a')),order=[];let release,entered;const gate=new Promise(r=>release=r),inside=new Promise(r=>entered=r);
+  const running=f.service.exclusive(async()=>{entered();await gate;order.push('account');},{account:a.id});await inside;
+  const whole=f.service.exclusive(async()=>order.push('whole')),after=f.service.exclusive(async()=>order.push('after'),{account:a.id});
+  await new Promise(r=>setTimeout(r,10));assert.deepEqual(order,[]);release();await Promise.all([running,whole,after]);assert.deepEqual(order,['account','whole','after']);
+});
+test('quota refresh covers every account, up to three at once, and shows which are refreshing',async t=>{
+  const f=await fixture(t),all=[];for(const n of ['a','b','c','d','e'])all.push(await f.service.capture(auth(n)));
+  let active=0,peak=0;const seen=[];f.service.refreshOne=async id=>{seen.push(id);active++;peak=Math.max(peak,active);assert.equal(f.service.view().profiles.find(p=>p.id===id).refreshing,true);await new Promise(r=>setTimeout(r,5));active--;};
+  await f.service.refreshAll();assert.deepEqual(seen.sort(),all.map(p=>p.id).sort());assert.equal(peak,3);assert(f.service.view().profiles.every(p=>!p.refreshing));
+});
+test('parallel credential lookups for one account read the vault once',async t=>{
+  const f=await fixture(t),p=await f.service.capture(freshAuth('a')),reads=countVault(f.service);
+  const bundles=await Promise.all([1,2,3,4].map(()=>f.service.accessBundle(p.id)));assert(bundles.every(b=>b.accessToken));assert.equal(reads(),1);
+});
+test('waiting for a browser sign-in leaves accounts usable and allows only one sign-in',async t=>{
+  const f=await fixture(t),p=await f.service.capture(auth('a'));let opened;const browser=new Promise(r=>opened=r);
+  const listeners=new Set(),rpc={listeners,closed:false,initialize:async()=>{},request:async method=>method==='account/login/start'?{loginId:'fixture',authUrl:'https://auth.openai.com/fixture'}:{},close:async()=>{}};f.service.rpcFactory=()=>rpc;
+  const login=f.service.addAccount('New',async()=>opened());await browser;
+  assert.equal(f.service.busy,false);await f.service.edit(p.id,'Renamed','');await f.service.refresh(p.id).catch(()=>{});
+  await assert.rejects(f.service.addAccount('Second',async()=>{}),{code:'LOGIN_ACTIVE'});
+  f.service.cancelLogin();await assert.rejects(login,{code:'CANCELLED'});assert.equal(f.service.login,null);
+});
+test('accounts keep a saved order, and a stale list is refused',async t=>{
+  const f=await fixture(t),a=await f.service.capture(auth('a')),b=await f.service.capture(auth('b')),c=await f.service.capture(auth('c'));
+  await f.service.reorderProfiles([c.id,a.id,b.id]);assert.deepEqual(f.service.view().profiles.map(p=>p.id),[c.id,a.id,b.id]);
+  assert.deepEqual((await f.create()).state.profiles.map(p=>p.id),[c.id,a.id,b.id]);
+  for(const ids of [[a.id,b.id],[a.id,a.id,b.id],[a.id,b.id,'unknown'],'invalid',null])await assert.rejects(f.service.reorderProfiles(ids),{code:'INVALID_ORDER'});
+  assert.deepEqual(f.service.state.profiles.map(p=>p.id),[c.id,a.id,b.id]);
+});
+test('a periodic pass reads accounts in use or due; a skipped pass and a busy user action are quiet',async t=>{
+  const f=await fixture(t),a=await f.service.capture(auth('a')),b=await f.service.capture(auth('b')),now=new Date().toISOString(),seen=[];
+  f.service.refreshOne=async id=>{seen.push(id);};f.service.gateway={isUsing:id=>id===a.id,view:()=>({})};
+  for(const p of [a,b]){p.quotaAt=now;p.status='ready';}
+  await f.service.refreshBackground({dueOnly:true});assert.deepEqual(seen,[a.id]);
+  b.quotaAt=new Date(Date.now()-5*60000).toISOString();await f.service.refreshBackground({dueOnly:true});assert.deepEqual(seen,[a.id,a.id,b.id]);
+});
+test('startup removes leftover temporary backend folders and nothing else',async t=>{
+  const f=await fixture(t);for(const name of ['sayhi-rpc-AbC123','reset-rpc-xYz789','profiles-keep','sayhi-rpc-'])await fs.mkdir(path.join(f.data,name),{recursive:true});
+  await fs.writeFile(path.join(f.data,'reset-rpc-file'),'keep');await f.service.sweepTemporary();
+  assert.equal(await exists(path.join(f.data,'sayhi-rpc-AbC123')),false);assert.equal(await exists(path.join(f.data,'reset-rpc-xYz789')),false);
+  for(const name of ['profiles-keep','sayhi-rpc-','reset-rpc-file','profiles'])assert(await exists(path.join(f.data,name)));
+});
+test('the connection log keeps only allow-listed scalar fields and rotates at its limit',async t=>{
+  const {EventLog}=require('../src/core/event-log.cjs'),f=await fixture(t),file=path.join(f.directory,'events.jsonl'),log=new EventLog(file,{maxBytes:400});
+  log.write({scope:'shared',type:'model_step_uncertain',reason:'idle_timeout',attempt:2,accessToken:'secret-token',threadId:'secret-thread',prompt:'secret-prompt',from:'secret-account',kind:{nested:'secret-object'}});await log.flush();
+  const entry=JSON.parse(await fs.readFile(file,'utf8'));assert.deepEqual(Object.keys(entry),['at','scope','type','reason','attempt']);
+  for(let i=0;i<20;i++)log.write({type:'client_closed',kind:'vscode',code:1006,activeTurns:i});await log.flush();
+  assert((await fs.stat(file)).size<=400);assert(await exists(file+'.1'));assert(!(await fs.readFile(file+'.1','utf8')).includes('secret'));
+});
+test('an unwritable connection log never reaches the caller',async t=>{
+  const {EventLog}=require('../src/core/event-log.cjs'),f=await fixture(t),log=new EventLog(path.join(f.directory,'missing','events.jsonl'));
+  log.write({type:'fixture'});await log.flush();
+});
+test('the helper launcher exists only while the connection is enabled',async t=>{
+  const {syncManagerLauncher}=require('../src/core/manager-launcher.cjs'),f=await fixture(t),file=path.join(f.data,'gateway','launcher.json');
+  f.service.state.gatewayEnabled=true;await syncManagerLauncher(f.service,'C:\\Apps\\PADSwitcher.exe');assert.deepEqual(JSON.parse(await fs.readFile(file,'utf8')),{version:1,executable:'C:\\Apps\\PADSwitcher.exe'});
+  f.service.state.gatewayEnabled=false;await syncManagerLauncher(f.service,'C:\\Apps\\PADSwitcher.exe');assert.equal(await exists(file),false);await syncManagerLauncher(f.service,null);
+  f.service.state.gatewayEnabled=true;await syncManagerLauncher(f.service,null);assert.equal(await exists(file),false);
+});
+
+const {Updater,newer,notes,assetUrl}=require('../src/core/updater.cjs');
+function release(version,bytes,extra={}){
+  const name='PADSwitcher-'+version+'-Windows.exe',base='https://github.com/padduwcs/PADSwitcher/releases/download/v'+version+'/';
+  return {tag_name:'v'+version,draft:false,prerelease:false,published_at:'2026-11-07T00:00:00Z',body:'Tiếng **Việt** [link](https://x.test)\n\n---\n\nEnglish',assets:[{name,size:bytes.length,browser_download_url:base+name},{name:name+'.sha256',size:64,browser_download_url:base+name+'.sha256'}],...extra};
+}
+async function updateFixture(t,value,bytes,{checksum}={}){
+  const f=await fixture(t),folder=path.join(f.directory,'app');await fs.mkdir(folder);const executable=path.join(folder,'PADSwitcher-1.0.0-Windows.exe');await fs.writeFile(executable,'old');
+  const sum=checksum??require('node:crypto').createHash('sha256').update(bytes).digest('hex'),requests=[];
+  const request=async(url,options)=>{requests.push({url,options});
+    if(url.includes('api.github.com'))return new Response(JSON.stringify(value));
+    if(url.endsWith('.sha256'))return new Response(sum+'  file.exe\n');
+    return new Response(bytes);};
+  const scripts=[],spawned=[];
+  const updater=new Updater({current:'1.0.0',executable,root:f.data,fetch:request,pid:4242,platform:{powershell:'powershell.exe',ps:async(script,options)=>scripts.push({script,env:options.env})},spawn:(file,args,options)=>{spawned.push({file,args,options});const child=new (require('node:events').EventEmitter)();child.unref=()=>{};setImmediate(()=>child.emit('spawn'));return child;}});
+  return {updater,executable,folder,requests,scripts,spawned};
+}
+test('versions compare numerically and only exact release tags count',()=>{
+  assert(newer('1.10.0','1.9.9'));assert(newer('v2.0.0','1.99.99'));assert(!newer('1.0.0','1.0.0'));assert(!newer('1.0.0','1.0.1'));assert(!newer('1.0.0-unix.1','0.1.0'));assert(!newer('unix-v9.0.0','1.0.0'));
+  assert.deepEqual(notes('Việt **đậm**\n---\nEnglish [a](http://b)'),{vi:'Việt đậm',en:'English a'});
+  assert(assetUrl('https://github.com/padduwcs/PADSwitcher/releases/download/v1/a.exe'));
+  for(const url of ['http://github.com/padduwcs/PADSwitcher/releases/download/v1/a.exe','https://github.com/other/PADSwitcher/releases/download/v1/a.exe','https://evil.test/padduwcs/PADSwitcher/releases/download/v1/a.exe','bad'])assert.equal(assetUrl(url),null);
+});
+test('an update downloads beside the app, passes its checksum and repoints shortcuts before relaunching',async t=>{
+  const bytes=Buffer.from('new executable'),f=await updateFixture(t,release('1.1.0',bytes),bytes),{updater}=f;
+  assert.equal((await updater.check()).status,'available');assert.equal(updater.view().notes.vi,'Tiếng Việt link');
+  await updater.install().then(()=>assert.fail('not ready'),e=>assert.equal(e.code,'UPDATE_NONE'));
+  const done=await updater.download();assert.equal(done.status,'ready');assert.equal(done.progress,100);
+  const target=path.join(f.folder,'PADSwitcher-1.1.0-Windows.exe');assert.deepEqual(await fs.readFile(target),bytes);assert.equal((await fs.readFile(f.executable,'utf8')),'old','the previous version stays available');
+  assert.equal((await fs.readdir(f.folder)).length,2);
+  await updater.install();assert.equal(f.scripts[0].env.PAD_UPDATE_OLD,f.executable);assert.equal(f.scripts[0].env.PAD_UPDATE_NEW,target);
+  const start=f.spawned[0];assert.equal(start.options.detached,true);assert.equal(start.options.env.PAD_UPDATE_PID,'4242');assert.equal(start.options.env.PORTABLE_EXECUTABLE_FILE,undefined);
+  assert(!start.args.join(' ').includes(target),'paths reach PowerShell only through its environment');
+  assert(f.requests.every(r=>r.options.headers['user-agent'].startsWith('PADSwitcher/')&&!JSON.stringify(r.options.headers).includes('authorization')));
+});
+test('a download failing its checksum is removed and can be retried',async t=>{
+  const bytes=Buffer.from('tampered'),f=await updateFixture(t,release('1.1.0',bytes),bytes,{checksum:'0'.repeat(64)}),{updater}=f;
+  await updater.check();await assert.rejects(updater.download(),{code:'UPDATE_VERIFY'});
+  assert.equal(updater.view().status,'available');assert(updater.view().error.includes('checksum'));assert.deepEqual(await fs.readdir(f.folder),[path.basename(f.executable)]);
+});
+test('the same or an older release, a draft or missing assets never offer an update',async t=>{
+  const bytes=Buffer.from('x');
+  for(const value of [release('1.0.0',bytes),release('0.9.0',bytes),release('1.1.0',bytes,{prerelease:true}),release('1.1.0',bytes,{draft:true})]){const f=await updateFixture(t,value,bytes);assert.equal((await f.updater.check()).status,'current');}
+  const missing=await updateFixture(t,release('1.1.0',bytes,{assets:[]}),bytes);const view=await missing.updater.check();assert.equal(view.status,'idle');assert(view.error);
+  const foreign=release('1.1.0',bytes);foreign.assets[0].browser_download_url='https://evil.test/a.exe';assert((await (await updateFixture(t,foreign,bytes)).updater.check()).error);
+});
+test('a verified earlier download is reused, an offline check stays quiet, and source builds cannot self-install',async t=>{
+  const bytes=Buffer.from('ready'),f=await updateFixture(t,release('1.1.0',bytes),bytes);await fs.writeFile(path.join(f.folder,'PADSwitcher-1.1.0-Windows.exe'),bytes);
+  assert.equal((await f.updater.check()).status,'ready');
+  const offline=new Updater({current:'1.0.0',root:f.folder,platform:{},fetch:async()=>{throw Error('offline');}});const view=await offline.check();assert.equal(view.status,'idle');assert(view.error);assert.equal(view.supported,false);
+  await assert.rejects(offline.download(),{code:'UPDATE_UNSUPPORTED'});
+});
+test('cancelling a download removes its partial file',async t=>{
+  const bytes=Buffer.alloc(1024,1),f=await updateFixture(t,release('1.1.0',bytes),bytes),{updater}=f;await updater.check();
+  updater.request=async(url,options)=>{if(url.endsWith('.sha256'))return new Response('a'.repeat(64));return new Response(new ReadableStream({start(c){c.enqueue(new Uint8Array(10));options.signal.addEventListener('abort',()=>c.error(Error('aborted')));}}));};
+  const download=updater.download();for(let i=0;i<50&&!updater.controller;i++)await new Promise(r=>setTimeout(r,5));await new Promise(r=>setTimeout(r,20));updater.cancel();
+  assert.equal((await download).status,'available');assert.equal(updater.view().error,null);assert.deepEqual(await fs.readdir(f.folder),[path.basename(f.executable)]);
+});
+
+test('a sign-in cancelled before Codex starts never launches a backend',async t=>{
+  const f=await fixture(t);let created=false;f.service.rpcFactory=()=>{created=true;return {};};
+  const promise=f.service.addAccount('B',async()=>{});f.service.cancelLogin();await assert.rejects(promise,{code:'CANCELLED'});
+  assert.equal(created,false);assert.equal(f.service.login,null);
 });

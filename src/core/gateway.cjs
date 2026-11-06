@@ -16,6 +16,7 @@ const {DesktopToolsPipe}=require('./desktop-tools.cjs');
 const START_METHODS=new Set(['turn/start','review/start']);
 const AUTH_METHODS=new Set(['account/login/start','account/login/cancel','account/logout']);
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const personalPlan=plan=>['free','plus','pro'].includes(String(plan||'').toLowerCase());
 async function freePort(){const s=net.createServer();await new Promise((r,j)=>{s.once('error',j);s.listen(0,'127.0.0.1',r);});const port=s.address().port;await new Promise(r=>s.close(r));return port;}
 function validBearer(value,token){const bytes=Buffer.from(String(value||''));const expected=Buffer.from('Bearer '+token);return bytes.length===expected.length&&crypto.timingSafeEqual(bytes,expected);}
 class Gateway {
@@ -26,8 +27,11 @@ class Gateway {
     this.recovery=new Recovery(this);
     this.knownTurns=new Map();
   }
-  view(){const connected={vscode:0,cli:0,jetbrains:0,desktop:0,other:0};for(const c of this.clients)if(!c.startup&&c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.pendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',usage:this.router?{...this.router.usage}:null,lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
+  // With a router, native auth only follows it for display; a sync in progress is not a pending user choice.
+  get visiblePendingId(){return this.pendingSource==='route'?null:this.pendingId;}
+  view(){const connected={vscode:0,cli:0,jetbrains:0,desktop:0,other:0};for(const c of this.clients)if(!c.startup&&c.initialized&&c.initializeAccepted&&c.front.readyState===WebSocket.OPEN&&c.back?.readyState===WebSocket.OPEN)connected[c.kind||'other']++;return {status:this.status,profileId:this.router?.profileId||this.profileId,pendingId:this.visiblePendingId,activeTurns:this.turns.size,clients:this.clients.size,connected,modelRouting:this.router?'request':'continuation',usage:this.router?{...this.router.usage}:null,lastError:this.error,helper:this.helper||null,version:this.version||null,recovery:this.recovery.view()};}
   changed(){this.service.changed();}
+  log(type,fields={}){this.service.eventLog?.write({scope:this.options.scope||'shared',type,...fields});}
   async start(id){
     this.service.get(id);
     if(this.status==='ready'){await this.select(id);return;}
@@ -94,22 +98,39 @@ class Gateway {
       this.pendingId=this.router.profileId;this.pendingSource='route';this.applyPending().catch(()=>{});
     }
   }
-  backendFailed(){this.recovery.cancel();if(!this.options.sharedRouter)this.router?.cancel();this.status='error';this.error='Codex gateway đã dừng. Mở lại gateway để kết nối.';for(const c of this.clients)c.front.close(1011,'Codex backend stopped');this.changed();}
+  backendFailed(){this.log('backend_failed');this.recovery.cancel();if(!this.options.sharedRouter)this.router?.cancel();this.status='error';this.error='Codex gateway đã dừng. Mở lại gateway để kết nối.';for(const c of this.clients)c.front.close(1011,'Codex backend stopped');this.changed();}
   async select(id){
     this.service.get(id);if(this.status!=='ready')throw new UserError('Hãy bật gateway trước.', 'GATEWAY_STOPPED');
     this.recovery.cancel(this.recovery.busy?'Bạn đã chọn tài khoản thủ công; đã hủy tự tiếp tục.':null);
+    if(this.router){await this.selectRouted(id);return;}
     this.pendingId=id;this.pendingSource='manual';this.error=null;this.changed();await this.applyPending();
   }
+  async selectRouted(id){
+    // Every model request carries the router's credential, so a choice takes effect
+    // from the next model call, exactly like a quota rotation. A step already
+    // streaming finishes normally. Native auth follows once this backend is idle.
+    if(!this.options.sharedRouter){
+      const generation=this.generation,bundle=await this.bundle(id);
+      if(this.generation!==generation)return;
+      if(!personalPlan(bundle.chatgptPlanType))throw new UserError('Bộ định tuyến hiện hỗ trợ tài khoản cá nhân Free, Plus và Pro. Tài khoản tổ chức cần luồng kết nối riêng.', 'GATEWAY_ROUTER_PLAN');
+      const from=this.router.profileId;
+      if(from!==id){
+        this.router.select(id);this.service.state.gatewayProfileId=id;this.router.persist('Không lưu được tài khoản đã chọn; phiên hiện tại vẫn dùng tài khoản này.');
+        if(this.turns.size||this.router.active)this.recovery.note('selected','Đã chọn tài khoản; lần gọi model tiếp theo sẽ dùng tài khoản này.',from,id);
+      }
+    }
+    this.pendingId=this.router.profileId;this.pendingSource='route';this.error=null;this.changed();await this.applyPending();
+  }
   async applyPending(){
-    if(!['ready','starting'].includes(this.status)||this.changing||this.refreshFlight||this.turns.size||this.router?.active||this.options.canChange?.()===false||!this.pendingId)return;
+    if(!['ready','starting'].includes(this.status)||this.changing||this.refreshFlight||this.turns.size||this.router?.active||!this.pendingId)return;
     if(this.options.sharedRouter&&this.pendingId!==this.router.profileId)return;
     this.changing=true;this.changed();const id=this.pendingId,source=this.pendingSource,generation=this.generation,control=this.control;
     try {
       await this.reconcile();
-      if(this.generation!==generation||this.turns.size||this.options.canChange?.()===false)return;
+      if(this.generation!==generation||this.turns.size)return;
       const bundle=await this.bundle(id);
-      if(this.generation!==generation||this.pendingId!==id||this.options.canChange?.()===false||!['ready','starting'].includes(this.status))return;
-      if(this.router&&!['free','plus','pro'].includes(String(bundle.chatgptPlanType||'').toLowerCase()))throw new UserError('Bộ định tuyến hiện hỗ trợ tài khoản cá nhân Free, Plus và Pro. Tài khoản tổ chức cần luồng kết nối riêng.', 'GATEWAY_ROUTER_PLAN');
+      if(this.generation!==generation||this.pendingId!==id||this.turns.size||!['ready','starting'].includes(this.status))return;
+      if(this.router&&!personalPlan(bundle.chatgptPlanType))throw new UserError('Bộ định tuyến hiện hỗ trợ tài khoản cá nhân Free, Plus và Pro. Tài khoản tổ chức cần luồng kết nối riêng.', 'GATEWAY_ROUTER_PLAN');
       await control.request('account/login/start',{type:'chatgptAuthTokens',...bundle});
       if(this.options.verifyAccount){
         const auth=await control.request('getAuthStatus',{includeToken:true,refreshToken:false});
@@ -122,7 +143,7 @@ class Gateway {
       // roll back a newer model-account selection made while it was pending.
       if(!this.options.sharedRouter&&source!=='route')this.router?.select(id);
       this.service.state.gatewayProfileId=source==='route'?this.router.profileId:id;await this.service.save();this.error=null;
-    }catch(e){if(this.generation===generation){this.pendingId=null;this.pendingSource=null;this.error=publicError(e).message;if(this.options.verifyAccount){this.status='error';for(const c of this.clients)c.front.close(1011,'Desktop account verification failed');}}throw e;}
+    }catch(e){if(this.generation===generation){this.pendingId=null;this.pendingSource=null;this.error=publicError(e).message;if(this.options.verifyAccount&&e.code==='DESKTOP_AUTH_VERIFY'){this.status='error';for(const c of this.clients)c.front.close(1011,'Desktop account verification failed');}}throw e;}
     finally{if(this.generation===generation){this.changing=false;if(!this.pendingId)this.pendingSource=null;this.changed();}}
     if(this.pendingId)await this.applyPending();
   }
@@ -140,16 +161,16 @@ class Gateway {
         if(type==='active'&&![...this.turns.values()].some(t=>t.threadId===id))this.turns.set('native:'+id,{client:null,threadId:id,turnId:null});
       }
       for(const [key,t]of this.turns){
-        if(t.client===null&&status.get(t.threadId)!=='active')this.turns.delete(key);
-        else if(t.turnId&&status.get(t.threadId)==='idle')this.turns.delete(key);
+        const state=status.get(t.threadId);
+        if((t.client===null||t.disconnected)&&state!=='active')this.turns.delete(key);
+        else if(t.turnId&&['idle','systemError'].includes(state)){this.turns.delete(key);if(this.router)this.knownTurns.delete(t.turnId);}
       }
       this.changed();
     })().finally(()=>{this.reconcileFlight=null;});
     return this.reconcileFlight;
   }
   async bundle(id,force=false){
-    // Quota refresh/login use the same credential lock. Never refresh two copies concurrently.
-    for(let i=0;this.service.busy&&i<600;i++)await pause(100);
+    // The account lock queues this behind quota reads, so two copies never refresh together.
     return this.service.accessBundle(id,force);
   }
   async serverRequest(method,params){
@@ -177,7 +198,7 @@ class Gateway {
     const queue=[...initialMessages];let forwarding=false,queuedBytes=queue.reduce((n,d)=>n+d.length,0);
     front.on('message',data=>{queuedBytes+=data.length;if(queue.length>=100||queuedBytes>MAX_FRAME){front.close(1009);return;}queue.push(data);drain();});
     const drain=()=>{if(!c.back||forwarding)return;forwarding=true;try{while(queue.length){const data=queue.shift();queuedBytes-=data.length;this.fromClient(c,data);}}finally{forwarding=false;}};
-    front.on('close',()=>{this.clients.delete(c);for(const p of c.internal.values())p.reject(new UserError('Client đã ngắt.', 'RECOVERY_DISCONNECTED'));c.internal.clear();if(this.recovery.active?.client===c||this.recovery.queue.some(j=>j.client===c))this.recovery.cancel('Codex đã ngắt kết nối; đã hủy tự tiếp tục.');for(const t of this.turns.values())if(t.client===c)t.disconnected=true;c.back?.terminate();if(this.status==='ready')this.interruptDisconnected(c).catch(()=>{});this.changed();});
+    front.on('close',code=>{this.log('client_closed',{kind:c.kind||'other',code,activeTurns:[...this.turns.values()].filter(t=>t.client===c).length});this.clients.delete(c);for(const [id,t]of this.knownTurns)if(t.client===c)this.knownTurns.delete(id);for(const p of c.internal.values())p.reject(new UserError('Client đã ngắt.', 'RECOVERY_DISCONNECTED'));c.internal.clear();if(this.recovery.active?.client===c||this.recovery.queue.some(j=>j.client===c))this.recovery.cancel('Codex đã ngắt kết nối; đã hủy tự tiếp tục.');for(const t of this.turns.values())if(t.client===c)t.disconnected=true;c.back?.terminate();if(this.status==='ready')this.interruptDisconnected(c).catch(()=>{});this.changed();});
     front.on('error',()=>{});
     try{
       c.back=await connect(this.backendUrl,this.backToken);
@@ -194,7 +215,9 @@ class Gateway {
     if(typeof m.id==='string'&&m.id.startsWith('pad-auto-')){this.clientError(c,m.id,'Reserved request ID.');return;}
     if(!m.method&&m.id!=null)c.approvals.delete(m.id);
     if(['turn/start','review/start','turn/steer','turn/interrupt','thread/archive','thread/rollback','thread/resume','thread/compact/start'].includes(m.method))this.recovery.cancelThread(m.params?.threadId);
-    if(/^thread\/(realtime|goal|background)\//.test(m.method||'')){this.clientError(c,m.id,'Background and realtime sessions are not supported by PADSwitcher gateway.');return;}
+    // Realtime bypasses the relay. Goal turns use it like any other turn, so only
+    // the continuation-based mode without a router has to refuse them.
+    if((this.router?/^thread\/(realtime|background)\//:/^thread\/(realtime|goal|background)\//).test(m.method||'')){this.clientError(c,m.id,'Background and realtime sessions are not supported by PADSwitcher gateway.');return;}
     if(m.method==='initialize'){
       if(c.initializeId===undefined&&!c.initializeAccepted&&m.id!=null){
         const name=m.params?.clientInfo?.name;
@@ -227,7 +250,9 @@ class Gateway {
     }
     if(['thread/start','thread/resume','thread/fork'].includes(m.method)&&m.id!=null)c.threadPending.set(m.id,m.params?.ephemeral===true||m.params?.threadSource==='thread_title');
     if(START_METHODS.has(m.method)){
-      if(c.routeChanging||this.pendingId||this.changing||this.options.canStart?.()===false||this.recovery.busy||this.status!=='ready'){this.clientError(c,m.id,'PADSwitcher is switching accounts. Wait for the current turn to finish, then retry.');return;}
+      // A router gives each request its own credential, so account changes never
+      // hold up a new turn. Continuation mode swaps the one native login instead.
+      if(c.routeChanging||(!this.router&&(this.pendingId||this.changing||this.recovery.busy))||this.status!=='ready'){this.log('turn_rejected',{kind:c.kind||'other',reason:c.routeChanging?'route_changing':this.status!=='ready'?'gateway_'+this.status:'switching'});this.clientError(c,m.id,'PADSwitcher is switching accounts. Wait for the current turn to finish, then retry.');return;}
       if(m.id==null){c.front.close(1007);return;}
       if(c.pending.has(m.id)){this.clientError(c,m.id,'Duplicate active request ID.');return;}
       if(this.knownTurns.size>=256){this.clientError(c,m.id,'Too many tracked turns. Stop and restart the gateway.');return;}
@@ -275,7 +300,8 @@ class Gateway {
   async interruptDisconnected(c){
     const lost=[...this.turns.entries()].filter(([,t])=>t.client===c);
     for(const [key,t]of lost){
-      if(!t.threadId||!t.turnId){this.error='Một kết nối mất khi yêu cầu chưa xác định trạng thái. Dừng gateway trước khi chuyển tài khoản.';this.changed();continue;}
+      // Reconciliation releases this record once native reports the thread inactive.
+      if(!t.threadId||!t.turnId){if(!this.router){this.error='Một kết nối mất khi yêu cầu chưa xác định trạng thái. Dừng gateway trước khi chuyển tài khoản.';this.changed();}continue;}
       try{
         await this.control.request('turn/interrupt',{threadId:t.threadId,turnId:t.turnId});
         for(let i=0;i<40;i++){
@@ -283,7 +309,7 @@ class Gateway {
           const turn=result.thread?.turns?.find(x=>x.id===t.turnId);
           if(turn&&turn.status!=='inProgress'){this.turns.delete(key);break;}await pause(250);
         }
-      }catch{this.error='Chưa xác định được trạng thái yêu cầu sau khi mất kết nối.';}
+      }catch{if(!this.router)this.error='Chưa xác định được trạng thái yêu cầu sau khi mất kết nối.';}
     }
     this.changed();await this.applyPending();
   }

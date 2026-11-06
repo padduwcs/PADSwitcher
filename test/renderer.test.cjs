@@ -84,7 +84,7 @@ test('Kaggle account cards omit idle filler and duplicate names but keep activit
     active.notebooks.push({ref:'padvision/waiting',status:'queued'});
   });await settle();const d=w.document;d.querySelector('[data-service=kaggle]').click();
   const [idle,active,expired]=d.querySelectorAll('.kg-account');
-  assert.equal(idle.querySelector('.avatar'),null);assert.equal(idle.querySelector('small'),null);assert.equal(idle.querySelector('.kg-account-hint'),null);
+  assert(idle.querySelector('.avatar'),'Kaggle cards share the Codex card layout');assert.equal(idle.querySelector('small'),null);assert.equal(idle.querySelector('.kg-account-hint'),null);
   assert(idle.querySelector('.kg-account-quota').textContent.includes('18,5 h'));assert.equal(idle.getAttribute('aria-pressed'),'true');
   assert.equal(active.querySelector('.kg-account-hint').textContent,'1 đang chạy · 1 đang chờ');
   assert.equal(expired.querySelector('.kg-account-hint').textContent,'Cần token mới');assert(expired.querySelector('.kg-account-quota').classList.contains('kg-stale'));
@@ -238,6 +238,7 @@ function dom(t,demo = true, editState = null) {
     window.pad.action = async (...args) => { const response = await action(...args); if (args[0] === 'state') editState(response.result); return response; };
   }
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/i18n.js'),'utf8'));
+  window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/reorder.js'),'utf8'));
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/services.js'),'utf8'));
   window.eval(fs.readFileSync(path.join(__dirname,'../src/renderer/kaggle.js'),'utf8'));
   window.eval(script); t.after(() => {window.close();assert.deepEqual(errors,[],'Renderer must not throw uncaught errors');}); return window;
@@ -288,9 +289,9 @@ test('model diagnostics distinguish attempts from charges and show minute refres
   const w=dom(t);await settle();const info={modelUsage:[{scope:'shared',requests:2,attempts:3,quotaRetries:1,authRefreshes:0,inputTokens:100,cachedInputTokens:90,lastModel:'gpt-fixture',lastEffort:'medium'}]};
   const action=w.pad.action;w.pad.action=async(...args)=>{const result=await action(...args);if(args[0]==='diagnostics')result.result.modelUsage=info.modelUsage;return result;};
   w.document.querySelector('#check-system').click();await settle();const vi=w.document.querySelector('#diagnostics').textContent;assert(vi.includes('90%'));assert(vi.includes('Lần gửi tới model'));assert(vi.includes('không phải số quota bị trừ'));
-  assert(w.document.querySelector('label.check-label').textContent.includes('mỗi phút'));
+  assert(w.document.querySelector('#autoRefresh').parentElement.textContent.includes('mỗi phút'));
   w.document.querySelector('#language-toggle').click();w.document.querySelector('#check-system').click();await settle();const en=w.document.querySelector('#diagnostics').textContent;assert(en.includes('Upstream attempts'));assert(en.includes('not quota charges'));
-  assert(w.document.querySelector('label.check-label').textContent.includes('every minute'));
+  assert(w.document.querySelector('#autoRefresh').parentElement.textContent.includes('every minute'));
 });
 
 test('a failed refresh marks the last snapshot stale even when its timestamp is recent',async t => {
@@ -475,4 +476,60 @@ test('connection indicators explain the next step, translate and offer a shortcu
   const w=dom(t,true,state=>{state.vscode={configuration:'configured',helperPresent:true};state.gateway={...state.gateway,status:'ready',connected:{vscode:0,cli:1}};});await settle();const d=w.document;
   assert(d.querySelector('#vscode-next').textContent.includes('Reload Window'));d.querySelector('#vscode-pill').click();assert(!d.querySelector('#connections-page').classList.contains('hidden'));
   d.querySelector('#language-toggle').click();assert.equal(d.querySelector('#vscode-status').textContent,'VS Code · Waiting for extension');assert.equal(d.querySelector('#vscode-config').textContent,'Configured');assert.equal(d.querySelector('#cli-status').textContent,'1 CLI connections');
+});
+
+test('dragging a card previews its position, saves once and a plain click still selects',async t=>{
+  const w=dom(t);await settle();const d=w.document,calls=[],action=w.pad.action;w.pad.action=async(command,args)=>{calls.push({command,args});return action(command,args);};
+  const list=d.querySelector('#account-list'),ids=[...list.children].map(c=>c.dataset.id);assert(ids.length>=2);
+  [...list.children].forEach((card,index)=>{card.getBoundingClientRect=()=>({top:index*100,bottom:index*100+90,height:90,left:0,right:100});});
+  const pointer=(type,target,y)=>{const e=new w.Event(type,{bubbles:true});Object.assign(e,{button:0,clientX:0,clientY:y,pointerId:1});target.dispatchEvent(e);};
+  const card=list.children[0];pointer('pointerdown',card,10);pointer('pointermove',w,12);assert(!card.classList.contains('dragging'),'small movements stay a click');
+  pointer('pointermove',w,250);assert(card.classList.contains('dragging'));assert.notEqual(list.children[0],card);
+  const before=calls.length;pointer('pointerup',w,250);await settle();
+  assert.equal(w.padReorder.dragging,false);const saved=calls.slice(before).find(c=>c.command==='reorderProfiles');assert(saved);assert.equal(new Set(saved.args.ids).size,ids.length);assert.notDeepEqual([...saved.args.ids],ids);
+  assert.deepEqual([...d.querySelectorAll('#account-list .account-card')].map(c=>c.dataset.id),[...saved.args.ids]);
+});
+test('Escape restores the order, and search or keyboard use reorder safely',async t=>{
+  const w=dom(t);await settle();const d=w.document,calls=[],action=w.pad.action;w.pad.action=async(command,args)=>{calls.push({command,args});return action(command,args);};
+  const list=d.querySelector('#account-list'),ids=[...list.children].map(c=>c.dataset.id);
+  [...list.children].forEach((card,index)=>{card.getBoundingClientRect=()=>({top:index*100,bottom:index*100+90,height:90,left:0,right:100});});
+  const pointer=(type,target,y)=>{const e=new w.Event(type,{bubbles:true});Object.assign(e,{button:0,clientX:0,clientY:y,pointerId:1});target.dispatchEvent(e);};
+  pointer('pointerdown',list.children[0],10);pointer('pointermove',w,250);w.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await settle();
+  assert.equal(w.padReorder.dragging,false);assert.deepEqual([...list.children].map(c=>c.dataset.id),ids);assert(!calls.some(c=>c.command==='reorderProfiles'));
+  list.children[0].dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',altKey:true,bubbles:true}));await settle();
+  assert.deepEqual([...d.querySelectorAll('#account-list .account-card')].map(c=>c.dataset.id).slice(0,2),[ids[1],ids[0]]);assert.equal(calls.filter(c=>c.command==='reorderProfiles').length,1);
+  d.querySelector('#search').value='a';d.querySelector('#search').dispatchEvent(new w.Event('input'));await settle();
+  assert(![...d.querySelectorAll('#account-list .account-card')].some(c=>c.dataset.reorderId));assert(d.querySelector('#reorder-hint').classList.contains('hidden'));
+});
+test('a failed reorder puts the cards back',async t=>{
+  const w=dom(t);await settle();const d=w.document,action=w.pad.action;w.pad.action=async(command,args)=>command==='reorderProfiles'?{ok:false,error:{code:'INVALID_ORDER',message:'Stale'}}:action(command,args);
+  const list=d.querySelector('#account-list'),ids=[...list.children].map(c=>c.dataset.id);
+  list.children[0].dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowDown',altKey:true,bubbles:true}));await settle();await settle();
+  d.querySelector('#search').dispatchEvent(new w.Event('input'));assert.deepEqual([...d.querySelectorAll('#account-list .account-card')].map(c=>c.dataset.id),ids);
+});
+test('only the button that started an action waits; the rest of the window stays usable',async t=>{
+  const w=dom(t);await settle();const d=w.document,action=w.pad.action;let release;
+  w.pad.action=(command,args)=>command==='refreshAll'?new Promise(resolve=>{release=()=>resolve({ok:true});}):action(command,args);
+  d.querySelector('#refresh-all').click();await settle();
+  assert.equal(d.querySelector('#refresh-all').disabled,true);assert(d.querySelector('#refresh-all').classList.contains('is-loading'));
+  for(const selector of ['#add-account','#configure-auto','#say-hi-all','#use-gateway','#edit-profile','#remove-profile'])assert.equal(d.querySelector(selector).disabled,false,selector);
+  release();await settle();await settle();assert.equal(d.querySelector('#refresh-all').disabled,false);assert(!d.querySelector('#refresh-all').classList.contains('is-loading'));
+});
+test('a whole-app busy flag from the service no longer disables account controls',async t=>{
+  const w=dom(t,true,s=>{s.busy=true;});await settle();const d=w.document;
+  for(const selector of ['#add-account','#refresh-all','#configure-auto','#edit-profile'])assert.equal(d.querySelector(selector).disabled,false,selector);
+});
+test('the version panel follows each update stage, in both languages',async t=>{
+  let update={status:'available',supported:true,current:'1.0.0',version:'1.1.0',notes:{vi:'Ghi chú <b>việt</b>',en:'English notes'},progress:0,error:null};
+  const w=dom(t,true,s=>{s.update=update;s.gateway={...s.gateway,activeTurns:2};});await settle();const d=w.document,calls=[],action=w.pad.action;
+  const refresh=async next=>{update={...update,...next};d.querySelector('#language-toggle').click();await settle();d.querySelector('#language-toggle').click();await settle();};
+  w.pad.action=async(command,args)=>{calls.push({command,args});if(command.startsWith('update')||command==='openRelease')return {ok:true,result:{}};const r=await action(command,args);const base=r.state||r.result;return command==='state'?{...r,state:{...base,update,gateway:{...base.gateway,activeTurns:2}}}:r;};
+  assert.equal(d.querySelector('#update-pill').classList.contains('hidden'),false);assert(d.querySelector('#update-status').textContent.includes('Có bản mới 1.1.0'));assert.equal(d.querySelector('#update-notes-text').innerHTML.includes('<b>'),false);
+  d.querySelector('#update-action').click();await settle();assert.equal(calls.at(-1).command,'updateDownload');
+  d.querySelector('#language-toggle').click();assert(d.querySelector('#update-status').textContent.includes('Version 1.1.0 is available.'));assert.equal(d.querySelector('#update-action').textContent,'Download');assert.equal(d.querySelector('#update-notes-text').textContent,'English notes');
+  d.querySelector('#language-toggle').click();await settle();
+  await refresh({status:'ready',progress:100});
+  d.querySelector('#update-action').click();assert.equal(d.querySelector('#modal').open,true);assert(d.querySelector('#modal-body').textContent.includes('2 lượt Codex đang chạy'));assert(d.querySelector('#modal-body').textContent.includes('Reload Window'));
+  d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();assert.deepEqual(calls.at(-1).args.force,true);assert.equal(calls.at(-1).command,'updateInstall');
+  await refresh({status:'available',supported:false});d.querySelector('#update-action').click();await settle();assert.equal(calls.at(-1).command,'openRelease');
 });

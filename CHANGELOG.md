@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.21.0 — 2026-11-07
+
+### Changed
+
+- Operations no longer block each other. Work on one account queues behind that
+  account only, different accounts run side by side, and the only whole-app lock
+  left is for short changes to the shared store. Waiting replaces the former
+  "another operation is running" error.
+- Controls no longer go grey while something else runs: an action marks only its
+  own button. Browser sign-in holds no lock while waiting on the browser.
+- Quota refresh reads up to three accounts at once and shows which card is
+  refreshing. Kaggle changes queue instead of failing during a refresh.
+- All pages share one set of measurements for cards, buttons, fields, chips,
+  disclosures and quota figures. Kaggle uses the same card layout and page width
+  as Codex (`src/renderer/ui.css`).
+- A manually selected account applies from the next model request, like a quota
+  rotation, instead of waiting for every turn on the connection to finish. A step
+  already streaming finishes normally, and an older request can never restore the
+  previous account. A request rejected for quota right after a selection moves to
+  the selected account.
+- Account switches and auth synchronization no longer refuse new turns in other
+  sessions. Each backend updates its native account when it is idle, independently
+  of the others; VS Code and desktop no longer block each other.
+- Native Codex retries run to their full default budget. The replay guard now only
+  stops a step that keeps failing past that budget (measured 30, limit 32).
+- Periodic quota polling reads only accounts in use or not refreshed for five
+  minutes.
+
+### Added
+
+- Drag account cards to reorder them, in Codex and Kaggle, or use Alt+Up/Down. The
+  order is saved.
+- Updates from Settings: check, download, verify against the release checksum,
+  install and restart. Desktop, Start menu and taskbar shortcuts move to the new
+  version, and the previous file is kept. Checks run automatically and can be
+  turned off.
+- Opening Codex in VS Code before PADSwitcher starts the app in the tray and
+  connects, unless the connection was turned off in PADSwitcher.
+- `events.jsonl` in the data folder: a bounded local connection history holding
+  event types and reasons only, listed under System check.
+- `thread/goal/*` reaches native Codex through the model router.
+
+### Fixed
+
+- Model requests no longer spawn PowerShell for each vault decryption or wait for
+  a quota read: valid access tokens stay in memory until shortly before expiry.
+- Reduced background PowerShell use: desktop status is checked every 15 seconds
+  rather than every 3.
+- A failed account change can no longer leave desktop waiting forever and blocking
+  VS Code turns. A transient credential error no longer closes desktop.
+- A client lost mid-request no longer leaves a turn record holding back account
+  synchronization or shutdown, and no longer leaks tracked-turn capacity.
+- Quitting from the tray during a background quota read now completes.
+- Leftover temporary Say hi and reset folders are removed at startup.
+
 ## 1.20.2 — 2026-10-28
 
 ### Fixed

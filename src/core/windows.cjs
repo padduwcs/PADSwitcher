@@ -74,7 +74,8 @@ async function nativeExecutable(file){
 }
 let desktopCache;
 async function findDesktop({candidates,local=process.env.LOCALAPPDATA||'',packages}={}){
-  if(!candidates&&!packages&&desktopCache&&Date.now()-desktopCache.at<30000&&await nativeExecutable(desktopCache.app.executable))return desktopCache.app;
+  // The executable check catches an app update, so this can outlive status polling.
+  if(!candidates&&!packages&&desktopCache&&Date.now()-desktopCache.at<600000&&await nativeExecutable(desktopCache.app.executable))return desktopCache.app;
   const list=[...(candidates||[])];
   if(!candidates){
     for(const folder of ['Codex','ChatGPT','OpenAI\\Codex','Programs\\Codex','Programs\\ChatGPT','Programs\\OpenAI\\Codex']){
