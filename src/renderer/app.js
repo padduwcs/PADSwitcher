@@ -431,7 +431,7 @@ setInterval(() => { if (state && ['accounts','kaggle'].includes(page) && !$('#mo
 window.padReorder.attach($('#account-list'),{enabled:()=>!$('#search').value.trim(),onEnd:()=>{if(renderQueued)render();},onChange:async(ids,moved)=>{
   const previous=state.profiles,byId=new Map(previous.map(p=>[p.id,p]));
   state.profiles=ids.map(id=>byId.get(id));focusCard=moved||null;render();
-  if(!await call('reorderProfiles',{ids}))state.profiles=previous;
+  if(!await call('reorderProfiles',{ids})){state.profiles=previous;render();}
 }});
 
 function desktopLaunchDialog(id){

@@ -58,6 +58,17 @@ test('a managed account is refused before the router moves and a transient looku
   hub.desktop.pendingId=a.id;hub.desktop.pendingSource='route';await assert.rejects(hub.desktop.applyPending());assert.equal(hub.desktop.status,'ready');assert.equal(client.socket.readyState,1);
   service.accessBundle=original;
 });
+test('a catalog read or an auth sync never refuses a mode change, while model work still does',async t=>{
+  const f=await setup(t),{hub,a}=f,g=hub.shared;
+  g.router.active=1;g.changing=true;setTimeout(()=>{g.changing=false;},150);
+  await hub.configure({scope:'jetbrains',mode:'private',profileId:a.id});assert.equal(hub.view().scopes.jetbrains.mode,'private');
+  g.router.inferring=1;await assert.rejects(hub.configure({scope:'cli',mode:'private',profileId:a.id}),{code:'GATEWAY_ACTIVE'});assert.equal(hub.view().scopes.cli.mode,'shared');
+  g.router.inferring=0;g.router.active=0;
+});
+test('choosing an account in a quota cooldown lifts that cooldown only',async t=>{
+  const f=await setup(t),{hub,a,b,service}=f;service.state.quotaCooldowns={[a.id]:Date.now()+60000,[b.id]:Date.now()+60000};
+  await hub.start(b.id);assert.equal(hub.shared.router.profileId,b.id);assert.deepEqual(Object.keys(service.state.quotaCooldowns),[a.id]);
+});
 test('with the router, goals reach native Codex and realtime stays refused',async t=>{
   const f=await setup(t),vscode=await f.client(f.hub.shared);
   await vscode.request('thread/goal/get',{threadId:'with-goal'});await assert.rejects(vscode.request('thread/realtime/start',{threadId:'with-goal'}));

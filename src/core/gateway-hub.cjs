@@ -6,6 +6,7 @@ const {Gateway}=require('./gateway.cjs');
 const {MAX_FRAME}=require('./ws-rpc.cjs');
 const {SCOPES}=require('./client-routes.cjs');
 const {UserError}=require('./errors.cjs');
+const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function kind(m){const n=m.params?.clientInfo?.name;return m.params?._padswitcherClient==='jetbrains'?'jetbrains':['codex_vscode','codex_vscode_copilot'].includes(n)?'vscode':['codex_cli_rs','codex_cli'].includes(n)?'cli':'other';}
 class GatewayHub{
   constructor(service,options={}){
@@ -79,7 +80,10 @@ class GatewayHub{
     const previous=this.config(scope),old=this.route(scope);
     if(previous.mode===mode){if(mode==='private')await old.start(profileId);return {reconnect:false};}
     if(old.status==='ready')await old.reconcile();
-    if([...old.turns.values()].some(t=>!t.client||t.client.kind===scope)||old.changing||old.refreshFlight||old.router?.active)throw new UserError('Chờ lượt đang chạy hoàn tất trước khi đổi chế độ kết nối.', 'GATEWAY_ACTIVE');
+    const working=()=>[...old.turns.values()].some(t=>!t.client||t.client.kind===scope)||old.router?.inferring;
+    // An auth sync ends in moments, so it is worth a short wait. Real turns are not.
+    for(let i=0;i<50&&!working()&&(old.changing||old.refreshFlight);i++)await pause(100);
+    if(working()||old.changing||old.refreshFlight)throw new UserError('Chờ lượt đang chạy hoàn tất trước khi đổi chế độ kết nối.', 'GATEWAY_ACTIVE');
     const config={...previous,mode,profileId:mode==='private'?profileId:previous.profileId};this.transitions.set(scope,config);
     const frozen=[...old.clients].filter(c=>c.kind===scope);for(const c of frozen)c.routeChanging=true;
     let next,committed=false;
@@ -88,7 +92,7 @@ class GatewayHub{
       this.service.state.clientRoutes[scope]=config;
       try{await this.service.save();}catch(e){this.service.state.clientRoutes[scope]=previous;throw e;}
       // Do not interrupt any active work. Recheck after asynchronous setup/save.
-      if([...old.turns.values()].some(t=>!t.client||t.client.kind===scope)||old.router?.active){this.service.state.clientRoutes[scope]=previous;await this.service.save();throw new UserError('Một lượt mới vừa bắt đầu. Giữ chế độ hiện tại và thử lại sau.', 'GATEWAY_ACTIVE');}
+      if(working()){this.service.state.clientRoutes[scope]=previous;await this.service.save();throw new UserError('Một lượt mới vừa bắt đầu. Giữ chế độ hiện tại và thử lại sau.', 'GATEWAY_ACTIVE');}
       committed=true;
       for(const c of old.clients)if(c.kind===scope)c.front.close(1012,'Account mode changed; reconnect client');
       if(mode==='shared'&&this.private.has(scope)){await old.stop(true);this.private.delete(scope);}
@@ -112,7 +116,7 @@ class GatewayHub{
   }
   async stop(force=false){
     if(this.flight)throw new UserError('Chờ thay đổi chế độ kết nối hoàn tất.', 'BUSY');
-    if(!force){for(const g of this.all())if(g.status==='ready')await g.reconcile();if(this.turns.size||this.all().some(g=>g.router?.active))throw new UserError('Codex còn yêu cầu đang chạy. Chờ hoàn tất trước khi dừng.', 'GATEWAY_ACTIVE');}
+    if(!force){for(const g of this.all())if(g.status==='ready')await g.reconcile();if(this.turns.size||this.all().some(g=>g.router?.inferring))throw new UserError('Codex còn yêu cầu đang chạy. Chờ hoàn tất trước khi dừng.', 'GATEWAY_ACTIVE');}
     for(const p of this.waiting)p.front.terminate();this.waiting.clear();
     for(const g of [...(this.desktop?[this.desktop]:[]),...this.private.values(),this.shared])await g.stop(force);this.desktop=null;this.private.clear();
   }

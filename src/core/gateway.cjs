@@ -94,8 +94,9 @@ class Gateway {
     // A later automatic rotation may supersede an auth sync waiting behind an
     // active desktop/IDE turn. Retarget the sync, never treat it as a user choice.
     if(this.pendingId&&this.pendingSource==='route'&&this.router?.profileId)this.pendingId=this.router.profileId;
-    if(this.router?.profileId&&this.router.profileId!==this.profileId&&!this.router.active&&!this.turns.size&&!this.pendingId&&!this.changing&&this.status==='ready'){
-      this.pendingId=this.router.profileId;this.pendingSource='route';this.applyPending().catch(()=>{});
+    if(this.router?.profileId&&this.router.profileId!==this.profileId&&!this.router.active&&!this.turns.size&&!this.pendingId&&!this.changing&&this.status==='ready'&&Date.now()>=(this.syncRetryAt||0)){
+      // A failing sync can mean starting Codex to refresh a token; do not repeat it every tick.
+      this.pendingId=this.router.profileId;this.pendingSource='route';this.applyPending().catch(()=>{this.syncRetryAt=Date.now()+30000;});
     }
   }
   backendFailed(){this.log('backend_failed');this.recovery.cancel();if(!this.options.sharedRouter)this.router?.cancel();this.status='error';this.error='Codex gateway đã dừng. Mở lại gateway để kết nối.';for(const c of this.clients)c.front.close(1011,'Codex backend stopped');this.changed();}
@@ -115,6 +116,8 @@ class Gateway {
       if(!personalPlan(bundle.chatgptPlanType))throw new UserError('Bộ định tuyến hiện hỗ trợ tài khoản cá nhân Free, Plus và Pro. Tài khoản tổ chức cần luồng kết nối riêng.', 'GATEWAY_ROUTER_PLAN');
       const from=this.router.profileId;
       if(from!==id){
+        // An explicit choice overrides a cooldown; a real quota rejection sets it again.
+        const {[id]:_cleared,...cooldowns}=this.service.state.quotaCooldowns||{};this.service.state.quotaCooldowns=cooldowns;
         this.router.select(id);this.service.state.gatewayProfileId=id;this.router.persist('Không lưu được tài khoản đã chọn; phiên hiện tại vẫn dùng tài khoản này.');
         if(this.turns.size||this.router.active)this.recovery.note('selected','Đã chọn tài khoản; lần gọi model tiếp theo sẽ dùng tài khoản này.',from,id);
       }

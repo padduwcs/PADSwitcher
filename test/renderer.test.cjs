@@ -533,3 +533,20 @@ test('the version panel follows each update stage, in both languages',async t=>{
   d.querySelector('#modal-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();assert.deepEqual(calls.at(-1).args.force,true);assert.equal(calls.at(-1).command,'updateInstall');
   await refresh({status:'available',supported:false});d.querySelector('#update-action').click();await settle();assert.equal(calls.at(-1).command,'openRelease');
 });
+
+test('leaving the window mid-press never freezes rendering, and a press without a drag still selects after a queued update',async t=>{
+  const w=dom(t);await settle();const d=w.document,list=d.querySelector('#account-list');
+  const pointer=(type,target,y)=>{const e=new w.Event(type,{bubbles:true});Object.assign(e,{button:0,clientX:0,clientY:y,pointerId:1});target.dispatchEvent(e);};
+  pointer('pointerdown',list.children[1],10);assert.equal(w.padReorder.dragging,true);w.dispatchEvent(new w.Event('blur'));assert.equal(w.padReorder.dragging,false);await settle();
+  const second=list.children[1];pointer('pointerdown',second,10);d.querySelector('#search').dispatchEvent(new w.Event('input'));pointer('pointerup',w,10);
+  assert.equal(second.isConnected,true,'the pressed card survives until its click');second.click();await settle();
+  assert(d.querySelector('#account-list .account-card.selected').dataset.id===second.dataset.id);
+});
+
+test('English mode leaves no Vietnamese in static text or control labels',async t=>{
+  const w=dom(t);await settle();const d=w.document;d.querySelector('#language-toggle').click();await settle();
+  const vietnamese=/[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/i,left=[];
+  const walker=d.createTreeWalker(d.body,w.NodeFilter.SHOW_TEXT);
+  for(let node;(node=walker.nextNode());){const text=node.textContent.trim();if(text&&vietnamese.test(text)&&!node.parentElement.closest('[data-literal],.avatar,script,style'))left.push(text.slice(0,90));}
+  assert.deepEqual(left,[]);
+});

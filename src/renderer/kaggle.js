@@ -1,7 +1,7 @@
 'use strict';
 // Account management only. Job execution remains in the official Kaggle CLI.
 window.padKaggleUI = (() => {
-  let hooks, data, selected, workspace='', query='', toolsBusy=false,accountBusy=false;
+  let hooks, data, selected, workspace='', query='', toolsBusy=false,accountBusy=false,renderQueued=false;
   const loadingPages=new Set();
   const $=s=>document.querySelector(s);
   const t=(vi,en)=>window.padUI.language==='en'?en:vi;
@@ -86,7 +86,8 @@ window.padKaggleUI = (() => {
   function dialog(title,body,submit,label){hooks.showModal(title,literal(body),submit,label);}
   function render(next,defaultWorkspace) {
     data=next||{accounts:[],settings:{autoRefresh:true},tool:null,editing:false};workspace=defaultWorkspace||workspace;
-    if(window.padReorder?.dragging)return;
+    if(window.padReorder?.dragging){renderQueued=true;return;}
+    renderQueued=false;
     const unavailable=!!data.storeError;
     const root=$('#kaggle-content'),active=document.activeElement;
     const focusId=root.contains(active)?active.id:null;
@@ -97,7 +98,7 @@ window.padKaggleUI = (() => {
     if(!root.dataset.ready){
       root.innerHTML='<div id="kg-heading" class="page-heading"></div><div id="kg-tool-hint"></div><div id="kg-toolbar" class="toolbar"><div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="kg-search" type="search"></div><div id="kg-refresh" class="toolbar-right"></div></div><div id="kg-empty"></div><div class="kg-layout" id="kg-layout"><div class="kg-account-pane"><div id="kg-list" class="kg-list"></div><div id="kg-accounts-grip"></div></div><div id="kg-column-grip"></div><aside id="kg-detail" class="kg-detail"></aside></div>';
       root.dataset.ready='1';setupResizing(root);$('#kg-search').oninput=event=>{query=event.target.value;render(data,workspace);};
-      window.padReorder?.attach($('#kg-list'),{enabled:()=>!query.trim(),onEnd:()=>render(data,workspace),onChange:async(ids,moved)=>{
+      window.padReorder?.attach($('#kg-list'),{enabled:()=>!query.trim(),onEnd:()=>{if(renderQueued)render(data,workspace);},onChange:async(ids,moved)=>{
         const previous=data.accounts,byId=new Map(previous.map(p=>[p.id,p]));data.accounts=ids.map(id=>byId.get(id));render(data,workspace);
         if(moved)root.querySelector(`[data-kg-account="${moved}"]`)?.focus({preventScroll:true});
         if(!await act('kaggleReorder',{ids})){data.accounts=previous;render(data,workspace);}

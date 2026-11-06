@@ -96,7 +96,7 @@ class DesktopIntegration {
     }
     const app = await this.installed(); await this.status({ fresh: true });
     if (this.running) throw new UserError('Lưu công việc và thoát hẳn ChatGPT/Codex desktop trước lần kết nối này. PADSwitcher không tự đóng ứng dụng. Sau khi mở qua PADSwitcher, đổi tài khoản không cần mở lại desktop.', 'DESKTOP_RUNNING');
-    if (this.hub.turns.size || this.hub.shared.router?.active) throw new UserError('Chờ các lượt Codex đang chạy hoàn tất trước lần kết nối desktop đầu tiên.', 'GATEWAY_ACTIVE');
+    if (this.hub.turns.size || this.hub.shared.router?.inferring) throw new UserError('Chờ các lượt Codex đang chạy hoàn tất trước lần kết nối desktop đầu tiên.', 'GATEWAY_ACTIVE');
     await fs.mkdir(this.record.home, { recursive: true, mode: 0o700 }); await assertDirectory(this.record.home);
     await this.hub.start(id);
     const previous = { ...this.record }; this.record.enabled = true;

@@ -53,7 +53,7 @@ class Updater{
   set(fields){Object.assign(this,fields);this.onChange();}
   async json(url,accept){
     const response=await this.request(url,{headers:{accept,'user-agent':'PADSwitcher/'+this.current},redirect:'follow',signal:AbortSignal.timeout(20000)});
-    if(!response.ok)throw new UserError('GitHub chưa trả lời yêu cầu cập nhật. Hãy thử lại sau.','UPDATE_CHECK');
+    if(!response.ok||(url!==LATEST&&response.url&&!finalHost(response.url)))throw new UserError('GitHub chưa trả lời yêu cầu cập nhật. Hãy thử lại sau.','UPDATE_CHECK');
     return response;
   }
   async check(){
@@ -69,7 +69,7 @@ class Updater{
       this.release={version,name,url,sumUrl,size:binary.size,notes:notes(value.body),publishedAt:typeof value.published_at==='string'?value.published_at:null};
       this.set({status:'available',progress:0});
       if(this.executable)await this.reuse();
-    }catch(error){this.set({status:previous==='ready'?'ready':'idle',error:error instanceof UserError?error.message:'Không kiểm tra được bản cập nhật. Kiểm tra kết nối mạng rồi thử lại.'});}
+    }catch(error){this.set({status:previous,error:error instanceof UserError?error.message:'Không kiểm tra được bản cập nhật. Kiểm tra kết nối mạng rồi thử lại.'});}
     return this.view();
   }
   // An interrupted or earlier run may already have left the verified file in place.

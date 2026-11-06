@@ -96,10 +96,9 @@ class ProfileService extends EventEmitter {
   get foregroundBusy() { return this.lock.whole; }
   // Pass `account` whenever only one profile is touched, so others stay available.
   async exclusive(operation, { account = null } = {}) {
-    return this.lock.run(account, async () => {
-      if (account === null) this.changed();
-      try { return await operation(); } finally { if (account === null) queueMicrotask(() => this.changed()); }
-    });
+    try {
+      return await this.lock.run(account, () => { if (account === null) this.changed(); return operation(); });
+    } finally { if (account === null) this.changed(); }
   }
   get(id) { const p = this.state.profiles.find(p => p.id === id); if (!p) throw new UserError('Không tìm thấy hồ sơ.', 'PROFILE_MISSING'); return p; }
   home(id) { return profilePath(this.profilesRoot,id); }
@@ -229,6 +228,11 @@ class ProfileService extends EventEmitter {
       if (await exists(marker)) await fs.unlink(marker);
     }
   }
+  // Sealing touches other accounts, so it needs the whole store. Most passes have
+  // nothing to seal and should not wait for anyone. Never call this holding a lock.
+  async sealRecovered() {
+    if ([...this.running.values()].some(v => v.recovered)) await this.exclusive(() => this.checkRecovered());
+  }
   async checkRecovered() {
     const recovered = [...this.running.entries()].filter(([,v]) => v.recovered);
     if (!recovered.length) return;
@@ -253,7 +257,7 @@ class ProfileService extends EventEmitter {
   // A periodic pass reads only accounts in use or due, instead of spawning Codex for all.
   refreshBackground({ dueOnly = false } = {}) { return this.refreshAccounts(p => !dueOnly || this.refreshDue(p)); }
   async refreshAccounts(wanted) {
-    await this.exclusive(async () => { await this.checkRecovered(); await this.syncDesktop(); });
+    await this.sealRecovered(); await this.syncDesktop();
     const queue = this.state.profiles.filter(wanted).map(p => p.id);
     const worker = async () => {
       while (queue.length && !this.closing) {
@@ -516,8 +520,9 @@ class ProfileService extends EventEmitter {
     });
   }
   async launchCli(id, resume = false) {
+    await this.sealRecovered();
     return this.exclusive(async () => {
-      this.get(id); await this.checkRecovered();
+      this.get(id);
       if (this.running.has(id)) throw new UserError('CLI của hồ sơ này đã mở.', 'PROFILE_RUNNING');
       const current = await this.desktopIdentity();
       const desktop = current?.identity === this.get(id).identity;
@@ -550,8 +555,8 @@ class ProfileService extends EventEmitter {
     p.label = name; p.notes = cleanText(notes,500); await this.save(); this.changed();
   }
   async reorderProfiles(ids) {
-    const position = new Map(Array.isArray(ids) ? ids.map((id,index) => [id,index]) : []), profiles = this.state.profiles;
-    if (position.size !== profiles.length || ids.length !== profiles.length || profiles.some(p => !position.has(p.id))) throw new UserError('Danh sách tài khoản vừa thay đổi. Hãy thử sắp xếp lại.', 'INVALID_ORDER');
+    const profiles = this.state.profiles, position = new Map(Array.isArray(ids) ? ids.map((id,index) => [id,index]) : []);
+    if (!Array.isArray(ids) || position.size !== profiles.length || ids.length !== profiles.length || profiles.some(p => !position.has(p.id))) throw new UserError('Danh sách tài khoản vừa thay đổi. Hãy thử sắp xếp lại.', 'INVALID_ORDER');
     this.state.profiles = [...profiles].sort((a,b) => position.get(a.id) - position.get(b.id));
     await this.save(); this.changed();
   }

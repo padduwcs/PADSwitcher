@@ -151,6 +151,9 @@ async function checkCodexActions(preview) {
         await new Promise(resolve=>setTimeout(resolve,250));
         const compactFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
         await fs.writeFile(path.join(root,'accounts-compact.png'),compactFrame);
+        await preview.webContents.executeJavaScript("state.update={...state.update,status:'ready',version:'9.9.9',progress:100,notes:{vi:'Ghi chú mẫu',en:'Sample notes'}};render();");
+        await captureFixture(preview,'update-ready-compact.png');
+        await preview.webContents.executeJavaScript("state.update={...state.update,status:'idle',version:null,notes:null,progress:0};render();");
         // Real pointer input: a press and drag reorders; the release must not select the card.
         const dragPlan=await preview.webContents.executeJavaScript("(async()=>{window.scrollTo(0,0);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const cards=[...document.querySelectorAll('#account-list [data-reorder-id]')],box=el=>el.getBoundingClientRect();return {ids:cards.map(c=>c.dataset.id),selected:document.querySelector('#account-list .selected').dataset.id,x:Math.round(box(cards[0]).left+60),from:Math.round(box(cards[0]).top+30),to:Math.round(box(cards[1]).bottom-20)};})()");
         await armPointerRelease(preview);
@@ -159,7 +162,16 @@ async function checkCodexActions(preview) {
         preview.webContents.sendInputEvent({type:'mouseUp',x:dragPlan.x,y:dragPlan.to,button:'left',clickCount:1});
         await waitPointerRelease(preview);
         const dragged=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>setTimeout(r,120));return {ids:[...document.querySelectorAll('#account-list [data-reorder-id]')].map(c=>c.dataset.id),selected:document.querySelector('#account-list .selected').dataset.id,leftover:!!document.querySelector('.dragging,.reordering')};})()");
-        assert.notDeepEqual(dragged.ids,dragPlan.ids,'Native drag changes the account order');assert.equal(dragged.selected,dragPlan.selected,'A drag does not select the card');assert.equal(dragged.leftover,false);
+        assert.notDeepEqual(dragged.ids,dragPlan.ids,'Native drag changes the account order');
+        // A plain click selects, even when an app update redraws the list during the press.
+        const clickAt=await preview.webContents.executeJavaScript("(()=>{const card=[...document.querySelectorAll('#account-list .account-card')].find(c=>!c.classList.contains('selected')),r=card.getBoundingClientRect();return {id:card.dataset.id,x:Math.round(r.left+60),y:Math.round(r.top+30)};})()");
+        await armPointerRelease(preview);
+        preview.webContents.sendInputEvent({type:'mouseMove',x:clickAt.x,y:clickAt.y});preview.webContents.sendInputEvent({type:'mouseDown',x:clickAt.x,y:clickAt.y,button:'left',clickCount:1});
+        await preview.webContents.executeJavaScript("render()");
+        preview.webContents.sendInputEvent({type:'mouseUp',x:clickAt.x,y:clickAt.y,button:'left',clickCount:1});
+        await waitPointerRelease(preview);
+        assert.equal(await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>setTimeout(r,120));return document.querySelector('#account-list .selected').dataset.id;})()"),clickAt.id,'A click during a redraw still selects its card');
+        await preview.webContents.executeJavaScript("document.querySelector('#account-list [data-id=\""+dragPlan.selected+"\"]').click()");assert.equal(dragged.selected,dragPlan.selected,'A drag does not select the card');assert.equal(dragged.leftover,false);
         await preview.webContents.executeJavaScript("(async()=>{for(const id of "+JSON.stringify(dragPlan.ids)+".reverse()){const list=document.querySelector('#account-list');while(list.firstElementChild.dataset.id!==id){list.querySelector('[data-id=\""+"'+id+'"+"\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',altKey:true,bubbles:true}));await new Promise(r=>setTimeout(r,30));}}})()");
         // Presentation checks and reset dialog below use preview.js fixtures only.
         preview.setSize(1260,900);

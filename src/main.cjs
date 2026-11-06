@@ -40,7 +40,8 @@ function updateLauncher() {
 // The replacement starts after this process exits, so nothing may keep it alive.
 function quitForUpdate() {
   shutdown=true;clearInterval(timer);clearInterval(kaggleTimer);clearInterval(integrationTimer);clearInterval(updateTimer);
-  Promise.allSettled([service.close(),gateway.stop(true),kaggle.shutdown()]).finally(()=>{quitting=true;tray?.destroy();app.quit();});
+  const finished=Promise.allSettled([service.close(),gateway.stop(true),kaggle.shutdown()]);
+  Promise.race([finished,new Promise(resolve=>setTimeout(resolve,15000))]).finally(()=>{quitting=true;tray?.destroy();app.quit();});
 }
 async function start() {
   service = new ProfileService(path.join(app.getPath('appData'),'PADSwitcher','data'));

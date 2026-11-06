@@ -178,7 +178,7 @@ class KaggleService extends EventEmitter {
   async remove(id){return this.exclusive(async()=>{await this.settled(id);const p=this.get(id),index=this.state.accounts.indexOf(p);this.state.accounts.splice(index,1);try{await this.save();}catch(error){this.state.accounts.splice(index,0,p);throw error;}try{await fs.unlink(this.vault(id));}catch(error){if(error.code!=='ENOENT'){this.state.accounts.splice(index,0,p);await this.save();throw error;}}this.notebookPages.delete(id);});}
   async reorder(ids){
     this.requireStore();const position=new Map(Array.isArray(ids)?ids.map((id,index)=>[id,index]):[]),accounts=this.state.accounts;
-    if(position.size!==accounts.length||ids.length!==accounts.length||accounts.some(p=>!position.has(p.id)))throw new UserError('Danh sách tài khoản vừa thay đổi. Hãy thử sắp xếp lại.', 'INVALID_ORDER');
+    if(!Array.isArray(ids)||position.size!==accounts.length||ids.length!==accounts.length||accounts.some(p=>!position.has(p.id)))throw new UserError('Danh sách tài khoản vừa thay đổi. Hãy thử sắp xếp lại.', 'INVALID_ORDER');
     this.state.accounts=[...accounts].sort((a,b)=>position.get(a.id)-position.get(b.id));await this.save();this.changed();
   }
   async settings({pythonPath,autoRefresh}){return this.exclusive(async()=>{if(typeof pythonPath!=='string'||(pythonPath&&(!path.isAbsolute(pythonPath)||path.basename(pythonPath).toLowerCase()!=='python.exe'))||typeof autoRefresh!=='boolean')throw new UserError('Cấu hình Kaggle không hợp lệ.', 'KAGGLE_SETTINGS');if(this.toolFlight)throw new UserError('Một thao tác Kaggle khác đang chạy.','BUSY');const old=this.state.settings;this.state.settings={pythonPath,autoRefresh};try{await this.save();this.tool=null;}catch(error){this.state.settings=old;throw error;}});}

@@ -388,3 +388,20 @@ test('a sign-in cancelled before Codex starts never launches a backend',async t=
   const promise=f.service.addAccount('B',async()=>{});f.service.cancelLogin();await assert.rejects(promise,{code:'CANCELLED'});
   assert.equal(created,false);assert.equal(f.service.login,null);
 });
+
+test('opening a CLI seals a finished recovered session first, without waiting inside an account lock',async t=>{
+  const f=await fixture(t),a=await f.service.capture(auth('a')),b=await f.service.capture(auth('b')),order=[];
+  f.service.running.set(b.id,{pid:1,recovered:true});f.service.checkRecovered=async()=>{order.push('sealed');f.service.running.delete(b.id);};
+  await f.service.sealRecovered();assert.deepEqual(order,['sealed']);await f.service.sealRecovered();assert.deepEqual(order,['sealed'],'nothing left to seal needs no lock');
+  assert.equal(f.service.busy,false);await assert.rejects(f.service.reorderProfiles(null),{code:'INVALID_ORDER'});assert(a.id);
+});
+test('an empty account list rejects a malformed reorder cleanly',async t=>{
+  const f=await fixture(t);await assert.rejects(f.service.reorderProfiles(null),{code:'INVALID_ORDER'});await f.service.reorderProfiles([]);
+});
+test('a failed update check keeps an offer already found, and a redirected checksum must stay on GitHub',async t=>{
+  const bytes=Buffer.from('x'),f=await updateFixture(t,release('1.1.0',bytes),bytes),{updater}=f;await updater.check();assert.equal(updater.view().status,'available');
+  const request=updater.request;updater.request=async()=>{throw Error('offline');};
+  const view=await updater.check();assert.equal(view.status,'available');assert.equal(view.version,'1.1.0');assert(view.error);
+  updater.request=async(url,options)=>{if(url.endsWith('.sha256')){const r=new Response('a'.repeat(64));Object.defineProperty(r,'url',{value:'https://evil.test/sum'});return r;}return request(url,options);};
+  await assert.rejects(updater.download(),{code:'UPDATE_CHECK'});assert.equal(updater.view().status,'available');
+});

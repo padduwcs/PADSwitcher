@@ -22,6 +22,7 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
       let ready;for(let i=0;i<100;i++){ready=await evaluate('typeof window.pad === "object" && document.readyState === "complete"');if(ready)break;await pause(100);}assert(ready);
       const response=await evaluate("window.pad.action('state')");assert(response.ok,'Packaged state IPC rejected: '+response.error?.code);assert.equal(response.result.version,version);assert.equal(response.result.profiles.length,0);assert.equal(response.result.platform,'windows');assert.equal(await evaluate('typeof require'),'undefined');
       assert.equal(path.resolve(response.result.settings.desktopHome),path.join(root,'codex'));
+      assert.equal(response.result.update.supported,kind==='portable','Self-update depends on the portable launcher variable');
       await evaluate("document.querySelector('[data-service=codex]').click();document.querySelector('[data-page=connections]').click()");assert.equal(await evaluate("document.querySelectorAll('.integration-card').length"),4);assert.equal(await evaluate("document.querySelector('.desktop-card').classList.contains('hidden')"),false);
       await evaluate("window.padUI.setLanguage('en');window.padUI.setTheme('dark');render();new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))");
       const shot=await call('Page.captureScreenshot',{format:'png'});await fs.writeFile(path.join(parent,kind+'.png'),Buffer.from(shot.data,'base64'));

@@ -77,6 +77,14 @@ test('a choice made during the credential lookup applies before anything is sent
   const pending=f.call({input:[],stream:true});await received;f.r.select('b');release();
   assert.equal(await (await pending).text(),completed);assert.deepEqual(f.seen.map(x=>x.account),['b']);
 });
+test('a catalog read counts as activity but only a model request counts as inference',async t=>{
+  let release;const gate=new Promise(r=>release=r);
+  const f=await fixture(t,async(req,res)=>{await gate;res.writeHead(200,{'Content-Type':'application/json'});res.end('{}');});
+  const catalog=fetch(f.r.baseUrl+'/models',{headers:{authorization:'Bearer test'}}),step=f.call({input:[]});
+  for(let i=0;i<50&&f.seen.length<2;i++)await new Promise(r=>setTimeout(r,10));
+  assert.equal(f.r.active,2);assert.equal(f.r.inferring,1);release();await Promise.all([(await catalog).text(),(await step).text()]);
+  for(let i=0;i<50&&f.r.active;i++)await new Promise(r=>setTimeout(r,10));assert.equal(f.r.active,0);assert.equal(f.r.inferring,0);
+});
 test('native retries of one interrupted step all reach the model and success resets the count',async t=>{
   const logged=[];let failures=UNCERTAIN_ATTEMPT_LIMIT-1;
   const f=await fixture(t,(req,res)=>{if(failures>0){failures--;req.socket.destroy();}else{res.writeHead(200);res.end(completed);}});f.g.log=(type,fields)=>logged.push({type,...fields});

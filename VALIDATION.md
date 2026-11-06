@@ -2,13 +2,17 @@
 
 ## Concurrency, reordering, updates and shared layout — 2026-11-07
 
-- Regression suite: 288 tests, 286 passed locally. The PowerShell 7 check is skipped. The
+- Regression suite: 296 tests, 294 passed locally. The PowerShell 7 check is skipped. The
   Kaggle subprocess environment test fails in the local Git Bash environment before and
   after this work.
 - `npm run smoke:ui` checks the real renderer in Electron, including a native pointer
   drag that reorders a card without selecting it, at 1920/1260/1000 px, light/dark,
   Vietnamese/English. Screenshots of each page were reviewed by eye; that review found
   grid cards offset by a spacing rule, which is fixed.
+- Hosted CI runs the same fault matrix on native `0.160.0`: the budget is also 30/6, so
+  the limit of 32 holds on both engines measured. CI also exposed a real defect: a mode
+  change right after a client connected was refused because a model-catalog read
+  counted as active work. Only model requests count now.
 - Native loopback suites pass on the final code: faults, continuity, switch, protocol,
   Say hi and desktop. The packaged ASAR smoke and both real executables also pass.
 - `--background` was checked on the built portable with isolated data: no visible window,
@@ -62,9 +66,6 @@ one was found, and `client_closed` entries in `events.jsonl` will show the close
 code and active turns if it recurs. Reloading still interrupts that window's
 running turns, as closing it would.
 
-- Regression suite: 270 tests, 268 passed locally. The PowerShell 7 check is
-  skipped. `subprocess environment excludes inherited Kaggle credentials` fails in
-  the local Git Bash environment both before and after this change.
 - `npm run smoke:switch` (new, native engine, two VS Code clients and desktop): a
   selection during a tool call moved the running turn from account A to B at its
   next model call; other sessions started and finished turns meanwhile; a selection

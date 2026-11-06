@@ -35,7 +35,7 @@ function outgoingHeaders(incoming,bundle){
   return headers;
 }
 class ModelRouter {
-  constructor(gateway,options={}){this.g=gateway;this.options=options;this.requests=new Set();this.used=new Map();this.turnStates=new Map();this.failedRequests=new Map();this.usage=createUsage();this.epoch=0;this.selection=0;this.profileId=null;this.active=0;}
+  constructor(gateway,options={}){this.g=gateway;this.options=options;this.requests=new Set();this.used=new Map();this.turnStates=new Map();this.failedRequests=new Map();this.usage=createUsage();this.epoch=0;this.selection=0;this.profileId=null;this.active=0;this.inferring=0;}
   async start(){
     const upstream=new URL(this.options.upstream||'https://chatgpt.com/backend-api/codex/');
     if(!this.options.allowTestUpstream&&(upstream.protocol!=='https:'||upstream.hostname!=='chatgpt.com'||upstream.pathname!=='/backend-api/codex/'))throw Error('Invalid model upstream');
@@ -142,7 +142,8 @@ class ModelRouter {
     const suffix=req.url.slice(this.capability.length+2),route=suffix.split('?')[0];
     if(!ROUTES.has(route)||req.method!==ROUTES.get(route)){this.error(res,404,'not_found','Unsupported model route.');return;}
     if(this.active>=16){this.error(res,503,'router_busy','Too many model requests.');return;}
-    const controller=new AbortController(),epoch=this.epoch;this.requests.add(controller);this.active++;
+    // `active` includes catalog reads. Only `inferring` means model work is running.
+    const inference=req.method==='POST'&&route.startsWith('responses'),controller=new AbortController(),epoch=this.epoch;this.requests.add(controller);this.active++;if(inference)this.inferring++;
     let abortReason=null;const abort=reason=>{abortReason??=reason;controller.abort();};
     res.once('close',()=>{if(!res.writableFinished)abort('client_closed');});
     controller.signal.addEventListener('abort',()=>res.destroy(),{once:true});
@@ -227,7 +228,7 @@ class ModelRouter {
       const uncertain=inferenceStarted&&!streamCompleted&&(transportFailed||controller.signal.aborted||sse||streamFailed);
       if(uncertain){const reason=abortReason||(transportFailed?'upstream_transport':streamFailed?'stream_failed':'stream_ended_early');this.log('model_step_uncertain',{route,reason,attempt:this.recordUncertain(requestKey)});}
       else if(streamCompleted||accepted)this.failedRequests.delete(requestKey);
-      clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
+      clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;if(inference)this.inferring--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
   }
   async peek(response,controller,touch=()=>{}){
     const reader=response.body.getReader(),prefix=[],decoder=new TextDecoder();let text='',parsed=0,size=0;

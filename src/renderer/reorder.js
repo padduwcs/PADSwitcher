@@ -5,29 +5,33 @@ window.padReorder = (() => {
   const THRESHOLD=6,EDGE=48,SCROLL=12;
   let drag=null;
   const keys=list=>[...list.children].map(el=>el.dataset.reorderId);
+  const swallow=event=>{event.preventDefault();event.stopPropagation();};
   function scrollParent(el){for(let node=el;node;node=node.parentElement){if(node.scrollHeight>node.clientHeight&&/(auto|scroll)/.test(getComputedStyle(node).overflowY))return node;}return document.scrollingElement;}
   function place(y){
     const {list,card}=drag;
     for(const sibling of list.children){
       if(sibling===card)continue;
-      const box=sibling.getBoundingClientRect(),middle=box.top+box.height/2;
-      if(y<middle){if(card.nextElementSibling!==sibling)list.insertBefore(card,sibling);return;}
+      const box=sibling.getBoundingClientRect();
+      if(y<box.top+box.height/2){if(card.nextElementSibling!==sibling)list.insertBefore(card,sibling);return;}
     }
     if(list.lastElementChild!==card)list.append(card);
   }
+  // A press that never became a drag still ends in a click. Redrawing the list now
+  // would remove the card under the pointer and lose it, so redraw just after.
+  function release(){
+    const {listeners,onEnd}=drag;drag=null;listeners.abort();setTimeout(()=>onEnd?.());
+  }
   function finish(commit){
-    const {list,card,before,onChange,onEnd,pointerId,move,end,key}=drag;
-    drag=null;
-    window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);window.removeEventListener('keydown',key,true);
+    const {list,card,before,onChange,onEnd,pointerId,listeners}=drag;
+    drag=null;listeners.abort();
     list.classList.remove('reordering');card.classList.remove('dragging');card.style.transform='';
     if(card.hasPointerCapture?.(pointerId))card.releasePointerCapture(pointerId);
     const after=keys(list);
     if(!commit||after.join()===before.join()){
       const position=new Map(before.map((id,index)=>[id,index]));
       [...list.children].sort((a,b)=>position.get(a.dataset.reorderId)-position.get(b.dataset.reorderId)).forEach(el=>list.append(el));
-      onEnd?.();return;
-    }
-    onChange(after);onEnd?.();
+    }else onChange(after);
+    onEnd?.();
   }
   function attach(list,{enabled=()=>true,onChange,onEnd}){
     if(list.dataset.reorderReady)return;
@@ -35,7 +39,8 @@ window.padReorder = (() => {
     list.addEventListener('pointerdown',event=>{
       const card=event.target.closest('[data-reorder-id]');
       if(!card||event.button!==0||drag||!enabled())return;
-      const startX=event.clientX,startY=event.clientY,pointerId=event.pointerId;let started=false;
+      const startX=event.clientX,startY=event.clientY,pointerId=event.pointerId,listeners=new AbortController();
+      let started=false;
       const begin=()=>{
         started=true;drag.before=keys(list);drag.offset=startY-card.getBoundingClientRect().top;
         list.classList.add('reordering');card.classList.add('dragging');card.setPointerCapture?.(pointerId);
@@ -51,14 +56,18 @@ window.padReorder = (() => {
       };
       const end=ended=>{
         if(ended.pointerId!==pointerId)return;
-        if(!started){window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);window.removeEventListener('keydown',key,true);drag=null;onEnd?.();return;}
+        if(!started){release();return;}
         // The click that ends a drag must not also select the card.
         window.addEventListener('click',swallow,{capture:true,once:true});setTimeout(()=>window.removeEventListener('click',swallow,true));
         finish(ended.type==='pointerup');
       };
       const key=pressed=>{if(pressed.key==='Escape'&&started){pressed.preventDefault();pressed.stopPropagation();finish(false);}};
-      drag={list,card,onChange,onEnd,pointerId,move,end,key,before:[],offset:0};
-      window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);window.addEventListener('keydown',key,true);
+      // Leaving the window mid-press may never deliver a release.
+      const lost=()=>{if(started)finish(false);else release();};
+      drag={list,card,onChange,onEnd,pointerId,listeners,before:[],offset:0};
+      const signal=listeners.signal;
+      window.addEventListener('pointermove',move,{signal});window.addEventListener('pointerup',end,{signal});window.addEventListener('pointercancel',end,{signal});
+      window.addEventListener('keydown',key,{capture:true,signal});window.addEventListener('blur',lost,{signal});
     });
     list.addEventListener('keydown',event=>{
       if(!event.altKey||!['ArrowUp','ArrowDown'].includes(event.key)||!enabled())return;
@@ -69,6 +78,5 @@ window.padReorder = (() => {
       [order[from],order[to]]=[order[to],order[from]];onChange(order,card.dataset.reorderId);
     });
   }
-  const swallow=event=>{event.preventDefault();event.stopPropagation();};
   return {attach,get dragging(){return !!drag;}};
 })();
