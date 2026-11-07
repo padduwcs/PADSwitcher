@@ -69,7 +69,7 @@ async function checkCodexActions(preview) {
         await fs.mkdir(path.join(root,'assets/fonts'),{recursive:true});
         for(const file of ['BeVietnamPro-Regular.ttf','BeVietnamPro-Medium.ttf','BeVietnamPro-SemiBold.ttf','OFL.txt'])await fs.copyFile(path.join(__dirname,'../src/assets/fonts',file),path.join(root,'assets/fonts',file));
         for (const file of ['padswitcher-symbol.png','padswitcher-logo.png','padswitcher-emblem.png']) await fs.copyFile(path.join(__dirname,'../src/assets',file),path.join(root,'assets',file));
-        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','services.css','services.js','kaggle.css','kaggle.js','app.js']) {
+        for (const file of ['index.html','styles.css','branding.css','themes.css','i18n.js','services.css','services.js','ui.css','reorder.js','kaggle.css','kaggle.js','app.js']) {
           let content = await fs.readFile(path.join(__dirname,'../src/renderer',file),'utf8');
           if (file === 'index.html') content = content.replace('<script src="app.js" defer></script>','<script src="preview.js" defer></script><script src="app.js" defer></script>');
           await fs.writeFile(path.join(fixtureRoot,file),content);
@@ -151,6 +151,28 @@ async function checkCodexActions(preview) {
         await new Promise(resolve=>setTimeout(resolve,250));
         const compactFrame=await new Promise(resolve=>{preview.webContents.once('paint',(_event,_rect,image)=>resolve(image.toPNG()));preview.webContents.invalidate();});
         await fs.writeFile(path.join(root,'accounts-compact.png'),compactFrame);
+        await preview.webContents.executeJavaScript("state.update={...state.update,status:'ready',version:'9.9.9',progress:100,notes:{vi:'Ghi chú mẫu',en:'Sample notes'}};render();");
+        await captureFixture(preview,'update-ready-compact.png');
+        await preview.webContents.executeJavaScript("state.update={...state.update,status:'idle',version:null,notes:null,progress:0};render();");
+        // Real pointer input: a press and drag reorders; the release must not select the card.
+        const dragPlan=await preview.webContents.executeJavaScript("(async()=>{window.scrollTo(0,0);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const cards=[...document.querySelectorAll('#account-list [data-reorder-id]')],box=el=>el.getBoundingClientRect();return {ids:cards.map(c=>c.dataset.id),selected:document.querySelector('#account-list .selected').dataset.id,x:Math.round(box(cards[0]).left+60),from:Math.round(box(cards[0]).top+30),to:Math.round(box(cards[1]).bottom-20)};})()");
+        await armPointerRelease(preview);
+        preview.webContents.sendInputEvent({type:'mouseMove',x:dragPlan.x,y:dragPlan.from});preview.webContents.sendInputEvent({type:'mouseDown',x:dragPlan.x,y:dragPlan.from,button:'left',clickCount:1});
+        for(const step of [.1,.4,.7,1])preview.webContents.sendInputEvent({type:'mouseMove',x:dragPlan.x,y:Math.round(dragPlan.from+(dragPlan.to-dragPlan.from)*step),button:'left'});
+        preview.webContents.sendInputEvent({type:'mouseUp',x:dragPlan.x,y:dragPlan.to,button:'left',clickCount:1});
+        await waitPointerRelease(preview);
+        const dragged=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>setTimeout(r,120));return {ids:[...document.querySelectorAll('#account-list [data-reorder-id]')].map(c=>c.dataset.id),selected:document.querySelector('#account-list .selected').dataset.id,leftover:!!document.querySelector('.dragging,.reordering')};})()");
+        assert.notDeepEqual(dragged.ids,dragPlan.ids,'Native drag changes the account order');
+        // A plain click selects, even when an app update redraws the list during the press.
+        const clickAt=await preview.webContents.executeJavaScript("(()=>{const card=[...document.querySelectorAll('#account-list .account-card')].find(c=>!c.classList.contains('selected')),r=card.getBoundingClientRect();return {id:card.dataset.id,x:Math.round(r.left+60),y:Math.round(r.top+30)};})()");
+        await armPointerRelease(preview);
+        preview.webContents.sendInputEvent({type:'mouseMove',x:clickAt.x,y:clickAt.y});preview.webContents.sendInputEvent({type:'mouseDown',x:clickAt.x,y:clickAt.y,button:'left',clickCount:1});
+        await preview.webContents.executeJavaScript("render()");
+        preview.webContents.sendInputEvent({type:'mouseUp',x:clickAt.x,y:clickAt.y,button:'left',clickCount:1});
+        await waitPointerRelease(preview);
+        assert.equal(await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>setTimeout(r,120));return document.querySelector('#account-list .selected').dataset.id;})()"),clickAt.id,'A click during a redraw still selects its card');
+        await preview.webContents.executeJavaScript("document.querySelector('#account-list [data-id=\""+dragPlan.selected+"\"]').click()");assert.equal(dragged.selected,dragPlan.selected,'A drag does not select the card');assert.equal(dragged.leftover,false);
+        await preview.webContents.executeJavaScript("(async()=>{for(const id of "+JSON.stringify(dragPlan.ids)+".reverse()){const list=document.querySelector('#account-list');while(list.firstElementChild.dataset.id!==id){list.querySelector('[data-id=\""+"'+id+'"+"\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',altKey:true,bubbles:true}));await new Promise(r=>setTimeout(r,30));}}})()");
         // Presentation checks and reset dialog below use preview.js fixtures only.
         preview.setSize(1260,900);
         await preview.webContents.executeJavaScript("document.querySelector('#language-select').value='vi';document.querySelector('#language-select').dispatchEvent(new Event('change'));document.querySelector('#theme-select').value='light';document.querySelector('#theme-select').dispatchEvent(new Event('change'));document.querySelectorAll('.account-card')[0].click();document.querySelector('#reset-list').open=true");
@@ -257,7 +279,7 @@ async function checkCodexActions(preview) {
           for(const width of [1920,1260,1000]){
             preview.setSize(width,width===1920?1080:width===1000?680:900);
             const metrics=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return {overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth,bodyOverflow:getComputedStyle(document.querySelector('#kg-detail-body')).overflowY,regions:['pinned','recent'].map(name=>{const el=document.querySelector('#kg-notebooks-'+name);return {height:el.clientHeight,content:el.scrollHeight,count:el.querySelectorAll('.kg-notebook').length};}),width:document.querySelector('#kg-layout').clientWidth};})()");
-            assert.equal(metrics.overflow,false);assert.equal(metrics.bodyOverflow,'visible');if(width===1920)assert(metrics.width>1700,'Kaggle uses the wide viewport');
+            assert.equal(metrics.overflow,false);assert.equal(metrics.bodyOverflow,'visible');if(width===1920)assert(metrics.width<=1240,'Kaggle shares the page width used by every service');
             assert.equal(metrics.regions[0].count,20);assert(metrics.regions.every(r=>r.content>r.height&&r.height>=250),'Roomy responsive lists: '+JSON.stringify(metrics));
             await preview.webContents.executeJavaScript("window.scrollTo(0,document.querySelector('#kg-notebooks-pinned').closest('section').getBoundingClientRect().top+scrollY-110);document.querySelector('#kg-notebooks-pinned').scrollTop=40;");
             await new Promise(resolve=>setTimeout(resolve,100));
@@ -290,7 +312,7 @@ async function checkCodexActions(preview) {
           await preview.webContents.executeJavaScript("document.querySelector('#kg-layout-reset').click()");
           preview.setSize(1920,1080);
           const minimumWidth=await preview.webContents.executeJavaScript("(async()=>{await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));document.querySelector('[data-kg-resize=width]').dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true}));return {pixels:Math.round(document.querySelector('#kg-list').getBoundingClientRect().width),fraction:JSON.parse(localStorage.getItem('pad-kaggle-layout')).width};})()");
-          assert.equal(minimumWidth.pixels,240);assert(minimumWidth.fraction<.15);
+          assert.equal(minimumWidth.pixels,240);assert(minimumWidth.fraction<.22);
           await preview.loadFile(path.join(fixtureRoot,'index.html'),{search:'demo=1&kgmany=1'});await preview.webContents.executeJavaScript("navigate('kaggle')");
           assert.equal(await preview.webContents.executeJavaScript("Math.round(document.querySelector('#kg-list').getBoundingClientRect().width)"),minimumWidth.pixels,'Minimum column width persists even on wide screens');
           await preview.webContents.executeJavaScript("document.querySelector('#kg-layout-reset').click()");

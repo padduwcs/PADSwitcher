@@ -2,7 +2,11 @@
 const $ = selector => document.querySelector(selector);
 const e = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let state, selectedId = null, page = 'services', privacy = localStorage.getItem('pad-hide-email') === '1', modalSubmit;
-let accountScope=localStorage.getItem('pad-account-scope')||'shared';
+let accountScope=localStorage.getItem('pad-account-scope')||'shared',renderQueued=false,focusCard=null;
+// Each action tracks itself: only its own button waits, never the whole window.
+const running=new Map(),runKey=(command,args={})=>command+':'+(args.id||args.scope||'');
+const isRunning=(command,id='')=>running.has(command+':'+id);
+function mark(selector,busy){const el=$(selector);if(!el)return;if(busy)el.disabled=true;el.classList.toggle('is-loading',!!busy);el.setAttribute('aria-busy',String(!!busy));}
 if(!['shared','vscode','jetbrains','cli'].includes(accountScope))accountScope='shared';
 const scopeName=k=>({shared:'Dùng chung',vscode:'VS Code',jetbrains:'JetBrains',cli:'CLI'}[k]);
 const gatewayForScope=()=>accountScope==='shared'?state?.gateway:state?.gateway?.scopes?.[accountScope]||state?.gateway;
@@ -16,6 +20,8 @@ function toast(message,error = false) {
   $('#toasts').append(el); ui.apply(el); setTimeout(() => el.remove(),error ? 25000 : 7000);
 }
 async function call(command,args = {},success = null) {
+  const key=runKey(command,args),tracked=!['state','pick'].includes(command);
+  if(tracked){running.set(key,(running.get(key)||0)+1);if(state)render();}
   try {
     const response = await api.action(command,{...args,locale:ui.language});
     if (response.state) { state = response.state; render(); }
@@ -23,6 +29,7 @@ async function call(command,args = {},success = null) {
     if (success) toast(success);
     return response;
   } catch { toast('Không kết nối được PADSwitcher. Hãy mở lại ứng dụng.',true); return null; }
+  finally { if(tracked){const left=running.get(key)-1;if(left)running.set(key,left);else running.delete(key);if(state)render();} }
 }
 function time(value) {
   const date = new Date(value); if (!Number.isFinite(date.getTime())) return 'Chưa xác định';
@@ -59,6 +66,8 @@ function progress(w,mini = false) {
 }
 function render() {
   if (!state) return;
+  if (window.padReorder?.dragging) { renderQueued=true; return; }
+  renderQueued=false;
   $('#account-scope').value=accountScope;
   $('#account-target').classList.toggle('hidden',!state.gateway?.scopes||!state.profiles.length);
   const own=accountScope!=='shared'&&state.clientRoutes?.[accountScope]?.mode==='private';
@@ -81,23 +90,25 @@ function render() {
   if (!profiles.some(p => p.id === selectedId)) selectedId = profiles.find(p=>p.id===state.gateway?.profileId)?.id || profiles[0]?.id || null;
   $('#account-layout').classList.toggle('hidden',!profiles.length);
   $('#no-results').classList.toggle('hidden',!state.profiles.length || profiles.length > 0);
-  $('#account-list').innerHTML = profiles.map(p => `<button class="account-card${p.id === selectedId ? ' selected' : ''}" data-id="${e(p.id)}" aria-pressed="${p.id === selectedId}"><div class="card-head"><div class="avatar">${e(initials(p))}</div><div class="card-identity" data-literal><strong>${e(p.label)}</strong><small>${e(email(p))}</small></div>${badge(p)}</div><div class="card-quota">${windows(p).length ? windows(p).slice(0,2).map(w => progress(w,true)).join('') : '<span class="quota-unavailable">Cập nhật để xem quota</span>'}</div><div class="timestamp${stale(p) ? ' stale' : ' fresh'}">${e(quotaAge(p))}${p.quotaAt && stale(p) ? ' · Dữ liệu cũ' : ''}</div></button>`).join('');
+  $('#account-list').innerHTML = profiles.map(p => `<button class="account-card${p.id === selectedId ? ' selected' : ''}" data-id="${e(p.id)}" ${query?'':`data-reorder-id="${e(p.id)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"`} aria-pressed="${p.id === selectedId}"><div class="card-head"><span class="drag-grip" aria-hidden="true"></span><div class="avatar">${e(initials(p))}</div><div class="card-identity" data-literal><strong>${e(p.label)}</strong><small>${e(email(p))}</small></div>${p.refreshing?'<span class="card-sync" role="img" aria-label="Đang cập nhật"></span>':''}${badge(p)}</div><div class="card-quota">${windows(p).length ? windows(p).slice(0,2).map(w => progress(w,true)).join('') : '<span class="quota-unavailable">Cập nhật để xem quota</span>'}</div><div class="timestamp${stale(p) ? ' stale' : ' fresh'}">${e(quotaAge(p))}${p.quotaAt && stale(p) ? ' · Dữ liệu cũ' : ''}</div></button>`).join('');
   document.querySelectorAll('.account-card').forEach(card => card.addEventListener('click',() => { selectedId = card.dataset.id; render(); document.querySelector('.account-card.selected')?.focus({preventScroll:true}); }));
+  $('#reorder-hint').classList.toggle('hidden',state.profiles.length<2||!!query);
+  if(focusCard){document.querySelector('#account-list [data-id="'+focusCard+'"]')?.focus({preventScroll:true});focusCard=null;}
   const p = state.profiles.find(p => p.id === selectedId); renderDetail(p);
   const g=gatewayForScope()||{status:'stopped'};
   renderConnectionStatus(state.gateway||g);
   renderRoutes();
   $('#shared-auto-status').textContent='Tự chuyển khi hết quota: '+(state.autoSwitch?.enabled?'Bật':'Tắt');
-  $('#open-shared-auto').disabled=state.busy;
   const desktop=state.desktop||{},desktopProfile=state.profiles.find(p=>p.id===desktop.profileId);
   $('.desktop-card').classList.remove('hidden');
   $('#desktop-state').textContent=desktop.connected?(desktop.pendingId?'Đang chờ đổi tài khoản':'Đang kết nối'):desktop.launching?'Đang mở desktop…':desktop.configuration==='configured'?'Chờ desktop':'Chưa kết nối';
   $('#desktop-next').textContent=desktop.lastError||(desktop.connected?'Codex desktop đang dùng '+(desktopProfile?.label||'tài khoản đã chọn')+'.':!desktop.available?'Cài ChatGPT/Codex desktop chính thức để kết nối.':desktop.running?'Lưu công việc và thoát hẳn desktop trước lần kết nối đầu tiên.':'Mở desktop qua PADSwitcher rồi mở lại hội thoại Codex cũ.');
   if(ui.language==='en'&&desktop.connected&&!desktop.lastError)$('#desktop-next').textContent='Codex desktop is using '+(desktopProfile?.label||'the selected account')+'.';
   $('#desktop-home-value').textContent=desktop.home||'';
-  $('#open-desktop-connected').disabled=state.busy||desktop.launching||!desktop.available||!state.gateway?.profileId||!!desktop.connected;
-  $('#disconnect-desktop').disabled=state.busy||desktop.launching||desktop.configuration!=='configured';
-  $('#desktop-home-pick').disabled=state.busy||desktop.launching||!!desktop.connected;
+  $('#open-desktop-connected').disabled=desktop.launching||!desktop.available||!state.gateway?.profileId||!!desktop.connected;
+  $('#disconnect-desktop').disabled=desktop.launching||desktop.configuration!=='configured';
+  $('#desktop-home-pick').disabled=desktop.launching||!!desktop.connected;
+  mark('#open-desktop-connected',desktop.launching);mark('#disconnect-desktop',isRunning('desktopDisconnect'));
 
   $('#gateway-status').textContent=({stopped:'Chưa bật kết nối',starting:'Đang khởi động Codex…',ready:'Đã kết nối Codex',stopping:'Đang dừng…',error:'Kết nối cần khởi động lại'}[g.status]||g.status);
   const pending=state.profiles.find(x=>x.id===g.pendingId);
@@ -110,24 +121,32 @@ function render() {
   $('#connection-state').classList.toggle('active',g.status==='ready');
   $('#connection-hint').textContent=g.status==='ready'?`Đang dùng ${active?.label||'tài khoản đã chọn'}. Chọn cách bạn dùng Codex bên dưới.`:g.lastError||'Chọn một tài khoản trong trang Tài khoản để bật kết nối.';
   $('#connection-hint').classList.toggle('hidden',g.status==='ready'&&!g.lastError);
-  for(const id of ['connect-vscode','connect-jetbrains','copy-cli','open-gateway-cli'])$('#'+id).disabled=g.status!=='ready'||state.busy;
+  for(const id of ['connect-vscode','connect-jetbrains','copy-cli','open-gateway-cli'])$('#'+id).disabled=g.status!=='ready';
   $('#connect-jetbrains').disabled||=!!state.gateway?.connected?.jetbrains;
-  $('#restore-jetbrains').disabled=state.busy||state.jetbrains?.configuration!=='configured';
-  $('#stop-gateway').disabled=state.busy||['stopped','starting','stopping'].includes(g.status);
+  $('#restore-jetbrains').disabled=state.jetbrains?.configuration!=='configured';
+  $('#stop-gateway').disabled=['stopped','starting','stopping'].includes(g.status);
+  for(const [selector,command]of [['#connect-vscode','configureVSCode'],['#connect-jetbrains','configureJetBrains'],['#restore-jetbrains','restoreJetBrains'],['#restore-vscode','restoreVSCode'],['#open-gateway-cli','launchGateway']])mark(selector,isRunning(command));
+  mark('#stop-gateway',isRunning('stopGateway')||isRunning('forceStopGateway'));
   const recovery=g.recovery||{},policy=policyForScope()||{enabled:false,order:[]};
   $('#recovery-title').textContent='Tự chuyển khi hết quota: '+(policy.enabled?'Bật':'Tắt');
   $('#configure-auto').setAttribute('aria-label','Thiết lập tự đổi khi hết quota: '+(policy.enabled?'đang bật':'đang tắt'));
   $('#recovery-detail').textContent=recovery.message||(policy.enabled?`${policy.order.length} tài khoản theo thứ tự ưu tiên. Thử lại lần gọi bị hết quota.`:state.profiles.length<2?'Thêm một tài khoản dự phòng để bật tự đổi.':'Chọn tài khoản dự phòng để công việc tiếp tục.');
   $('.recovery-panel').classList.toggle('enabled',policy.enabled);
   $('#recovery-detail').classList.remove('hidden');
-  $('#configure-auto').disabled=state.busy;$('#cancel-recovery').disabled=!(recovery.queued||recovery.active);$('#recovery-history').disabled=!recovery.events?.length;
+  $('#cancel-recovery').disabled=!(recovery.queued||recovery.active);$('#recovery-history').disabled=!recovery.events?.length;
   $('#recovery-history').classList.toggle('hidden',!recovery.events?.length);
   $('#cancel-recovery').classList.toggle('hidden',!(recovery.queued||recovery.active));
-  for (const id of ['add-account','import-current','empty-import','refresh-all','check-system','recover-login']) $( '#'+id ).disabled = state.busy;
-  $('#refresh-all').disabled = state.busy || !state.profiles.length;
-  $('#say-hi-all').disabled = state.busy || !!state.sayHi?.active || !state.profiles.length;
+  $('#add-account').disabled=!!state.login;
+  for(const id of ['import-current','empty-import'])mark('#'+id,isRunning('import'));
+  for(const id of ['import-current','empty-import'])if(!isRunning('import'))$('#'+id).disabled=false;
+  const refreshingAll=isRunning('refreshAll');
+  $('#refresh-all').disabled=!state.profiles.length;$('#refresh-all').classList.toggle('is-refreshing',refreshingAll);mark('#refresh-all',refreshingAll);
+  $('#check-system').disabled=false;mark('#check-system',isRunning('diagnostics'));
+  $('#recover-login').disabled=false;mark('#recover-login',isRunning('recoverLogin'));
+  $('#say-hi-all').disabled = !!state.sayHi?.active || !state.profiles.length;
   renderSayHi();
-  $('#restore').disabled = state.busy || !state.canRestore;
+  renderUpdate();
+  $('#restore').disabled = !state.canRestore;
   $('#login-bar').classList.toggle('hidden',!state.login);
   if (!state.login) $('#login-detail').textContent = 'Chọn đúng tài khoản trên trình duyệt. Phiên hiện tại vẫn được giữ.';
   if (!$('#settings-form').dataset.dirty) fillSettings();
@@ -139,7 +158,8 @@ function renderDetail(p) {
   if (!p) { $('#detail').innerHTML = ''; return; }
   const previous=$('#detail').dataset.profileId===p.id?new Set([...$('#detail').querySelectorAll('details[open]')].map(el=>el.id)):new Set();
   $('#detail').dataset.profileId=p.id;
-  const disabled = state.busy ? 'disabled' : '';
+  const disabled = '';
+  const switching=isRunning('gateway',p.id),refreshing=p.refreshing||isRunning('refresh',p.id);
   const current=gatewayForScope()?.profileId===p.id&&gatewayForScope()?.status==='ready'&&!gatewayForScope()?.pendingId&&!gatewayForScope()?.recovery?.active&&!gatewayForScope()?.recovery?.queued;
   $('#detail').innerHTML = `
     <div class="detail-top"><div class="detail-profile"><div class="avatar">${e(initials(p))}</div><div data-literal><h2>${e(p.label)}</h2><p>${e(email(p))}</p></div></div><div class="detail-meta"><span class="badge">${e(planName(p.plan))}</span></div></div>
@@ -147,17 +167,17 @@ function renderDetail(p) {
       <div class="detail-label quota-title"><span>Quota còn lại</span><span class="timestamp${stale(p) ? ' stale' : ' fresh'}">${e(quotaAge(p))}${p.quotaAt&&stale(p)?' · Dữ liệu cũ':''}</span></div>
       ${p.lastError ? `<div class="inline-error">${e(ui.error({message:p.lastError,code:p.status==='reauth'?'AUTH_INVALID':'QUOTA_REFRESH'}))}</div>` : ''}
       <div class="detail-quotas">${windows(p).length ? windows(p).map(w => progress(w)).join('') : '<p class="field-help">Chưa có dữ liệu quota.</p>'}</div>
-      <div class="detail-actions"><button class="button primary" id="use-gateway" ${disabled || (current||['starting','stopping'].includes(gatewayForScope()?.status)?'disabled':'')}>${current?'Đang sử dụng':'Dùng tài khoản này'}</button><button class="button secondary" id="say-hi-one" ${disabled || (state.sayHi?.active?'disabled':'')} title="Gửi một lời chào ngắn để bắt đầu chu kỳ quota sớm."><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8H4l-1 2v-10a8 8 0 0 1 8-8h1a8 8 0 0 1 8 8Z"/><path d="M7 11.5h.01M11.5 11.5h.01M16 11.5h.01"/></svg><span>Say hi</span></button></div>
+      <div class="detail-actions"><button class="button primary${switching?' is-loading':''}" id="use-gateway" ${current||switching||['starting','stopping'].includes(gatewayForScope()?.status)?'disabled':''}>${current?'Đang sử dụng':'Dùng tài khoản này'}</button><button class="button secondary" id="say-hi-one" ${state.sayHi?.active?'disabled':''} title="Gửi một lời chào ngắn để bắt đầu chu kỳ quota sớm."><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a8 8 0 0 1-8 8H4l-1 2v-10a8 8 0 0 1 8-8h1a8 8 0 0 1 8 8Z"/><path d="M7 11.5h.01M11.5 11.5h.01M16 11.5h.01"/></svg><span>Say hi</span></button></div>
       <p class="field-help say-hi-hint">Say hi tiêu hao một ít quota.</p>
       ${resetPanel(p,disabled)}
-      <details class="detail-management" id="profile-management" ${previous.has('profile-management')?'open':''}><summary>Tùy chọn tài khoản</summary><div class="detail-bottom"><button class="button ghost" id="edit-profile" ${disabled}>Sửa tên</button><button class="button ghost" id="reauth-profile" ${disabled}>Đăng nhập lại</button><button class="button ghost danger-text" id="remove-profile" ${disabled}>Xóa</button></div><button class="button ghost refresh-detail" id="refresh-one" ${disabled}>Làm mới quota tài khoản này</button>${p.notes ? `<p class="detail-note" data-literal>${e(p.notes)}</p>` : ''}
-      <details class="legacy-actions" id="profile-legacy" ${previous.has('profile-legacy')?'open':''}><summary>Nâng cao</summary><p class="field-help">${ui.language==='en'?'Source: Codex service':'Nguồn: dịch vụ Codex'}${p.quotaAt?' · '+e(time(p.quotaAt)):''}. ${windows(p).map(w=>e(ui.t(windowName(w)))+': '+Math.round(w.usedPercent)+(ui.language==='en'?'% used':'% đã dùng')).join(' · ')}. ${ui.language==='en'?'The options below do not support auto-switching.':'Các cách dùng bên dưới không hỗ trợ tự đổi.'}</p><button class="button secondary" id="use-desktop" ${disabled || (p.desktopActive ? 'disabled' : '')}>${p.desktopActive ? 'Phiên dùng chung hiện tại' : 'Đổi phiên chung · cần đóng Codex'}</button><div class="cli-actions"><button class="button secondary" id="launch-cli" ${disabled || (p.running ? 'disabled' : '')}>${p.running ? 'CLI riêng đang mở' : 'Mở CLI riêng'}</button><button class="button secondary" id="resume-cli" ${disabled || (p.running ? 'disabled' : '')}>Tiếp tục CLI riêng</button></div></details></details>
+      <details class="detail-management" id="profile-management" ${previous.has('profile-management')?'open':''}><summary>Tùy chọn tài khoản</summary><div class="detail-bottom"><button class="button ghost" id="edit-profile" ${disabled}>Sửa tên</button><button class="button ghost" id="reauth-profile" ${state.login?'disabled':''}>Đăng nhập lại</button><button class="button ghost danger-text" id="remove-profile">Xóa</button></div><button class="button ghost refresh-detail${refreshing?' is-loading':''}" id="refresh-one" ${refreshing?'disabled':''}>Làm mới quota tài khoản này</button>${p.notes ? `<p class="detail-note" data-literal>${e(p.notes)}</p>` : ''}
+      <details class="legacy-actions" id="profile-legacy" ${previous.has('profile-legacy')?'open':''}><summary>Nâng cao</summary><p class="field-help">${ui.language==='en'?'Source: Codex service':'Nguồn: dịch vụ Codex'}${p.quotaAt?' · '+e(time(p.quotaAt)):''}. ${windows(p).map(w=>e(ui.t(windowName(w)))+': '+Math.round(w.usedPercent)+(ui.language==='en'?'% used':'% đã dùng')).join(' · ')}. ${ui.language==='en'?'The options below do not support auto-switching.':'Các cách dùng bên dưới không hỗ trợ tự đổi.'}</p><button class="button secondary" id="use-desktop" ${p.desktopActive ? 'disabled' : ''}>${p.desktopActive ? 'Phiên dùng chung hiện tại' : 'Đổi phiên chung · cần đóng Codex'}</button><div class="cli-actions"><button class="button secondary" id="launch-cli" ${p.running ? 'disabled' : ''}>${p.running ? 'CLI riêng đang mở' : 'Mở CLI riêng'}</button><button class="button secondary" id="resume-cli" ${p.running ? 'disabled' : ''}>Tiếp tục CLI riêng</button></div></details></details>
     </div>`;
   document.querySelectorAll('[data-reset-credit]').forEach(button => button.onclick = () => resetModal(p,button.dataset.resetCredit || null));
-  $('#use-gateway').onclick = async()=>{const r=await call('gateway',{id:p.id,scope:accountScope});if(r)toast(gatewayForScope()?.pendingId?'Sẽ chuyển khi lượt đang chạy hoàn tất.':'Đang dùng '+p.label+'.');};
+  $('#use-gateway').onclick = async()=>{const r=await call('gateway',{id:p.id,scope:accountScope});if(r)toast(gatewayForScope()?.pendingId?'Sẽ chuyển khi lượt đang chạy hoàn tất.':gatewayForScope()?.activeTurns?'Đã chuyển sang '+p.label+'. Lần gọi model tiếp theo sẽ dùng tài khoản này.':'Đang dùng '+p.label+'.');};
   if(state.platform==='unix'){
     $('#use-desktop').textContent='Dùng trong Codex desktop';
-    $('#use-desktop').disabled=state.busy||state.desktop?.launching||!state.desktop?.available;
+    $('#use-desktop').disabled=state.desktop?.launching||!state.desktop?.available;
     $('#profile-legacy .field-help').textContent=ui.language==='en'?'Desktop uses the shared account and supports auto-switching. Private CLI sessions stay separate.':'Desktop dùng tài khoản chung và hỗ trợ tự đổi. CLI riêng giữ lựa chọn độc lập.';
     $('#use-desktop').onclick=()=>desktopLaunchDialog(p.id);
   }else $('#use-desktop').onclick = () => showModal('Dùng cho desktop',`<p>Chuyển sang <span class="confirm-name" data-literal>${e(p.label)}</span>.</p><p class="field-help">Kết thúc tác vụ và thoát Codex/ChatGPT cùng IDE đang dùng Codex trước khi chuyển. Phiên trước được lưu để khôi phục; lịch sử và cấu hình được giữ nguyên.</p>`,async () => { closeModal(); const response = await call('switch',{id:p.id},'Đã đổi phiên. Mở lại desktop và kiểm tra tài khoản đang hiển thị.'); if (response) showModal('Đã chuyển phiên', '<p>Mở Codex desktop để tiếp tục. Kiểm tra tên tài khoản trong ứng dụng trước khi gửi yêu cầu mới.</p>',async () => { closeModal(); await call('openDesktop'); },'Mở Codex desktop'); },'Chuyển tài khoản');
@@ -172,6 +192,32 @@ function renderDetail(p) {
   $('#reauth-profile').onclick = () => accountModal(p);
   $('#remove-profile').onclick = () => showModal('Xóa khỏi danh sách?',`<p>Hồ sơ <span class="confirm-name">${e(p.label)}</span> sẽ được chuyển vào thư mục trash trên máy. Tài khoản OpenAI vẫn giữ nguyên.</p><p class="field-help">Không thể xóa hồ sơ đang dùng cho desktop hoặc đang mở CLI.</p>`,async () => { closeModal(); await call('remove',{id:p.id},'Đã chuyển hồ sơ vào trash.'); },'Xóa hồ sơ');
 }
+const UPDATE_LABELS={available:'Tải về',downloading:'Hủy tải',ready:'Cài đặt và khởi động lại'};
+function renderUpdate() {
+  const u=state.update||{status:'idle',supported:false},v=u.version;
+  const lines={checking:'Đang kiểm tra bản mới…',current:'Bạn đang dùng bản mới nhất.',available:'Có bản mới '+v+'.',downloading:'Đang tải '+v+' · '+u.progress+'%',ready:'Đã tải '+v+'. Sẵn sàng cài đặt.'};
+  $('#update-status').textContent='PADSwitcher '+(u.current||state.version||'')+(lines[u.status]?' · '+ui.t(lines[u.status]):'');
+  const action=u.supported||u.status!=='available'?UPDATE_LABELS[u.status]:'Mở trang phát hành';
+  $('#update-action').classList.toggle('hidden',!action);if(action)$('#update-action').textContent=ui.t(action);
+  $('#update-check').disabled=['checking','downloading'].includes(u.status);mark('#update-check',u.status==='checking');
+  $('#update-progress').classList.toggle('hidden',u.status!=='downloading');$('#update-progress').value=u.progress||0;
+  $('#update-error').classList.toggle('hidden',!u.error);$('#update-error').textContent=u.error?ui.error({message:u.error}):'';
+  const notes=u.notes?.[ui.language]||'';$('#update-notes').classList.toggle('hidden',!notes);$('#update-notes-text').textContent=notes;
+  $('#update-pill').classList.toggle('hidden',!['available','downloading','ready'].includes(u.status));
+  if(v)$('#update-pill').textContent=u.status==='ready'?ui.t('Cài bản '+v):ui.t('Có bản '+v);
+  $('#auto-update').checked=state.settings.autoUpdate!==false;
+}
+function installUpdate(){
+  const turns=state.gateway?.activeTurns||0;
+  showModal('Cài đặt bản cập nhật?',`<p>PADSwitcher sẽ đóng rồi tự mở bản ${e(state.update.version)}. Shortcut của bạn được chuyển sang bản mới; bản cũ vẫn nằm trên máy.</p>${turns?`<p>${ui.language==='en'?turns+' active Codex turns will be interrupted.':turns+' lượt Codex đang chạy sẽ bị ngắt.'}</p>`:''}<p class="field-help">Kết nối Codex tạm ngắt. Sau khi mở lại, chạy Developer: Reload Window trong VS Code một lần.</p>`,async()=>{closeModal();await call('updateInstall',{force:true});},'Cài đặt và khởi động lại');
+}
+$('#update-check').onclick=async()=>{const r=await call('updateCheck');if(r&&r.result?.status==='current')toast('Bạn đang dùng bản mới nhất.');};
+$('#update-action').onclick=()=>{
+  const status=state.update?.status;
+  if(status==='ready')installUpdate();else if(status==='downloading')call('updateCancel');
+  else if(status==='available')call(state.update.supported?'updateDownload':'openRelease');
+};
+$('#auto-update').onchange=()=>call('settings',{autoUpdate:$('#auto-update').checked});
 function renderSayHi() {
   const job=state.sayHi||{rows:[]},rows=job.rows||[];
   $('#say-hi-panel').classList.toggle('hidden',!rows.length);
@@ -223,7 +269,7 @@ function renderRoutes(){
     $('#route-'+scope).dataset.literal='';
     $('#route-'+scope).textContent=ui.t(own?'Tài khoản riêng':'Dùng chung')+' · '+(next?ui.t('Chờ lượt xong')+': '+next.label:p?.label||ui.t('Chưa chọn tài khoản'));
     $('#route-'+scope).title=g?.lastError||'';
-    document.querySelector('[data-route="'+scope+'"]').disabled=state.busy||state.gateway?.routingBusy||state.gateway?.status!=='ready';
+    document.querySelector('[data-route="'+scope+'"]').disabled=state.gateway?.routingBusy||state.gateway?.status!=='ready';
   }
 }
 function routeModal(scope){
@@ -338,7 +384,7 @@ function usageDiagnostics(info) {
 $('#check-system').onclick = async () => {
   const response = await call('diagnostics'); if (!response) return;
   const info = response.result;
-  $('#diagnostics').innerHTML = `<b>${e(info.version)}</b><br>${e(info.codex)}<br><br><b>Trước khi chuyển desktop</b><br>${info.blockers.length ? (ui.language==='en'?'Close: ':'Cần đóng: ')+e(info.blockers.join(', ')) : 'Không phát hiện ứng dụng dùng Codex đang chạy.'}<br><br><b>Kho dữ liệu riêng</b><br>${e(info.storage)}${info.loginRecovery ? '<br><br>Có phiên đăng nhập chưa lưu. Dùng Khôi phục đăng nhập bên dưới.' : ''}${usageDiagnostics(info)}`; ui.apply($('#diagnostics'));
+  $('#diagnostics').innerHTML = `<b>${e(info.version)}</b><br>${e(info.codex)}<br><br><b>Trước khi chuyển desktop</b><br>${info.blockers.length ? (ui.language==='en'?'Close: ':'Cần đóng: ')+e(info.blockers.join(', ')) : 'Không phát hiện ứng dụng dùng Codex đang chạy.'}<br><br><b>Kho dữ liệu riêng</b><br>${e(info.storage)}<br><br><b>Nhật ký kết nối</b><br>${e(info.eventLog||'')}${info.loginRecovery ? '<br><br>Có phiên đăng nhập chưa lưu. Dùng Khôi phục đăng nhập bên dưới.' : ''}${usageDiagnostics(info)}`; ui.apply($('#diagnostics'));
 };
 $('#restore').onclick = () => showModal('Khôi phục phiên trước', '<p>Khôi phục tài khoản trước lần chuyển desktop gần nhất. Hãy thoát Codex/ChatGPT và IDE đang dùng Codex trước khi tiếp tục.</p>',async () => { closeModal(); await call('restore',{},'Đã khôi phục phiên desktop trước. Mở lại Codex để kiểm tra.'); },'Khôi phục');
 $('#recover-login').onclick = async () => { const response = await call('recoverLogin',{},'Đã lưu lại phiên đăng nhập còn tồn.'); if (response) { selectedId = response.result; navigate('accounts'); render(); } };
@@ -381,11 +427,16 @@ api.onState(next => { state = next; render(); });
 api.onDevice(device => { $('#login-detail').textContent = ui.t(`Mã thiết bị: ${device.userCode} · Nhập mã trên trang OpenAI vừa mở.`); });
 api.onRefreshError?.(error => toast(ui.error(error),true));
 call('state').then(response => { if (response) { state = response.result; render(); } });
-setInterval(() => { if (state && ['accounts','kaggle'].includes(page) && !state.busy && !$('#modal').open) render(); },30000);
+setInterval(() => { if (state && ['accounts','kaggle'].includes(page) && !$('#modal').open) render(); },30000);
+window.padReorder.attach($('#account-list'),{enabled:()=>!$('#search').value.trim(),onEnd:()=>{if(renderQueued)render();},onChange:async(ids,moved)=>{
+  const previous=state.profiles,byId=new Map(previous.map(p=>[p.id,p]));
+  state.profiles=ids.map(id=>byId.get(id));focusCard=moved||null;render();
+  if(!await call('reorderProfiles',{ids})){state.profiles=previous;render();}
+}});
 
 function desktopLaunchDialog(id){
   const label=state.profiles.find(p=>p.id===id)?.label||'';
-  showModal('Kết nối Codex desktop','<p><span>Tài khoản</span>: <strong data-literal>'+e(label)+'</strong>.</p><p>Desktop sẽ dùng tài khoản chung đã chọn qua PADSwitcher và giữ kho hội thoại Codex hiện tại.</p><p>Áp dụng cùng tài khoản cho các kết nối đang dùng chung.</p><p class="field-help">Lần đầu: lưu công việc và thoát hẳn desktop trước khi mở. Các lần đổi tài khoản sau chờ lượt đang chạy hoàn tất và không cần đóng desktop. Áp dụng cho Codex cục bộ; lịch sử ChatGPT thông thường không chuyển giữa tài khoản.</p>',async()=>{
+  showModal('Kết nối Codex desktop','<p><span>Tài khoản</span>: <strong data-literal>'+e(label)+'</strong>.</p><p>Desktop sẽ dùng tài khoản chung đã chọn qua PADSwitcher và giữ kho hội thoại Codex hiện tại.</p><p>Áp dụng cùng tài khoản cho các kết nối đang dùng chung.</p><p class="field-help">Lần đầu: lưu công việc và thoát hẳn desktop trước khi mở. Các lần đổi tài khoản sau có hiệu lực từ lần gọi model tiếp theo và không cần đóng desktop. Áp dụng cho Codex cục bộ; lịch sử ChatGPT thông thường không chuyển giữa tài khoản.</p>',async()=>{
     closeModal();const r=await call('desktopLaunch',{id});
     if(r)toast(r.result?.launched&&r.result?.connected?'Đã mở và kết nối Codex desktop.':r.result?.connected?'Đã gửi yêu cầu chọn tài khoản cho desktop.':'Đã yêu cầu mở desktop. Chờ trạng thái Đang kết nối.');
   },'Mở desktop qua PADSwitcher');

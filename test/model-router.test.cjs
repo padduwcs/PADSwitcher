@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),http=require('node:http'),net=require('node:net'),zlib=require('node:zlib');
-const {ModelRouter}=require('../src/core/model-router.cjs');
+const {ModelRouter,UNCERTAIN_ATTEMPT_LIMIT}=require('../src/core/model-router.cjs');
 const quota={error:{type:'usage_limit_reached',message:'Fixture quota',resets_in_seconds:900}};
 const event=(type,value={})=>'event: '+type+'\ndata: '+JSON.stringify({type,...value})+'\n\n';
 const completed=event('response.completed',{response:{id:'resp_ok',status:'completed',output:[]}});
@@ -39,14 +39,65 @@ test('disabled switching or an account reference forwards early SSE quota intact
     assert.equal(await (await f.call(body)).text(),payload);assert.equal(f.seen.length,1);assert.equal(f.r.active,0);
   }
 });
-test('disabling switching or selecting manually during a quota response prevents a late automatic retry',async t=>{
-  for(const action of ['disable','manual']){
+test('disabling switching during a quota response prevents a late automatic retry',async t=>{
+  let release,arrived;const gate=new Promise(r=>release=r),received=new Promise(r=>arrived=r);
+  const f=await fixture(t,async(req,res)=>{arrived();await gate;res.writeHead(429,{'Content-Type':'application/json'});res.end(JSON.stringify(quota));});
+  const pending=f.call({input:[]});await received;
+  f.g.service.state.autoSwitch.enabled=false;release();
+  assert.equal((await pending).status,429);assert.equal(f.seen.length,1);
+});
+test('a quota rejection after a manual choice moves to exactly that account, with or without auto-switch',async t=>{
+  for(const enabled of [true,false]){
     let release,arrived;const gate=new Promise(r=>release=r),received=new Promise(r=>arrived=r);
-    const f=await fixture(t,async(req,res)=>{arrived();await gate;res.writeHead(429,{'Content-Type':'application/json'});res.end(JSON.stringify(quota));});
-    const pending=f.call({input:[]});await received;
-    if(action==='disable')f.g.service.state.autoSwitch.enabled=false;else f.g.pendingId='c';release();
-    assert.equal((await pending).status,429);assert.equal(f.seen.length,1);
+    const f=await fixture(t,async(req,res,entry)=>{if(entry.account==='a'){arrived();await gate;res.writeHead(429,{'Content-Type':'application/json'});res.end(JSON.stringify(quota));}else{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(completed);}},enabled);
+    const pending=f.call({input:[{role:'user',content:'Keep'}],stream:true});await received;
+    f.r.select('c');release();
+    assert.equal(await (await pending).text(),completed);assert.deepEqual(f.seen.map(x=>x.account),['a','c']);assert(f.seen[0].bytes.equals(f.seen[1].bytes));assert.equal(f.r.profileId,'c');
   }
+});
+test('the next model call uses a manual choice while the step already streaming finishes on its account',async t=>{
+  let finish;const f=await fixture(t,(req,res,entry)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.write(event('response.created',{response:{id:'one'}}));res.write(event('response.output_text.delta',{delta:'Streaming'}));if(entry.account==='a')finish=()=>res.end(completed);else res.end(completed);});
+  const first=await f.call({input:[],stream:true}),reader=first.body.getReader();await reader.read();
+  f.r.select('b');assert.equal(f.r.active,1,'the running step is not interrupted');
+  assert.match(await (await f.call({input:[],stream:true})).text(),/response.completed/);
+  finish();for(;;){const {done}=await reader.read();if(done)break;}
+  assert.deepEqual(f.seen.map(x=>x.account),['a','b']);assert.equal(f.r.profileId,'b');
+});
+test('an older request finishing or rotating can never overwrite a newer manual choice',async t=>{
+  let release,arrived;const gate=new Promise(r=>release=r),received=new Promise(r=>arrived=r);
+  const f=await fixture(t,async(req,res,entry)=>{if(entry.account==='a'){arrived();await gate;}res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(completed);});
+  const pending=f.call({input:[],stream:true});await received;
+  f.r.select('b');release();await (await pending).text();
+  assert.equal(f.r.profileId,'b');assert.equal(f.g.service.state.gatewayProfileId,undefined);assert(!f.events.some(x=>x.type==='routed'));
+});
+test('a choice made during the credential lookup applies before anything is sent',async t=>{
+  let release,arrived;const gate=new Promise(r=>release=r),received=new Promise(r=>arrived=r);
+  const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(completed);});
+  const bundle=f.g.bundle;f.g.bundle=async(id,force)=>{if(id==='a'){arrived();await gate;}return bundle(id,force);};
+  const pending=f.call({input:[],stream:true});await received;f.r.select('b');release();
+  assert.equal(await (await pending).text(),completed);assert.deepEqual(f.seen.map(x=>x.account),['b']);
+});
+test('a catalog read counts as activity but only a model request counts as inference',async t=>{
+  let release;const gate=new Promise(r=>release=r);
+  const f=await fixture(t,async(req,res)=>{await gate;res.writeHead(200,{'Content-Type':'application/json'});res.end('{}');});
+  const catalog=fetch(f.r.baseUrl+'/models',{headers:{authorization:'Bearer test'}}),step=f.call({input:[]});
+  for(let i=0;i<50&&f.seen.length<2;i++)await new Promise(r=>setTimeout(r,10));
+  assert.equal(f.r.active,2);assert.equal(f.r.inferring,1);release();await Promise.all([(await catalog).text(),(await step).text()]);
+  for(let i=0;i<50&&f.r.active;i++)await new Promise(r=>setTimeout(r,10));assert.equal(f.r.active,0);assert.equal(f.r.inferring,0);
+});
+test('native retries of one interrupted step all reach the model and success resets the count',async t=>{
+  const logged=[];let failures=UNCERTAIN_ATTEMPT_LIMIT-1;
+  const f=await fixture(t,(req,res)=>{if(failures>0){failures--;req.socket.destroy();}else{res.writeHead(200);res.end(completed);}});f.g.log=(type,fields)=>logged.push({type,...fields});
+  const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"same-step"}'},body={input:[{role:'user',content:'private prompt'}],stream:true};
+  for(let i=0;i<UNCERTAIN_ATTEMPT_LIMIT-1;i++){const r=await f.call(body,headers);assert.equal(r.status,502);await r.text();}
+  assert.equal(await (await f.call(body,headers)).text(),completed);assert.equal(f.seen.length,UNCERTAIN_ATTEMPT_LIMIT);assert.equal(f.r.failedRequests.size,0);assert.equal(f.r.usage.blockedReplays,0);
+  assert.equal(logged.length,UNCERTAIN_ATTEMPT_LIMIT-1);assert.deepEqual(logged[1],{type:'model_step_uncertain',route:'responses',reason:'upstream_transport',attempt:2});assert(!JSON.stringify(logged).includes('private prompt'));
+});
+test('the limit sits above the native default budget of thirty attempts and then stops a runaway loop',async t=>{
+  assert(UNCERTAIN_ATTEMPT_LIMIT>30);
+  const f=await fixture(t,req=>req.socket.destroy()),headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"same-step"}'};
+  for(let i=0;i<UNCERTAIN_ATTEMPT_LIMIT;i++){const r=await f.call({input:[],stream:true},headers);assert.equal(r.status,502);await r.text();}
+  const blocked=await f.call({input:[],stream:true},headers);assert.equal(blocked.status,400);assert.equal((await blocked.json()).error.code,'model_replay_blocked');assert.equal(f.seen.length,UNCERTAIN_ATTEMPT_LIMIT);assert.equal(f.r.usage.blockedReplays,1);
 });
 test('after a text delta or a tool item is committed, quota is forwarded and never retried',async t=>{
   for(const type of ['response.output_text.delta','response.output_item.added']){
@@ -205,8 +256,8 @@ test('numeric diagnostics distinguish native requests, quota retries and reporte
   assert.equal(invalid.r.usage.attempts,3);assert.equal(invalid.r.usage.lastModel,null);
 });
 
-test('uncertain failure blocks native recovery even when its body changes; an explicit new turn remains usable',async t=>{
-  const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(completed);}});
+test('past the limit, an interrupted step stays blocked even when its body changes; an explicit new turn remains usable',async t=>{
+  const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(completed);}},true,{uncertainAttemptLimit:1});
   const headers=turn=>({'thread-id':'fixture-thread','x-codex-turn-metadata':JSON.stringify({turn_id:turn})});
   const first=await f.call({input:[{role:'user',content:'private prompt'}]},headers('first'));assert.equal(first.status,502);await first.text();
   const repeat=await f.call({input:[{role:'user',content:'private prompt'},{role:'assistant',content:'partial recovery'}]},headers('first'));assert.equal(repeat.status,400);assert.equal((await repeat.json()).error.code,'model_replay_blocked');assert.equal(f.seen.length,1);
@@ -232,7 +283,7 @@ test('a definitive early SSE rejection permits native retry while partial output
 });
 
 test('new inter-agent messages are real progress; delivery timestamps alone do not authorize replay',async t=>{
-  const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200);res.end(completed);}});
+  const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200);res.end(completed);}},true,{uncertainAttemptLimit:1});
   const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"same-step"}'},user={role:'user',content:'Original task'};
   const agent=text=>({type:'agent_message',id:'agent-message-fixture',author:'worker',recipient:'parent',content:[{type:'input_text',text}],internal_chat_message_metadata_passthrough:{turn_id:'delivery',create_time:1}});
   const first=await f.call({input:[user,agent('First result')],stream:true},headers);assert.equal(first.status,502);await first.text();
@@ -243,7 +294,7 @@ test('new inter-agent messages are real progress; delivery timestamps alone do n
 
 test('partial SSE ending normally or failing explicitly blocks a retry, while successful tool follow-ups remain allowed',async t=>{
   for(const end of ['',event('response.failed',{response:{error:{type:'server_error'}}})]){
-    const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(event('response.output_text.delta',{delta:'partial'})+end);});
+    const f=await fixture(t,(req,res)=>{res.writeHead(200,{'Content-Type':'text/event-stream'});res.end(event('response.output_text.delta',{delta:'partial'})+end);},true,{uncertainAttemptLimit:1});
     const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
     await (await f.call({input:[]},headers)).text();assert.equal((await f.call({input:[{role:'assistant',content:'partial'}]},headers)).status,400);assert.equal(f.seen.length,1);
   }
@@ -282,7 +333,7 @@ test('missing MIME does not hide an early quota fallback or allow incomplete-str
   assert.equal(await (await f.call({input:[],stream:true},headers)).text(),completed);
   assert.deepEqual(f.seen.map(x=>x.account),['a','b']);assert(f.seen[0].bytes.equals(f.seen[1].bytes));assert.equal(f.r.failedRequests.size,0);
   assert.equal(await (await f.call({input:[],stream:true},headers)).text(),completed);assert.equal(f.seen.length,3);
-  const broken=await fixture(t,(req,res)=>{res.writeHead(200);res.end(event('response.output_text.delta',{delta:'partial'}));});
+  const broken=await fixture(t,(req,res)=>{res.writeHead(200);res.end(event('response.output_text.delta',{delta:'partial'}));},true,{uncertainAttemptLimit:1});
   await (await broken.call({input:[],stream:true},headers)).text();assert.equal((await broken.call({input:[],stream:true},headers)).status,400);assert.equal(broken.seen.length,1);
 });
 
@@ -294,7 +345,7 @@ test('valid non-streaming JSON responses are not classified as uncertain failure
 });
 
 test('an SSE event missing its final separator is incomplete and does not authorize a duplicate inference',async t=>{
-  const f=await fixture(t,(req,res)=>{res.writeHead(200);res.end(completed.trimEnd());});
+  const f=await fixture(t,(req,res)=>{res.writeHead(200);res.end(completed.trimEnd());},true,{uncertainAttemptLimit:1});
   const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
   const response=await f.call({input:[],stream:true},headers);assert.equal(await response.text(),completed.trimEnd());
   assert.equal((await f.call({input:[],stream:true},headers)).status,400);assert.equal(f.seen.length,1);
@@ -306,7 +357,7 @@ test('data-only large completion events are terminal without retaining their pay
   const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
   for(let i=0;i<2;i++){const response=await f.call({input:[],stream:true},headers);assert.equal(response.status,200);assert.equal(await response.text(),payload);}
   assert.equal(f.seen.length,2);assert.equal(f.r.failedRequests.size,0);
-  const broken=await fixture(t,(req,res)=>{res.writeHead(200);res.end(payload.slice(0,-4)+'INVALID\n\n');});
+  const broken=await fixture(t,(req,res)=>{res.writeHead(200);res.end(payload.slice(0,-4)+'INVALID\n\n');},true,{uncertainAttemptLimit:1});
   await (await broken.call({input:[],stream:true},headers)).text();assert.equal((await broken.call({input:[],stream:true},headers)).status,400);assert.equal(broken.seen.length,1);
 });
 
@@ -315,7 +366,7 @@ test('steering input, a completed tool result and separate compact routes are pr
     {input:[{role:'user',content:'First request'},{role:'user',content:[{type:'input_text',text:'New instruction while running'}]}],stream:true},
     {input:[{role:'user',content:'First request'},{type:'function_call_output',call_id:'done-once',output:'Verified tool result'}],stream:true},
   ]){
-    const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200);res.end(completed);}});
+    const f=await fixture(t,(req,res)=>{if(f.seen.length===1)req.socket.destroy();else{res.writeHead(200);res.end(completed);}},true,{uncertainAttemptLimit:1});
     const headers={'thread-id':'fixture-thread','x-codex-turn-metadata':'{"turn_id":"fixture-turn"}'};
     assert.equal((await f.call({input:[{role:'user',content:'First request'}],stream:true},headers)).status,502);
     const response=await f.call(next,headers);assert.equal(response.status,200);assert.equal(await response.text(),completed);assert.equal(f.seen.length,2);

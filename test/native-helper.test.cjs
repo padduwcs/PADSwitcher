@@ -38,3 +38,28 @@ test('native stdio host owns its Codex process and closes it when the manager di
   assert(Number.isSafeInteger(hostPid));const list=await windows.processes(),native=list.find(p=>p.ParentProcessId===hostPid&&p.Name.toLowerCase()==='codex.exe');assert(native);
   owner.kill();let alive;for(let i=0;i<20;i++){alive=(await windows.processes()).some(p=>p.ProcessId===native.ProcessId||p.ProcessId===hostPid);if(!alive)break;await pause(100);}assert.equal(alive,false);
 });
+
+test('native helper opens the manager once for a waiting client, with a clean environment, then connects',{timeout:40000},async t=>{
+  const parent=path.resolve('artifacts/tests');await fs.mkdir(parent,{recursive:true});
+  const root=await fs.mkdtemp(path.join(parent,'launch-')),helper=path.join(root,'PADCodex.exe'),source=path.join(root,'Manager.cs'),manager=path.join(root,'Fixture Manager.exe'),marker=path.join(root,'started.txt');
+  await fs.copyFile(path.resolve('src/assets/PADCodex.exe'),helper);
+  await fs.writeFile(source,'using System;using System.IO;class P{static void Main(string[] a){File.AppendAllText(Environment.GetEnvironmentVariable("FIXTURE_MARKER"),String.Join(",",a)+"|"+Environment.GetEnvironmentVariable("ELECTRON_RUN_AS_NODE")+"|"+Environment.GetEnvironmentVariable("CODEX_HOME")+"\\n");}}');
+  const compiled=spawn(path.join(process.env.SystemRoot||process.env.SYSTEMROOT,'Microsoft.NET','Framework64','v4.0.30319','csc.exe'),['/nologo','/out:'+manager,source],{windowsHide:true,stdio:'ignore'});
+  assert.equal(await new Promise(r=>compiled.once('close',r)),0);
+  const server=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise(r=>server.once('listening',r));
+  let child;t.after(async()=>{child?.kill();for(const c of server.clients)c.terminate();await new Promise(r=>server.close(r));await pause(200);await fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});});
+  await fs.writeFile(path.join(root,'launcher.json'),JSON.stringify({version:1,executable:manager}));
+  const token=crypto.randomBytes(32).toString('hex'),received=new Promise(resolve=>server.on('connection',socket=>socket.on('message',bytes=>resolve(JSON.parse(bytes)))));
+  const env={...process.env,FIXTURE_MARKER:marker,ELECTRON_RUN_AS_NODE:'1',CODEX_HOME:'inherited-home'};delete env.PADSWITCHER_CONNECTION_FILE;
+  child=spawn(helper,['app-server'],{env,stdio:['pipe','pipe','ignore'],windowsHide:true});child.stdin.write(JSON.stringify({id:1,method:'initialize',params:{clientInfo:{name:'codex_vscode'}}})+'\n');
+  let started='';for(let i=0;i<100&&!started;i++){started=await fs.readFile(marker,'utf8').catch(()=>'');if(!started)await pause(100);}
+  assert.equal(started.trim(),'--background||');
+  await pause(1500);await fs.writeFile(path.join(root,'client-capability'),token);await fs.writeFile(path.join(root,'connection.json'),JSON.stringify({version:1,url:'ws://127.0.0.1:'+server.address().port,tokenFile:path.join(root,'client-capability')}));
+  assert.equal((await received).method,'initialize','the first client message waited in stdin');assert.equal((await fs.readFile(marker,'utf8')).trim().split('\n').length,1);
+});
+test('without a launcher, a stopped connection still fails at once',{timeout:15000},async t=>{
+  const parent=path.resolve('artifacts/tests');await fs.mkdir(parent,{recursive:true});const root=await fs.mkdtemp(path.join(parent,'stopped-')),helper=path.join(root,'PADCodex.exe');await fs.copyFile(path.resolve('src/assets/PADCodex.exe'),helper);
+  t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100}));
+  const env={...process.env};delete env.PADSWITCHER_CONNECTION_FILE;const began=Date.now(),child=spawn(helper,['app-server'],{env,stdio:'ignore',windowsHide:true});
+  assert.equal(await new Promise(r=>child.once('close',r)),1);assert(Date.now()-began<3000);
+});

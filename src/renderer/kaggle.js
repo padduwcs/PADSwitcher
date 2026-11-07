@@ -1,7 +1,7 @@
 'use strict';
 // Account management only. Job execution remains in the official Kaggle CLI.
 window.padKaggleUI = (() => {
-  let hooks, data, selected, workspace='', query='', toolsBusy=false,accountBusy=false;
+  let hooks, data, selected, workspace='', query='', toolsBusy=false,accountBusy=false,renderQueued=false;
   const loadingPages=new Set();
   const $=s=>document.querySelector(s);
   const t=(vi,en)=>window.padUI.language==='en'?en:vi;
@@ -86,7 +86,9 @@ window.padKaggleUI = (() => {
   function dialog(title,body,submit,label){hooks.showModal(title,literal(body),submit,label);}
   function render(next,defaultWorkspace) {
     data=next||{accounts:[],settings:{autoRefresh:true},tool:null,editing:false};workspace=defaultWorkspace||workspace;
-    const unavailable=data.editing||!!data.storeError;
+    if(window.padReorder?.dragging){renderQueued=true;return;}
+    renderQueued=false;
+    const unavailable=!!data.storeError;
     const root=$('#kaggle-content'),active=document.activeElement;
     const focusId=root.contains(active)?active.id:null;
     const focusAccount=active?.dataset.kgAccount;
@@ -96,8 +98,13 @@ window.padKaggleUI = (() => {
     if(!root.dataset.ready){
       root.innerHTML='<div id="kg-heading" class="page-heading"></div><div id="kg-tool-hint"></div><div id="kg-toolbar" class="toolbar"><div class="search"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="kg-search" type="search"></div><div id="kg-refresh" class="toolbar-right"></div></div><div id="kg-empty"></div><div class="kg-layout" id="kg-layout"><div class="kg-account-pane"><div id="kg-list" class="kg-list"></div><div id="kg-accounts-grip"></div></div><div id="kg-column-grip"></div><aside id="kg-detail" class="kg-detail"></aside></div>';
       root.dataset.ready='1';setupResizing(root);$('#kg-search').oninput=event=>{query=event.target.value;render(data,workspace);};
+      window.padReorder?.attach($('#kg-list'),{enabled:()=>!query.trim(),onEnd:()=>{if(renderQueued)render(data,workspace);},onChange:async(ids,moved)=>{
+        const previous=data.accounts,byId=new Map(previous.map(p=>[p.id,p]));data.accounts=ids.map(id=>byId.get(id));render(data,workspace);
+        if(moved)root.querySelector(`[data-kg-account="${moved}"]`)?.focus({preventScroll:true});
+        if(!await act('kaggleReorder',{ids})){data.accounts=previous;render(data,workspace);}
+      }});
     }
-    $('#kg-heading').innerHTML=`<div><h1 tabindex="-1">Kaggle</h1><div class="list-heading"><h2>${data.accounts.length} ${t('tài khoản','accounts')}</h2></div></div><div class="heading-actions">${button('kg-help',t('Cách dùng','How to use'),'ghost')}${button('kg-setup',t('Thiết lập','Setup'),'secondary')}${button('kg-add',t('＋ Thêm tài khoản','＋ Add account'),'primary',data.editing)}</div>`;
+    $('#kg-heading').innerHTML=`<div><h1 tabindex="-1">Kaggle</h1><div class="list-heading"><h2>${data.accounts.length} ${t('tài khoản','accounts')}</h2></div></div><div class="heading-actions">${button('kg-help',t('Cách dùng','How to use'),'ghost')}${button('kg-setup',t('Thiết lập','Setup'),'secondary')}${button('kg-add',t('＋ Thêm tài khoản','＋ Add account'),'primary')}</div>`;
     $('#kg-help').onclick=guide;$('#kg-setup').onclick=setup;$('#kg-add').onclick=()=>account();
     if(data.storeError){$('#kg-tool-hint').innerHTML=`<div class="banner danger">${e(window.padUI.error(data.storeError))} ${t('Mở Codex → Cài đặt → Khôi phục & dữ liệu để xem thư mục dữ liệu, rồi khởi động lại sau khi sửa.','Open Codex → Settings → Recovery & data to inspect storage, then restart after repairing it.')}</div>`;}
     else $('#kg-tool-hint').innerHTML=data.tool&&!data.tool.supported?`<div class="banner">${t('Mở Thiết lập để cài công cụ Kaggle.','Open Setup to install the Kaggle tools.')}</div>`:'';
@@ -105,7 +112,7 @@ window.padKaggleUI = (() => {
     $('#kg-search').placeholder=t('Tìm tên hoặc username','Search name or username');$('#kg-search').setAttribute('aria-label',$('#kg-search').placeholder);
     $('#kg-toolbar').classList.toggle('hidden',!data.accounts.length);
     const any=data.accounts.some(p=>p.refreshing);
-    $('#kg-refresh').innerHTML=button('kg-layout-reset',t('Bố cục mặc định','Reset layout'),'ghost')+button('kg-refresh-all',`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-5v5h5M4 13a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></svg><span>${any?t('Đang cập nhật…','Refreshing…'):t('Làm mới','Refresh')}</span>`,'ghost refresh-button',any||unavailable);
+    $('#kg-refresh').innerHTML=button('kg-layout-reset',t('Bố cục mặc định','Reset layout'),'ghost')+button('kg-refresh-all',`<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-5L3 9m0-5v5h5M4 13a8 8 0 0 0 14 5l3-3m0 5v-5h-5"/></svg><span>${any?t('Đang cập nhật…','Refreshing…'):t('Làm mới','Refresh')}</span>`,'ghost refresh-button',unavailable);
     $('#kg-layout-reset').onclick=()=>{endResize(true);sizes={};saveSizes();applySizes();};
     $('#kg-refresh-all').onclick=()=>act('kaggleRefreshAll',{},t('Đã làm mới.','Refreshed.'));
     const rows=data.accounts.filter(p=>(p.label+' '+p.username).toLowerCase().includes(query.toLowerCase()));
@@ -113,7 +120,7 @@ window.padKaggleUI = (() => {
     $('#kg-layout').classList.toggle('hidden',!rows.length);
     $('#kg-column-grip').innerHTML=grip('width',t('Đổi chiều rộng cột tài khoản · phím trái/phải; Enter để đặt lại','Resize account column · left/right arrows; Enter to reset'),true);
     $('#kg-accounts-grip').innerHTML=grip('accounts',t('Đổi chiều cao danh sách tài khoản · phím lên/xuống; Enter để đặt lại','Resize account list · up/down arrows; Enter to reset'));
-    $('#kg-empty').innerHTML=!data.accounts.length?`<div class="empty kg-empty"><div class="service-mark kaggle">k</div><h2>${t('Thêm tài khoản Kaggle đầu tiên','Add your first Kaggle account')}</h2><p>${t('Thêm API token một lần, dùng tài khoản khi cần.','Add an API token once, then use the account whenever you need it.')}</p>${button('kg-empty-add',t('Thêm tài khoản','Add account'),'primary',data.editing)}</div>`:!rows.length?`<div class="no-results">${t('Không tìm thấy tài khoản.','No matching accounts.')}</div>`:'';
+    $('#kg-empty').innerHTML=!data.accounts.length?`<div class="empty kg-empty"><div class="service-mark kaggle">k</div><h2>${t('Thêm tài khoản Kaggle đầu tiên','Add your first Kaggle account')}</h2><p>${t('Thêm API token một lần, dùng tài khoản khi cần.','Add an API token once, then use the account whenever you need it.')}</p>${button('kg-empty-add',t('Thêm tài khoản','Add account'),'primary')}</div>`:!rows.length?`<div class="no-results">${t('Không tìm thấy tài khoản.','No matching accounts.')}</div>`:'';
     $('#kg-empty-add')?.addEventListener('click',()=>account());
     if($('#kg-empty-add'))$('#kg-empty-add').disabled=unavailable;
     $('#kg-list').setAttribute('aria-label',t('Tài khoản Kaggle đã lưu','Saved Kaggle accounts'));
@@ -122,7 +129,7 @@ window.padKaggleUI = (() => {
       const older=stale(p.notebooksAt)||!!p.lastError||!!p.notebooksError,quotaOld=stale(p.quotaAt)||!!p.lastError||!!p.quotaError;
       const counts=[running?t(`${running} đang chạy`,`${running} running`):'',queued?t(`${queued} đang chờ`,`${queued} queued`):''].filter(Boolean).join(' · ');
       const hint=p.refreshing?t('Đang cập nhật…','Refreshing…'):p.status==='reauth'?t('Cần token mới','New token needed'):p.lastError||p.notebooksError||p.quotaError?t('Lỗi cập nhật','Refresh error'):!p.notebooksAt?t('Chưa cập nhật','Not refreshed'):older||quotaOld?t('Dữ liệu cũ','Older data'):counts;
-      return `<button type="button" class="kg-account ${selected===p.id?'selected':''}" data-kg-account="${e(p.id)}" aria-pressed="${selected===p.id}"><span class="kg-account-top"><span class="kg-account-name"><strong>${e(p.label)}</strong>${p.label!==p.username?`<small>@${e(p.username)}</small>`:''}</span><svg class="icon kg-account-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span><span class="kg-account-quota ${quotaOld?'kg-stale':''}" title="${e(date(p.quotaAt))}${quotaOld?' · '+t('Dữ liệu cũ','Older data'):''}">${['GPU','TPU'].map(resource=>`<span aria-label="${resource} ${t('còn lại','remaining')}"><span>${resource}</span><b>${hours(p.quota?.find(q=>q.resource===resource)?.remaining)}</b></span>`).join('')}</span>${hint?`<span class="kg-account-hint ${older||quotaOld||p.status==='reauth'?'kg-stale':running||queued?'kg-fresh':''}">${e(hint)}</span>`:''}</button>`;
+      return `<button type="button" class="kg-account ${selected===p.id?'selected':''}" data-kg-account="${e(p.id)}" ${query.trim()?'':`data-reorder-id="${e(p.id)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"`} aria-pressed="${selected===p.id}"><span class="card-head"><span class="drag-grip" aria-hidden="true"></span><span class="avatar">${e(p.username.slice(0,2).toUpperCase())}</span><span class="card-identity"><strong>${e(p.label)}</strong>${p.label!==p.username?`<small>@${e(p.username)}</small>`:''}</span>${p.refreshing?`<span class="card-sync" role="img" aria-label="${t('Đang cập nhật','Refreshing')}"></span>`:''}</span><span class="kg-account-quota ${quotaOld?'kg-stale':''}" title="${e(date(p.quotaAt))}${quotaOld?' · '+t('Dữ liệu cũ','Older data'):''}">${['GPU','TPU'].map(resource=>`<span aria-label="${resource} ${t('còn lại','remaining')}"><span>${resource}</span><b>${hours(p.quota?.find(q=>q.resource===resource)?.remaining)}</b></span>`).join('')}</span>${hint?`<span class="kg-account-hint ${older||quotaOld||p.status==='reauth'?'kg-stale':running||queued?'kg-fresh':''}">${e(hint)}</span>`:''}</button>`;
     }).join('');
     document.querySelectorAll('[data-kg-account]').forEach(el=>el.onclick=()=>{selected=el.dataset.kgAccount;render(data,workspace);});
     detail(rows.find(p=>p.id===selected));applySizes();
@@ -138,7 +145,7 @@ window.padKaggleUI = (() => {
     const opened=box.dataset.account===p.id?new Set([...box.querySelectorAll('details[open]')].map(el=>el.id)):new Set();
     const scroll=box.dataset.account===p.id?new Map([...box.querySelectorAll('[data-kg-scroll]')].map(el=>[el.id,el.scrollTop])):new Map();
     box.dataset.account=p.id;box.setAttribute('aria-label',t('Chi tiết tài khoản Kaggle','Kaggle account details'));
-    const disabled=data.editing||!!data.storeError||p.refreshing,quotaStale=stale(p.quotaAt)||!!p.lastError||!!p.quotaError,notebookStale=stale(p.notebooksAt)||!!p.lastError||!!p.notebooksError;
+    const disabled=!!data.storeError,quotaStale=stale(p.quotaAt)||!!p.lastError||!!p.quotaError,notebookStale=stale(p.notebooksAt)||!!p.lastError||!!p.notebooksError;
     const resources=['GPU','TPU'];
     const quotas=resources.map(resource=>{
       const q=p.quota?.find(q=>q.resource===resource),percent=q?.total>0&&Number.isFinite(q.remaining)?Math.max(0,Math.min(100,q.remaining/q.total*100)):0;
@@ -169,7 +176,7 @@ window.padKaggleUI = (() => {
         ${p.notebooksError?`<p class="kg-inline-error">${e(window.padUI.t(p.notebooksError))}</p>`:''}
         ${group('kg-notebooks-pinned',t('Đã ghim','Pinned'),pinned,true,t('Chưa ghim notebook.','No pinned notebooks.'))}
         ${group('kg-notebooks-recent',t('Gần đây','Recent'),recent,false,t('Chưa có notebook.','No notebooks yet.'))}
-        <details class="kg-management" id="kg-management" ${opened.has('kg-management')?'open':''}><summary>${t('Tùy chọn tài khoản','Account options')}</summary><div class="kg-workspace"><span>${t('Thư mục mở terminal mới','New terminal folder')}</span><code>${e(p.workspace)}</code></div><div class="kg-manage">${button('kg-edit',t('Sửa tên / thư mục','Edit name / folder'),'ghost',disabled)}${button('kg-token',t('Cập nhật token','Update token'),'ghost',disabled)}${button('kg-refresh-one',p.refreshing?t('Đang cập nhật…','Refreshing…'):t('Làm mới tài khoản','Refresh account'),'ghost',disabled)}${button('kg-remove',t('Xóa tài khoản','Remove account'),'ghost danger-text',disabled)}</div></details>
+        <details class="kg-management" id="kg-management" ${opened.has('kg-management')?'open':''}><summary>${t('Tùy chọn tài khoản','Account options')}</summary><div class="kg-workspace"><span>${t('Thư mục mở terminal mới','New terminal folder')}</span><code>${e(p.workspace)}</code></div><div class="kg-manage">${button('kg-edit',t('Sửa tên / thư mục','Edit name / folder'),'ghost',disabled)}${button('kg-token',t('Cập nhật token','Update token'),'ghost',disabled)}${button('kg-refresh-one',p.refreshing?t('Đang cập nhật…','Refreshing…'):t('Làm mới tài khoản','Refresh account'),'ghost',disabled||p.refreshing)}${button('kg-remove',t('Xóa tài khoản','Remove account'),'ghost danger-text',disabled)}</div></details>
       </div>`;
     $('#kg-terminal-copy').onclick=()=>act('kaggleTerminalCopy',{id:p.id},t('Đã sao chép. Dán lệnh vào terminal PowerShell đang mở.','Copied. Paste the command in your existing PowerShell terminal.'));
     $('#kg-terminal-setup').onclick=terminalSetup;

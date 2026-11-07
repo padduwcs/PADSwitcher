@@ -24,7 +24,7 @@ Không chuyển một socket đang làm việc sang backend khác. Khi đổi ch
 kiểm tra tác vụ, giữ các client không liên quan, chặn lượt mới của client đang đổi
 và chỉ ngắt client đó sau khi thiết lập thành công. Client nối lại một lần bằng
 helper cũ. Backend riêng bị lỗi không tự nối sang tài khoản chung. Đổi tài khoản
-trong cùng chế độ vẫn chờ tác vụ của nhóm đó rồi đổi, giữ kết nối và hội thoại.
+trong cùng chế độ có hiệu lực từ lần gọi model tiếp theo, giữ kết nối và hội thoại.
 
 1. PADCodex nối extension/CLI vào App Server chính thức như trước. App Server giữ thread, sandbox, công cụ và approvals.
 2. Chỉ tiến trình backend có `openai_base_url` trỏ đến relay loopback; không sửa cấu hình hay auth chung.
@@ -32,7 +32,8 @@ trong cùng chế độ vẫn chờ tác vụ của nhóm đó rồi đổi, gi�
 4. Relay đọc credential từ kho phiên hiện có, chuyển nguyên body đến `https://chatgpt.com/backend-api/codex/`. Account ID và bearer luôn lấy từ cùng một bundle.
 5. Nếu HTTP 429 có `usage_limit_reached`, chọn tài khoản cá nhân dự phòng theo ưu tiên và gửi lại **cùng byte request**. SSE quota ở đầu luồng cũng có thể đổi trước khi client nhận bất kỳ phần nào.
 6. Khi response đã bắt đầu được chuyển tiếp, không thử tài khoản khác cho response ấy. Phần còn lại do Codex xử lý theo cơ chế lỗi gốc.
-7. Không có `turn/start` thứ hai hoặc input “tiếp tục”. Sau khi hết các lượt đang chạy, native account được đồng bộ với lựa chọn của relay.
+7. Không có `turn/start` thứ hai hoặc input “tiếp tục”. Sau khi hết các lượt đang chạy của backend đó, native account được đồng bộ với lựa chọn của relay.
+8. Mỗi request tới model mang credential của relay, nên chọn tài khoản thủ công đổi relay ngay. Bước đang stream chạy nốt, không bị cắt; lần gọi kế tiếp dùng tài khoản mới với cùng cơ chế như khi hết quota. Việc đổi hoặc đồng bộ tài khoản không chặn `turn/start` của các phiên khác.
 
 ## Ranh giới an toàn
 
@@ -41,10 +42,10 @@ trong cùng chế độ vẫn chờ tác vụ của nhóm đó rồi đổi, gi�
 - Sau text delta hoặc item/tool event đầu tiên, SSE được chuyển tiếp nguyên trạng. Chỉ giữ phần prelude tối đa 128 KiB/5 giây; không đợi toàn bộ câu trả lời, không trộn hai stream.
 - Chỉ nghe `127.0.0.1`, port ngẫu nhiên, URL capability 256 bit đổi mỗi lần khởi động. Kiểm tra Host, bearer có mặt, từ chối Origin và Sec-Fetch-Site; gateway App Server vẫn có capability riêng.
 - Chỉ whitelist endpoint model; không cung cấp proxy URL tùy ý. Upstream production cố định HTTPS. Không theo redirect có thể làm lộ token. HTTP headers lọc, bearer/account luôn ghi đè bằng bundle đúng hồ sơ.
-- Tối đa 16 yêu cầu model đồng thời; body tối đa 64 MiB, decoded body cũng có giới hạn, lỗi upstream tối đa 1 MiB. Chọn dự phòng tối đa 2 phút, toàn yêu cầu tối đa 5 phút. Mỗi tài khoản thử một lần cho quota; credential 401 được refresh đúng hồ sơ một lần.
-- Không tự rotate vì lỗi mạng, 429 chung, 403, 5xx, hoặc chữ quota trong nội dung. Relay không tự retry kết quả chưa rõ; Codex vẫn có hành vi xử lý lỗi/transport của chính nó.
-- Khi người dùng tắt Tự đổi hoặc chọn thủ công, không bắt đầu fallback mới. Ngắt client/stop gateway abort upstream. Tài khoản đang dùng trong các request đều được bảo vệ khỏi xóa/reauth.
-- Relay không ghi prompt, body, token hoặc URL capability vào log/metadata/UI. Codex vẫn lưu lịch sử hội thoại theo cấu hình của người dùng. Metadata chỉ có profile ID, quota/cooldown và lựa chọn; token nằm trong DPAPI và bộ nhớ khi dùng.
+- Tối đa 16 yêu cầu model đồng thời; body tối đa 64 MiB, decoded body cũng có giới hạn, lỗi upstream tối đa 1 MiB. Chọn dự phòng tối đa 2 phút; yêu cầu bị hủy sau 5 phút không có dữ liệu. Mỗi tài khoản thử một lần cho quota; credential 401 được refresh đúng hồ sơ một lần.
+- Không tự rotate vì lỗi mạng, 429 chung, 403, 5xx, hoặc chữ quota trong nội dung. Relay không tự retry kết quả chưa rõ; Codex vẫn dùng đủ cơ chế thử lại mặc định của nó.
+- Khi người dùng tắt Tự đổi, không bắt đầu fallback mới. Nếu đang có lần gọi bị hết quota mà người dùng vừa chọn tài khoản khác, lần gọi đó chuyển sang đúng tài khoản được chọn; request cũ không bao giờ ghi đè lựa chọn mới. Ngắt client/stop gateway abort upstream. Tài khoản đang dùng trong các request đều được bảo vệ khỏi xóa/reauth.
+- Relay không ghi prompt, body, token hoặc URL capability vào log/metadata/UI. `events.jsonl` trong thư mục dữ liệu chỉ giữ loại sự kiện, lý do, mã đóng kết nối và số lượt (tối đa 1 MiB mỗi tệp, một bản xoay vòng) để tra cứu sự cố. Codex vẫn lưu lịch sử hội thoại theo cấu hình của người dùng. Metadata chỉ có profile ID, quota/cooldown và lựa chọn; token nằm trong DPAPI và bộ nhớ khi dùng.
 - Không tự gọi consume reset. Các kiểm thử reset tiếp tục chỉ dùng fixture.
 
 Đây là bảo vệ kỹ thuật của ứng dụng; không phải bảo đảm tài khoản luôn được dịch vụ chấp nhận hoặc không bao giờ thay đổi giới hạn/điều kiện sử dụng. Không thay sandbox/approval để giúp một lần thử thành công.
@@ -66,16 +67,19 @@ Shared account and policy; VS Code/CLI/JetBrains private routes remain separate.
 Native auth is ephemeral and verified before the desktop endpoint becomes ready.
 Desktop MCP uses a user/SYSTEM-only named pipe bound to the current GUI transport.
 
-Uncertain model-step replay is blocked in bounded process memory, keyed by a
-hash of request route, native thread/turn and user/tool/agent-result progress. Partial
-assistant recovery alone cannot authorize another attempt; new user/steering
-input, completed tool results and new agent messages can continue. Agent delivery
+Native retries are never cut short. Repeated uncertain failures of one model step
+are counted in bounded process memory, keyed by a hash of request route, native
+thread/turn and user/tool/agent-result progress, and only attempts past the
+measured native budget (30 with default settings on 0.164, limit 32) are refused.
+Partial assistant recovery alone is not progress; new user/steering input,
+completed tool results and new agent messages start a new count. Agent delivery
 timestamps alone do not count as progress. Explicit HTTP rejection and early SSE
-failure before output retain the native client's retry policy; they are not
-classified as an interrupted accepted stream. The relay itself only rotates on
+failure before output are not counted at all. The relay itself only rotates on
 structured quota rejection. Successful data-only or large
 SSE terminal events are recognized even without a Content-Type header.
 
-Automatic auth synchronization follows the newest routing decision and does not
-block further quota fallback. Slow account/cooldown persistence does not hold the
+Automatic auth synchronization follows the newest routing decision and blocks
+neither further quota fallback nor new turns; each backend syncs when it is idle.
+Model calls use an in-memory access token until shortly before expiry, so they do
+not wait for vault decryption or quota polling, which takes the lock per account. Slow account/cooldown persistence does not hold the
 response stream; metadata is still serialized and flushed on normal shutdown.

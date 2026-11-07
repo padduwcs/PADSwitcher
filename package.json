@@ -1,6 +1,6 @@
 {
   "name": "padswitcher",
-  "version": "1.20.2",
+  "version": "1.21.0",
   "description": "Profile Account Directory Switcher — Codex and Kaggle account manager for Windows",
   "private": true,
   "main": "src/main.cjs",
@@ -45,6 +45,7 @@
     "dist": "electron-builder --win portable",
     "smoke:faults": "node scripts/router-fault-smoke.cjs",
     "smoke:continuity": "node scripts/router-continuity-smoke.cjs",
+    "smoke:switch": "node scripts/router-switch-smoke.cjs",
     "smoke:desktop": "node scripts/desktop-protocol-smoke.cjs",
     "smoke:desktop:app": "node scripts/desktop-protocol-smoke.cjs --installed-desktop",
     "smoke:executables": "node scripts/windows-executable-smoke.cjs",

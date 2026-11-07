@@ -44,7 +44,7 @@ From 1.20.1, desktop launch checks startup policy and waits for a verified
 connection before reporting success. Open **Connections → Codex in desktop**. Save work and fully quit
 the existing desktop for the first connection, then choose **Open desktop through
 PADSwitcher**. Wait for **Connected** and reopen the existing Codex chat. Later
-account switches wait for active turns and keep the same window/history. Desktop
+account switches apply from the next model request and keep the same window/history. Desktop
 uses the Shared account and policy. Choose the conversation folder if it is
 outside `~/.codex`; quit desktop before disconnecting. Regular ChatGPT history
 does not transfer between accounts.

@@ -48,8 +48,10 @@ const jwt=p=>Buffer.from('{}').toString('base64url')+'.'+Buffer.from(JSON.string
       for(let i=0;i<450&&!status;i++)await pause(100);
       if(!status){await rpc.request('turn/interrupt',{threadId:thread.id,turnId});await pause(200);}
       const count=counts.get(scenario)||0;console.log(JSON.stringify({scenario,requests:count,status}));
-      const retryable=['status503','failed-sse'].includes(scenario);
-      assert.equal(count,retryable?2:1,scenario+' must preserve native retry for definite rejection and stop uncertain replay');assert.equal(status,scenario.startsWith('success')||retryable?'completed':'failed');
+      // Native default budget on 0.164: PADSwitcher must pass every attempt through.
+      const expected={status503:2,'failed-sse':2,drop:30,'idle-timeout':30,partial:6,eof:6}[scenario]||1,recovered=['status503','failed-sse'].includes(scenario);
+      assert.equal(count,expected,scenario+' must follow the native retry budget exactly');
+      assert.equal(status,scenario.startsWith('success')||recovered?'completed':'failed');
       await pause(200);
     }
     assert.equal(counts.get('idle')||0,0);await pause(500);console.log('Native fault checks completed without real model inference.');

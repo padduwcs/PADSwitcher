@@ -7,6 +7,10 @@ const zlib=require('node:zlib');
 const {exhaustedSnapshot}=require('./recovery.cjs');
 const {createUsage,observeUsage}=require('./model-usage.cjs');
 const MAX_BODY=64*1024*1024,MAX_PEEK=128*1024,MAX_ERROR=1024*1024;
+// Native Codex 0.164 repeats one step up to 30 times with default settings (5 × 6,
+// measured in VALIDATION.md). This limit sits above that budget: it stops only a
+// runaway loop and must never cut native retries short.
+const UNCERTAIN_ATTEMPT_LIMIT=32;
 const ROUTES=new Map([['responses','POST'],['responses/compact','POST'],['responses/lite','POST'],['models','GET'],['web_search','POST']]);
 const PRELUDE=new Set(['response.created','response.in_progress','response.queued']);
 function quotaError(value){const e=value?.error||value?.response?.error;return !!e&&[e.type,e.code].includes('usage_limit_reached');}
@@ -31,7 +35,7 @@ function outgoingHeaders(incoming,bundle){
   return headers;
 }
 class ModelRouter {
-  constructor(gateway,options={}){this.g=gateway;this.options=options;this.requests=new Set();this.used=new Map();this.turnStates=new Map();this.failedRequests=new Set();this.usage=createUsage();this.epoch=0;this.profileId=null;this.active=0;}
+  constructor(gateway,options={}){this.g=gateway;this.options=options;this.requests=new Set();this.used=new Map();this.turnStates=new Map();this.failedRequests=new Map();this.usage=createUsage();this.epoch=0;this.selection=0;this.profileId=null;this.active=0;this.inferring=0;}
   async start(){
     const upstream=new URL(this.options.upstream||'https://chatgpt.com/backend-api/codex/');
     if(!this.options.allowTestUpstream&&(upstream.protocol!=='https:'||upstream.hostname!=='chatgpt.com'||upstream.pathname!=='/backend-api/codex/'))throw Error('Invalid model upstream');
@@ -54,7 +58,10 @@ class ModelRouter {
   cancel(){this.epoch++;for(const controller of this.requests)controller.abort();}
   async stop(){this.cancel();this.turnStates.clear();this.failedRequests.clear();if(!this.server)return;this.server.closeAllConnections();await new Promise(r=>this.server.close(r));this.server=null;this.capability=null;this.baseUrl=null;this.profileId=null;}
   note(type,message,from=null,to=null){this.g.recovery.note(type,message,from,to);}
-  select(id){this.profileId=id;}
+  log(type,fields){this.g.log?.(type,fields);}
+  // A user choice applies from the next model call. `selection` marks it so that
+  // older in-flight requests can never route the account back.
+  select(id){this.profileId=id;this.selection++;}
   isUsing(id){return this.profileId===id||this.used.has(id);}
   turnState(token){
     if(typeof token!=='string'||!token||token.length>16384)return null;
@@ -85,8 +92,8 @@ class ModelRouter {
     while(this.turnStates.size>1024)this.turnStates.delete(this.turnStates.keys().next().value);
   }
   persist(message){Promise.resolve().then(()=>this.g.service.save()).catch(()=>this.note('error',message));}
-  routeSelected(id){
-    if(this.profileId===id||(this.g.service.state.quotaCooldowns?.[id]||0)>Date.now())return;
+  routeSelected(id,selection){
+    if(this.selection!==selection||this.profileId===id||(this.g.service.state.quotaCooldowns?.[id]||0)>Date.now())return;
     const from=this.profileId||this.g.profileId;this.profileId=id;
     this.g.service.state.gatewayProfileId=id;
     this.persist('Không lưu được tài khoản đã đổi; phiên hiện tại vẫn tiếp tục.');
@@ -95,7 +102,7 @@ class ModelRouter {
   }
   candidates(first,attempted){
     const g=this.g,policy=g.service.state.autoSwitch||{enabled:false,order:[]};
-    if(!policy.enabled||!personalProfile(g.service.state.profiles.find(p=>p.id===first)))return attempted.size?[]:[first];
+    if(!policy.enabled||!personalProfile(g.service.state.profiles.find(p=>p.id===first)))return attempted.has(first)?[]:[first];
     return [...new Set([first,...policy.order])].filter(id=>!attempted.has(id)&&g.service.state.profiles.some(p=>p.id===id&&personalProfile(p)&&p.status!=='reauth'&&!g.service.running.has(id)&&!exhaustedSnapshot(p,Date.now()))&&(g.service.state.quotaCooldowns?.[id]||0)<=Date.now());
   }
   cooldown(id,value){
@@ -123,20 +130,27 @@ class ModelRouter {
     }else hash.update(bytes);
     return hash.digest('hex');
   }
-  blockReplay(key){if(!key)return;this.failedRequests.add(key);while(this.failedRequests.size>1024)this.failedRequests.delete(this.failedRequests.values().next().value);}
+  recordUncertain(key){
+    if(!key)return 0;
+    const attempts=(this.failedRequests.get(key)||0)+1;this.failedRequests.delete(key);this.failedRequests.set(key,attempts);
+    while(this.failedRequests.size>1024)this.failedRequests.delete(this.failedRequests.keys().next().value);
+    return attempts;
+  }
   error(res,status,code,message){if(!res.headersSent){res.writeHead(status,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({error:{type:code,code,message}}));}else res.destroy();}
   async handle(req,res){
     if(!this.authorized(req)){this.error(res,401,'unauthorized','Local model connection rejected.');return;}
     const suffix=req.url.slice(this.capability.length+2),route=suffix.split('?')[0];
     if(!ROUTES.has(route)||req.method!==ROUTES.get(route)){this.error(res,404,'not_found','Unsupported model route.');return;}
     if(this.active>=16){this.error(res,503,'router_busy','Too many model requests.');return;}
-    const controller=new AbortController(),epoch=this.epoch;this.requests.add(controller);this.active++;
-    res.once('close',()=>{if(!res.writableFinished)controller.abort();});
+    // `active` includes catalog reads. Only `inferring` means model work is running.
+    const inference=req.method==='POST'&&route.startsWith('responses'),controller=new AbortController(),epoch=this.epoch;this.requests.add(controller);this.active++;if(inference)this.inferring++;
+    let abortReason=null;const abort=reason=>{abortReason??=reason;controller.abort();};
+    res.once('close',()=>{if(!res.writableFinished)abort('client_closed');});
     controller.signal.addEventListener('abort',()=>res.destroy(),{once:true});
     // Timeout inactivity, not total generation time. Cutting off a healthy long
     // stream can make native Codex retry inference that already consumed quota.
-    let timer;const touch=()=>{clearTimeout(timer);timer=setTimeout(()=>controller.abort(),this.options.idleTimeoutMs||300000);};touch();
-    let bytes=Buffer.alloc(0),requestKey=null,inferenceStarted=false,sse=false,streamCompleted=false,streamFailed=false;const used=new Set();
+    let timer;const touch=()=>{clearTimeout(timer);timer=setTimeout(()=>abort('idle_timeout'),this.options.idleTimeoutMs||300000);};touch();
+    let bytes=Buffer.alloc(0),requestKey=null,inferenceStarted=false,sse=false,streamCompleted=false,streamFailed=false,transportFailed=false,accepted=false;const used=new Set();
     try{
       const chunks=[];let size=0;
       for await(const chunk of req){touch();size+=chunk.length;if(size>MAX_BODY){this.error(res,413,'request_too_large','Model request is too large.');return;}chunks.push(chunk);}
@@ -145,12 +159,13 @@ class ModelRouter {
         try{body=decodeRequest(bytes,req.headers['content-encoding']);}catch{this.error(res,400,'invalid_request','Invalid model request.');return;}
       }
       const track=req.method==='POST'&&route.startsWith('responses');
-      if(track){requestKey=this.requestKey(req,route,bytes,body);if(this.failedRequests.has(requestKey)){this.usage.blockedReplays++;this.note('blocked','Kết nối bị ngắt ở bước trước. Đã dừng gửi lặp bước đó để tránh tốn quota; bạn có thể nhắn tiếp trong cùng chat.');this.error(res,400,'model_replay_blocked','The previous model step was interrupted. Automatic retry stopped to avoid duplicate usage. Send a new message in this chat to continue.');return;}}
+      if(track){requestKey=this.requestKey(req,route,bytes,body);if((this.failedRequests.get(requestKey)||0)>=(this.options.uncertainAttemptLimit||UNCERTAIN_ATTEMPT_LIMIT)){this.usage.blockedReplays++;this.log('model_replay_blocked',{route});this.note('blocked','Bước này đã lỗi nhiều lần liên tiếp vượt mức thử lại của Codex. Đã dừng gửi lặp để tránh tốn quota; bạn có thể nhắn tiếp trong cùng chat.');this.error(res,400,'model_replay_blocked','This model step kept failing beyond the native retry budget. Automatic retry stopped to avoid unbounded usage. Send a new message in this chat to continue.');return;}}
       const observe=track?observeUsage(this.usage,ok=>{if(ok)streamCompleted=true;else streamFailed=true;}):()=>{};
       if(track){this.usage.requests++;this.usage.lastModel=typeof body?.model==='string'&&/^[a-z0-9_.-]{1,80}$/i.test(body.model)?body.model:null;this.usage.lastEffort=['none','minimal','low','medium','high','xhigh','max'].includes(body?.reasoning?.effort)?body.reasoning.effort:null;}
       const canReplay=replayable(body),attempted=new Set(),deadline=Date.now()+120000;
-      let first=this.profileId||this.g.profileId,lastQuota=null;
+      let first=this.profileId||this.g.profileId,lastQuota=null,selection=this.selection;
       while(!controller.signal.aborted&&epoch===this.epoch){
+        if(selection!==this.selection){first=this.profileId;selection=this.selection;}
         const id=this.candidates(first,attempted)[0];
         if(!id||Date.now()>deadline){
           if(lastQuota){this.note('exhausted','Không còn tài khoản dự phòng khả dụng.');this.error(res,429,'usage_limit_reached','No available fallback account.');}
@@ -163,6 +178,8 @@ class ModelRouter {
         for(;;){
           const bundle=await this.g.bundle(id,refreshed);
           if(controller.signal.aborted||epoch!==this.epoch)return;
+          // Nothing was sent yet: honour a user choice made during the lookup.
+          if(selection!==this.selection&&this.profileId!==id){attempted.delete(id);break;}
           if(!['free','plus','pro'].includes(String(bundle.chatgptPlanType||'').toLowerCase())){
             if(id!==first){this.note('skipped','Bỏ qua tài khoản dự phòng chưa xác định là tài khoản cá nhân.',first,id);break;}
             this.note('blocked','Bộ định tuyến hiện hỗ trợ tài khoản cá nhân Free, Plus và Pro. Tài khoản tổ chức cần luồng kết nối riêng.');
@@ -187,26 +204,31 @@ class ModelRouter {
             sse=true;
             const peek=await this.peek(response,controller,touch);prefix=peek.prefix;quota=peek.quota;streamReader=peek.reader;
             if(quota||peek.rejected)inferenceStarted=false;
-            if(!quota){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);await this.forward(response,res,prefix,peek.reader,touch,observe);return;}
+            if(!quota){this.rememberTurnState(response,id,req.headers);this.routeSelected(id,selection);accepted=true;await this.forward(response,res,prefix,peek.reader,touch,observe);return;}
           }
           const personal=personalProfile(this.g.service.state.profiles.find(p=>p.id===first))&&['free','plus','pro'].includes(String(bundle.chatgptPlanType||'').toLowerCase());
-          const manualChange=(this.g.pendingId||this.g.changing)&&this.g.pendingSource!=='route';
-          if(quota&&this.g.service.state.autoSwitch?.enabled&&personal&&!manualChange&&canReplay&&epoch===this.epoch){
+          // A user's newer choice is explicit consent to move this rejected request.
+          const moved=selection!==this.selection;
+          if(quota&&(this.g.service.state.autoSwitch?.enabled||moved)&&personal&&canReplay&&epoch===this.epoch){
             await this.cooldown(id,quota);lastQuota=quota;
             this.note('retrying','Hết quota: đang thử tài khoản dự phòng cho cùng lần gọi model.',id);
             break;
           }
           if(quota&&!canReplay)this.note('blocked','Yêu cầu dùng trạng thái riêng của tài khoản; không tự phát lại.');
           if(quota&&this.g.service.state.autoSwitch?.enabled&&!personal)this.note('blocked','Tự đổi chỉ hỗ trợ tài khoản cá nhân Free, Plus và Pro đã xác định.');
-          if(response.ok){this.rememberTurnState(response,id,req.headers);await this.routeSelected(id);}
+          if(response.ok){this.rememberTurnState(response,id,req.headers);this.routeSelected(id,selection);accepted=true;}
           await this.forward(response,res,prefix,streamReader,touch,observe);return;
         }
       }
     }catch{
-      if(inferenceStarted&&!streamCompleted)this.blockReplay(requestKey);
-      if(!controller.signal.aborted)this.note('error','Lần gọi model bị lỗi kết nối; không tự phát lại.');
+      transportFailed=true;
+      if(!controller.signal.aborted)this.note('error','Lần gọi model bị lỗi kết nối; Codex sẽ xử lý theo cơ chế gốc.');
       this.error(res,502,'model_transport_error','Model connection failed. No automatic replay was performed.');
-    }finally{if(inferenceStarted&&!streamCompleted&&(controller.signal.aborted||sse||streamFailed))this.blockReplay(requestKey);clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
+    }finally{
+      const uncertain=inferenceStarted&&!streamCompleted&&(transportFailed||controller.signal.aborted||sse||streamFailed);
+      if(uncertain){const reason=abortReason||(transportFailed?'upstream_transport':streamFailed?'stream_failed':'stream_ended_early');this.log('model_step_uncertain',{route,reason,attempt:this.recordUncertain(requestKey)});}
+      else if(streamCompleted||accepted)this.failedRequests.delete(requestKey);
+      clearTimeout(timer);bytes.fill(0);this.requests.delete(controller);this.active--;if(inference)this.inferring--;for(const id of used){const count=this.used.get(id)-1;if(count)this.used.set(id,count);else this.used.delete(id);}this.g.changed();this.g.syncRoute?.();}
   }
   async peek(response,controller,touch=()=>{}){
     const reader=response.body.getReader(),prefix=[],decoder=new TextDecoder();let text='',parsed=0,size=0;
@@ -261,4 +283,4 @@ class ModelRouter {
     res.end();
   }
 }
-module.exports={ModelRouter,quotaError,replayable,decodeRequest,outgoingHeaders};
+module.exports={ModelRouter,quotaError,replayable,decodeRequest,outgoingHeaders,UNCERTAIN_ATTEMPT_LIMIT};
